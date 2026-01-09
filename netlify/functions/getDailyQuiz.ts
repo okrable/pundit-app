@@ -15,6 +15,17 @@ interface QuizQuestion {
   player_3: string | null;
 }
 
+const dbInfo = await query<{ current_database: string; current_schema: string }>(
+  'SELECT current_database() AS current_database, current_schema() AS current_schema'
+);
+console.log('DB info', dbInfo[0]);
+
+const tables = await query<{ table_schema: string; table_name: string }>(
+  "SELECT table_schema, table_name FROM information_schema.tables WHERE table_name = 'pu_player_ques'"
+);
+console.log('Tables', tables);
+
+
 export const handler: Handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
