@@ -45,7 +45,7 @@ export const handler: Handler = async (event) => {
     );
     console.log('Tables', tables);
 
-    const { date, language = 'en' } = event.queryStringParameters || {};
+    const { date, language = 'uk' } = event.queryStringParameters || {};
     // Uses UTC date; mismatch with local-date data can return no rows.
     const targetDate = date || new Date().toISOString().split('T')[0];
     console.log('Quiz query params', { targetDate, language });
