@@ -39,7 +39,7 @@ export const handler: Handler = async (event) => {
     const targetDate = date || new Date().toISOString().split('T')[0];
 
     const questions = await query<QuizQuestion>(
-      `SELECT * FROM public.pu_player_ques
+      `SELECT * FROM pu_player_ques
        WHERE date = $1 AND language = $2
        ORDER BY rank ASC
        LIMIT 5`,
