@@ -46,7 +46,9 @@ export const handler: Handler = async (event) => {
     console.log('Tables', tables);
 
     const { date, language = 'en' } = event.queryStringParameters || {};
+    // Uses UTC date; mismatch with local-date data can return no rows.
     const targetDate = date || new Date().toISOString().split('T')[0];
+    console.log('Quiz query params', { targetDate, language });
 
     const questions = await query<QuizQuestion>(
       `SELECT * FROM pu_player_ques
@@ -55,6 +57,7 @@ export const handler: Handler = async (event) => {
        LIMIT 5`,
       [targetDate, language]
     );
+    console.log('Quiz rows', questions.length);
 
     if (questions.length === 0) {
       return {
