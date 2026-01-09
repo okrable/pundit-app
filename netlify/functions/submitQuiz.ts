@@ -46,12 +46,13 @@ export const handler: Handler = async (event) => {
     const correctAnswers = await query<{
       question_id: string;
       player_id: string;
+      player_name: string;
       player_0: string;
       player_1: string;
       player_2: string;
       player_3: string;
     }>(
-      `SELECT question_id, player_id, player_0, player_1, player_2, player_3
+      `SELECT question_id, player_id, player_name, player_0, player_1, player_2, player_3
        FROM public.pu_player_ques
        WHERE question_id = ANY($1)`,
       [questionIds]
@@ -70,8 +71,8 @@ export const handler: Handler = async (event) => {
         };
       }
 
-      const options = [correct.player_0, correct.player_1, correct.player_2, correct.player_3];
-      const correctIndex = options.findIndex((opt) => opt === correct.player_id);
+      const options = [correct.player_0, correct.player_1, correct.player_2, correct.player_3].filter(Boolean);
+      const correctIndex = options.findIndex((opt) => opt === correct.player_name);
       const isCorrect = userAnswer.selectedOptionIndex === correctIndex;
 
       if (isCorrect) {

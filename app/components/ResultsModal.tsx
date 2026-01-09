@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { QuizResult } from '../types';
+import { theme } from '../theme/theme';
 
 interface ResultsModalProps {
   visible: boolean;
@@ -14,11 +15,7 @@ export default function ResultsModal({ visible, result, onClose }: ResultsModalP
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.contentContainer}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.contentContainer}>
           <View style={styles.header}>
             <Text style={styles.title}>Quiz Complete!</Text>
             <Text style={styles.subtitle}>Here's how you did</Text>
@@ -46,22 +43,16 @@ export default function ResultsModal({ visible, result, onClose }: ResultsModalP
           <View style={styles.answersSection}>
             <Text style={styles.answersTitle}>Answer Breakdown</Text>
             {result.answers.map((answer, index) => (
-              <View
-                key={answer.questionId}
-                style={[
-                  styles.answerItem,
-                  answer.isCorrect ? styles.answerCorrect : styles.answerIncorrect,
-                ]}
-              >
+              <View key={answer.questionId} style={styles.answerItem}>
                 <View style={styles.answerHeader}>
                   <Text style={styles.answerNumber}>Question {index + 1}</Text>
                   <Text
                     style={[
-                      styles.answerBadge,
-                      answer.isCorrect ? styles.answerBadgeCorrect : styles.answerBadgeIncorrect,
+                      styles.answerIcon,
+                      answer.isCorrect ? styles.answerIconCorrect : styles.answerIconIncorrect,
                     ]}
                   >
-                    {answer.isCorrect ? 'Correct' : 'Incorrect'}
+                    {answer.isCorrect ? '⚽️' : '❌'}
                   </Text>
                 </View>
               </View>
@@ -71,7 +62,7 @@ export default function ResultsModal({ visible, result, onClose }: ResultsModalP
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>Continue</Text>
           </TouchableOpacity>
-        </ScrollView>
+        </View>
       </View>
     </Modal>
   );
@@ -80,96 +71,102 @@ export default function ResultsModal({ visible, result, onClose }: ResultsModalP
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollView: {
-    flex: 1,
+    backgroundColor: theme.colors.background,
   },
   contentContainer: {
-    padding: 16,
-    paddingTop: 32,
-    paddingBottom: 48,
+    flex: 1,
+    padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xl,
+    paddingBottom: theme.spacing.lg,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: theme.spacing.lg,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 8,
+    fontSize: 23,
+    fontFamily: theme.fonts.gothamBlack,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#8E8E93',
+    fontSize: 14,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
   },
   scoreCard: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   scoreLabel: {
     fontSize: 14,
-    color: '#8E8E93',
-    marginBottom: 8,
+    color: theme.colors.mediumGray,
+    marginBottom: theme.spacing.sm,
+    fontFamily: theme.fonts.gothamBook,
   },
   scoreValue: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 4,
+    fontSize: 37,
+    fontFamily: theme.fonts.gothamBlack,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.xs,
   },
   scorePercentage: {
-    fontSize: 20,
-    color: '#8E8E93',
+    fontSize: 14,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamMedium,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 32,
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   statItem: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginBottom: 4,
+    fontSize: 13,
+    color: theme.colors.mediumGray,
+    marginBottom: theme.spacing.xs,
+    fontFamily: theme.fonts.gothamBook,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
+    fontSize: 21,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
   },
   answersSection: {
-    marginBottom: 24,
+    marginBottom: theme.spacing.lg,
   },
   answersTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 16,
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.md,
   },
   answerItem: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 2,
-  },
-  answerCorrect: {
-    backgroundColor: '#E8F5E9',
-    borderColor: '#4CAF50',
-  },
-  answerIncorrect: {
-    backgroundColor: '#FFEBEE',
-    borderColor: '#F44336',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.lightGray,
   },
   answerHeader: {
     flexDirection: 'row',
@@ -178,33 +175,33 @@ const styles = StyleSheet.create({
   },
   answerNumber: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.textDark,
   },
-  answerBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+  answerIcon: {
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamMedium,
   },
-  answerBadgeCorrect: {
-    backgroundColor: '#4CAF50',
-    color: '#FFF',
+  answerIconCorrect: {
+    color: theme.colors.correct,
   },
-  answerBadgeIncorrect: {
-    backgroundColor: '#F44336',
-    color: '#FFF',
+  answerIconIncorrect: {
+    color: theme.colors.incorrect,
   },
   closeButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   closeButtonText: {
-    color: '#FFF',
+    color: theme.colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.gothamMedium,
   },
 });

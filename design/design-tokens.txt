@@ -1,0 +1,6 @@
+Colours:
+- Background: #F9F6ED
+- Primary: #34855b
+- Accent: #d07158
+- Text dark: #2f2926
+- Neutral dark: #333

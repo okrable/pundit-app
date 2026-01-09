@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Question } from '../types';
+import { theme } from '../theme/theme';
 
 interface QuestionCardProps {
   question: Question;
-  questionNumber: number;
   selectedOption: number | null;
   onSelectOption: (optionIndex: number) => void;
   disabled?: boolean;
@@ -12,14 +12,12 @@ interface QuestionCardProps {
 
 export default function QuestionCard({
   question,
-  questionNumber,
   selectedOption,
   onSelectOption,
   disabled = false,
 }: QuestionCardProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.questionNumber}>Question {questionNumber}</Text>
       <Text style={styles.prompt}>{question.prompt}</Text>
       <View style={styles.optionsContainer}>
         {question.options.map((option, index) => (
@@ -49,39 +47,52 @@ export default function QuestionCard({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
-  },
-  questionNumber: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginBottom: 4,
+    backgroundColor: theme.colors.white,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   prompt: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#000',
+    fontSize: 18,
+    fontFamily: theme.fonts.gothamBook,
+    marginBottom: theme.spacing.md,
+    color: theme.colors.textDark,
+    lineHeight: 24,
   },
   optionsContainer: {
-    gap: 8,
+    gap: theme.spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   optionButton: {
-    backgroundColor: '#F2F2F7',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    backgroundColor: theme.colors.background,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.lightGray,
+    width: '48%',
+    minHeight: 44,
+    justifyContent: 'center',
   },
   optionButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   optionText: {
-    fontSize: 14,
-    color: '#000',
+    fontSize: 15,
+    color: theme.colors.textDark,
+    fontFamily: theme.fonts.gothamBook,
+    textAlign: 'center',
   },
   optionTextSelected: {
-    color: '#FFF',
-    fontWeight: '600',
+    color: theme.colors.white,
+    fontFamily: theme.fonts.gothamMedium,
   },
 });

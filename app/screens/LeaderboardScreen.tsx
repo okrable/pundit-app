@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LeaderboardEntry } from '../types';
 import { getLeaderboard } from '../services/api';
+import { theme } from '../theme/theme';
 
 export default function LeaderboardScreen() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -44,7 +45,7 @@ export default function LeaderboardScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Loading leaderboard...</Text>
         </View>
       </SafeAreaView>
@@ -85,83 +86,93 @@ export default function LeaderboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: theme.spacing.lg,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#8E8E93',
+    marginTop: theme.spacing.md,
+    fontSize: 14,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
   },
   errorText: {
-    fontSize: 16,
-    color: '#FF3B30',
+    fontSize: 14,
+    color: theme.colors.incorrect,
     textAlign: 'center',
+    fontFamily: theme.fonts.gothamBook,
   },
   header: {
-    padding: 16,
-    paddingBottom: 8,
+    padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 4,
+    fontSize: 24,
+    fontFamily: theme.fonts.gothamBlack,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: 13,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
   },
   listContainer: {
-    padding: 16,
-    paddingTop: 8,
+    padding: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
   },
   leaderboardItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    backgroundColor: theme.colors.white,
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   rankContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#007AFF',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: theme.spacing.md,
   },
   rank: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+    color: theme.colors.white,
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBold,
   },
   playerInfo: {
     flex: 1,
   },
   playerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
+    fontSize: 15,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.xs,
   },
   playerStats: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: 12,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
   },
   emptyContainer: {
-    padding: 32,
+    padding: theme.spacing.xxl,
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
-    color: '#8E8E93',
+    fontSize: 14,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
   },
 });

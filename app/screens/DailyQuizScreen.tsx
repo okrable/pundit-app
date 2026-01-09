@@ -6,6 +6,7 @@ import ResultsModal from '../components/ResultsModal';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
+import { theme } from '../theme/theme';
 
 export default function DailyQuizScreen() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -44,7 +45,6 @@ export default function DailyQuizScreen() {
     currentQuestion && answers[currentQuestion.id] !== undefined
       ? answers[currentQuestion.id]
       : null;
-  const isFirstQuestion = currentQuestionIndex === 0;
   const isLastQuestion = totalQuestions > 0 && currentQuestionIndex === totalQuestions - 1;
   const canAdvance = currentQuestion && answers[currentQuestion.id] !== undefined;
 
@@ -68,10 +68,6 @@ export default function DailyQuizScreen() {
   const goToNextQuestion = () => {
     if (!quiz) return;
     setCurrentQuestionIndex((prev) => Math.min(prev + 1, quiz.questions.length - 1));
-  };
-
-  const goToPreviousQuestion = () => {
-    setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
   };
 
   if (loading) {
@@ -116,54 +112,44 @@ export default function DailyQuizScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Daily Quiz</Text>
-          <Text style={styles.subtitle}>Answer all 5 questions</Text>
+          <Text style={styles.subtitle}>Question {currentQuestionIndex + 1} of {totalQuestions}</Text>
+          <Text style={styles.subtitle}>SCORE: 0</Text>
         </View>
 
         {currentQuestion && (
           <QuestionCard
             key={currentQuestion.id}
             question={currentQuestion}
-            questionNumber={currentQuestionIndex + 1}
             selectedOption={currentAnswer}
             onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
           />
         )}
 
-        <View style={styles.navigationRow}>
+      </ScrollView>
+
+      <View style={styles.bottomAction}>
+        {!isLastQuestion ? (
           <TouchableOpacity
-            style={[styles.navButton, isFirstQuestion && styles.navButtonDisabled]}
-            onPress={goToPreviousQuestion}
-            disabled={isFirstQuestion}
+            style={[styles.primaryActionButton, !canAdvance && styles.navButtonDisabled]}
+            onPress={goToNextQuestion}
+            disabled={!canAdvance}
           >
-            <Text style={[styles.navButtonText, isFirstQuestion && styles.navButtonTextDisabled]}>
-              Previous
+            <Text style={[styles.primaryActionText, !canAdvance && styles.navButtonTextDisabled]}>
+              Next
             </Text>
           </TouchableOpacity>
-
-          {!isLastQuestion ? (
-            <TouchableOpacity
-              style={[styles.navButton, !canAdvance && styles.navButtonDisabled]}
-              onPress={goToNextQuestion}
-              disabled={!canAdvance}
-            >
-              <Text style={[styles.navButtonText, !canAdvance && styles.navButtonTextDisabled]}>
-                Next
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.submitButton, !allQuestionsAnswered && styles.submitButtonDisabled]}
-              onPress={handleSubmit}
-              disabled={!allQuestionsAnswered}
-            >
-              <Text style={[styles.submitButtonText, !allQuestionsAnswered && styles.submitButtonTextDisabled]}>
-                Submit Answers
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </ScrollView>
+        ) : (
+          <TouchableOpacity
+            style={[styles.submitButton, !allQuestionsAnswered && styles.submitButtonDisabled]}
+            onPress={handleSubmit}
+            disabled={!allQuestionsAnswered}
+          >
+            <Text style={[styles.submitButtonText, !allQuestionsAnswered && styles.submitButtonTextDisabled]}>
+              Submit Answers
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {result && <ResultsModal visible={true} result={result} onClose={handleCloseResults} />}
     </SafeAreaView>
@@ -173,96 +159,101 @@ export default function DailyQuizScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: theme.spacing.lg,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#8E8E93',
+    marginTop: theme.spacing.md,
+    fontSize: 14,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
   },
   errorText: {
-    fontSize: 16,
-    color: '#FF3B30',
+    fontSize: 14,
+    color: theme.colors.incorrect,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing.lg,
+    fontFamily: theme.fonts.gothamBook,
   },
   retryButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.sm,
   },
   retryButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: theme.colors.white,
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamMedium,
   },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: theme.spacing.md,
+    paddingBottom: theme.spacing.xxl,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: theme.spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 4,
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamBlack,
+    color: theme.colors.textDark,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: 11,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
   },
   submitButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.sm,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: theme.spacing.sm,
   },
   submitButtonDisabled: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: theme.colors.lightGray,
   },
   submitButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: theme.colors.white,
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamMedium,
   },
   submitButtonTextDisabled: {
-    color: '#8E8E93',
+    color: theme.colors.mediumGray,
   },
-  navigationRow: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  navButton: {
-    flex: 1,
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 12,
+  bottomAction: {
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
     alignItems: 'center',
   },
-  navButtonDisabled: {
-    backgroundColor: '#E5E5EA',
+  primaryActionButton: {
+    backgroundColor: theme.colors.accent,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.sm,
+    alignItems: 'center',
+    minWidth: 220,
   },
-  navButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
+  navButtonDisabled: {
+    backgroundColor: theme.colors.lightGray,
+  },
+  primaryActionText: {
+    color: theme.colors.white,
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamMedium,
   },
   navButtonTextDisabled: {
-    color: '#8E8E93',
+    color: theme.colors.mediumGray,
   },
 });

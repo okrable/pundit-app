@@ -1,8 +1,10 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import DailyQuizScreen from '../screens/DailyQuizScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import { theme } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
 
@@ -11,24 +13,55 @@ export default function BottomTabNavigator() {
     <Tab.Navigator
       screenOptions={{
         headerShown: true,
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        headerStyle: {
+          backgroundColor: theme.colors.accent,
+        },
+        headerTintColor: theme.colors.white,
+        headerTitleStyle: {
+          fontFamily: theme.fonts.gothamBlack,
+          fontSize: 18,
+        },
+        tabBarActiveTintColor: theme.colors.accent,
+        tabBarInactiveTintColor: theme.colors.mediumGray,
+        tabBarStyle: {
+          backgroundColor: theme.colors.white,
+          borderTopColor: theme.colors.lightGray,
+        },
+        tabBarLabelStyle: {
+          fontFamily: theme.fonts.gothamMedium,
+          fontSize: 11,
+        },
       }}
     >
       <Tab.Screen
         name="Games"
         component={DailyQuizScreen}
-        options={{ title: 'Daily Quiz' }}
+        options={{
+          title: 'Quiz',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="football-outline" color={color} size={size} />
+          ),
+        }}
       />
       <Tab.Screen
         name="League Tables"
         component={LeaderboardScreen}
-        options={{ title: 'Leaderboard' }}
+        options={{
+          title: 'League Tables',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trophy-outline" color={color} size={size} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{ title: 'Settings' }}
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" color={color} size={size} />
+          ),
+        }}
       />
     </Tab.Navigator>
   );

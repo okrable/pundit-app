@@ -1,10 +1,13 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AuthSession from 'expo-auth-session';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAuthRequest, auth0Config } from '../services/auth0';
+import { theme } from '../theme/theme';
+
+const DONATION_URL = process.env.DONATION_URL || 'https://www.buymeacoffee.com';
 
 export default function SettingsScreen() {
   const { userStats, userId, fetchUserStats } = useQuizStore();
@@ -81,6 +84,10 @@ export default function SettingsScreen() {
     logout();
   };
 
+  const handleDonation = () => {
+    Linking.openURL(DONATION_URL);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.contentContainer}>
@@ -153,6 +160,14 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Support</Text>
+          <TouchableOpacity style={styles.donationButton} onPress={handleDonation}>
+            <Text style={styles.donationButtonText}>🥧 Buy Me a Half Time Pie</Text>
+            <Text style={styles.donationSubtext}>Support the development of this app</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
           <View style={styles.infoCard}>
             <Text style={styles.infoText}>Pundit Trivia v0.1</Text>
@@ -167,117 +182,166 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   contentContainer: {
-    padding: 16,
+    padding: theme.spacing.lg,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: theme.spacing.xl,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 4,
+    fontSize: 24,
+    fontFamily: theme.fonts.gothamBlack,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: 13,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: theme.spacing.xl,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 12,
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.md,
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: theme.spacing.md,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginBottom: 8,
+    fontSize: 11,
+    color: theme.colors.mediumGray,
+    marginBottom: theme.spacing.sm,
     textAlign: 'center',
+    fontFamily: theme.fonts.gothamBook,
   },
   statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontSize: 24,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.primary,
   },
   infoCard: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   infoText: {
-    fontSize: 14,
-    color: '#000',
-    fontFamily: 'monospace',
+    fontSize: 13,
+    color: theme.colors.textDark,
+    fontFamily: theme.fonts.gothamBook,
   },
   infoSubtext: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginTop: 4,
+    fontSize: 12,
+    color: theme.colors.mediumGray,
+    marginTop: theme.spacing.xs,
+    fontFamily: theme.fonts.gothamBook,
   },
   authCard: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   userInfo: {
-    marginBottom: 12,
+    marginBottom: theme.spacing.md,
   },
   userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
+    fontSize: 15,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.xs,
   },
   userEmail: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: 13,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
   },
   loginButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.md,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   loginButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: theme.colors.white,
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamMedium,
   },
   logoutButton: {
-    backgroundColor: '#FFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    backgroundColor: theme.colors.white,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.sm,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FF3B30',
+    borderColor: theme.colors.incorrect,
   },
   logoutButtonText: {
-    color: '#FF3B30',
-    fontSize: 14,
-    fontWeight: '600',
+    color: theme.colors.incorrect,
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamMedium,
+  },
+  donationButton: {
+    backgroundColor: theme.colors.accent,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  donationButtonText: {
+    color: theme.colors.white,
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamBold,
+    marginBottom: theme.spacing.xs,
+  },
+  donationSubtext: {
+    color: theme.colors.white,
+    fontSize: 11,
+    fontFamily: theme.fonts.gothamBook,
+    opacity: 0.9,
   },
   errorText: {
-    fontSize: 14,
-    color: '#FF3B30',
-    marginTop: 8,
+    fontSize: 12,
+    color: theme.colors.incorrect,
+    marginTop: theme.spacing.sm,
+    fontFamily: theme.fonts.gothamBook,
   },
 });
