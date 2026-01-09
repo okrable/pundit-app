@@ -9,6 +9,7 @@ import { getUserId } from '../storage/userStorage';
 
 export default function DailyQuizScreen() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const { quiz, loading, error, result, fetchQuiz, submitQuizAnswers, setUserId, resetQuiz } = useQuizStore();
   const { user, isAuthenticated } = useAuthStore();
 
@@ -22,6 +23,13 @@ export default function DailyQuizScreen() {
     initialize();
   }, [isAuthenticated, user]);
 
+  useEffect(() => {
+    if (quiz) {
+      setCurrentQuestionIndex(0);
+      setAnswers({});
+    }
+  }, [quiz?.id]);
+
   const handleSelectOption = (questionId: string, optionIndex: number) => {
     setAnswers((prev) => ({
       ...prev,
@@ -30,6 +38,15 @@ export default function DailyQuizScreen() {
   };
 
   const allQuestionsAnswered = quiz?.questions.every((q) => answers[q.id] !== undefined) ?? false;
+  const totalQuestions = quiz?.questions.length ?? 0;
+  const currentQuestion = quiz?.questions[currentQuestionIndex];
+  const currentAnswer =
+    currentQuestion && answers[currentQuestion.id] !== undefined
+      ? answers[currentQuestion.id]
+      : null;
+  const isFirstQuestion = currentQuestionIndex === 0;
+  const isLastQuestion = totalQuestions > 0 && currentQuestionIndex === totalQuestions - 1;
+  const canAdvance = currentQuestion && answers[currentQuestion.id] !== undefined;
 
   const handleSubmit = () => {
     if (!quiz) return;
@@ -46,6 +63,15 @@ export default function DailyQuizScreen() {
     setAnswers({});
     resetQuiz();
     fetchQuiz();
+  };
+
+  const goToNextQuestion = () => {
+    if (!quiz) return;
+    setCurrentQuestionIndex((prev) => Math.min(prev + 1, quiz.questions.length - 1));
+  };
+
+  const goToPreviousQuestion = () => {
+    setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
   };
 
   if (loading) {
@@ -94,25 +120,49 @@ export default function DailyQuizScreen() {
           <Text style={styles.subtitle}>Answer all 5 questions</Text>
         </View>
 
-        {quiz.questions.map((question, index) => (
+        {currentQuestion && (
           <QuestionCard
-            key={question.id}
-            question={question}
-            questionNumber={index + 1}
-            selectedOption={answers[question.id] ?? null}
-            onSelectOption={(optionIndex) => handleSelectOption(question.id, optionIndex)}
+            key={currentQuestion.id}
+            question={currentQuestion}
+            questionNumber={currentQuestionIndex + 1}
+            selectedOption={currentAnswer}
+            onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
           />
-        ))}
+        )}
 
-        <TouchableOpacity
-          style={[styles.submitButton, !allQuestionsAnswered && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={!allQuestionsAnswered}
-        >
-          <Text style={[styles.submitButtonText, !allQuestionsAnswered && styles.submitButtonTextDisabled]}>
-            Submit Answers
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.navigationRow}>
+          <TouchableOpacity
+            style={[styles.navButton, isFirstQuestion && styles.navButtonDisabled]}
+            onPress={goToPreviousQuestion}
+            disabled={isFirstQuestion}
+          >
+            <Text style={[styles.navButtonText, isFirstQuestion && styles.navButtonTextDisabled]}>
+              Previous
+            </Text>
+          </TouchableOpacity>
+
+          {!isLastQuestion ? (
+            <TouchableOpacity
+              style={[styles.navButton, !canAdvance && styles.navButtonDisabled]}
+              onPress={goToNextQuestion}
+              disabled={!canAdvance}
+            >
+              <Text style={[styles.navButtonText, !canAdvance && styles.navButtonTextDisabled]}>
+                Next
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.submitButton, !allQuestionsAnswered && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={!allQuestionsAnswered}
+            >
+              <Text style={[styles.submitButtonText, !allQuestionsAnswered && styles.submitButtonTextDisabled]}>
+                Submit Answers
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
 
       {result && <ResultsModal visible={true} result={result} onClose={handleCloseResults} />}
@@ -189,6 +239,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   submitButtonTextDisabled: {
+    color: '#8E8E93',
+  },
+  navigationRow: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  navButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  navButtonDisabled: {
+    backgroundColor: '#E5E5EA',
+  },
+  navButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  navButtonTextDisabled: {
     color: '#8E8E93',
   },
 });
