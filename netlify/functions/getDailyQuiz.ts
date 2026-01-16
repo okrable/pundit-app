@@ -73,12 +73,17 @@ export const handler: Handler = async (event) => {
     const formattedQuiz = {
       id: `quiz-${targetDate}`,
       date: targetDate,
-      questions: questions.map((q) => ({
-        id: q.question_id,
-        prompt: q.question || '',
-        options: [q.player_0, q.player_1, q.player_2, q.player_3].filter(Boolean),
-        correctOptionIndex: 0,
-      })),
+      questions: questions.map((q) => {
+        const options = [q.player_0, q.player_1, q.player_2, q.player_3].filter(Boolean);
+        const correctIndex = options.findIndex((opt) => opt === q.player_name);
+
+        return {
+          id: q.question_id,
+          prompt: q.question || '',
+          options,
+          correctOptionIndex: correctIndex >= 0 ? correctIndex : undefined,
+        };
+      }),
     };
 
     return {

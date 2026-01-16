@@ -1,16 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import QuestionCard from '../components/QuestionCard';
 import ResultsModal from '../components/ResultsModal';
+import WelcomeScreen from '../components/WelcomeScreen';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
 import { theme } from '../theme/theme';
 
+const AUTO_ADVANCE_DELAY = 2000; // 2 seconds
+
 export default function DailyQuizScreen() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [showingResult, setShowingResult] = useState(false);
+  const [score, setScore] = useState(0);
+  const [quizStarted, setQuizStarted] = useState(false);
+  const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
   const { quiz, loading, error, result, fetchQuiz, submitQuizAnswers, setUserId, resetQuiz } = useQuizStore();
   const { user, isAuthenticated } = useAuthStore();
 
@@ -28,47 +35,87 @@ export default function DailyQuizScreen() {
     if (quiz) {
       setCurrentQuestionIndex(0);
       setAnswers({});
+      setShowingResult(false);
+      setScore(0);
     }
   }, [quiz?.id]);
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceTimer.current) {
+        clearTimeout(autoAdvanceTimer.current);
+      }
+    };
+  }, []);
+
   const handleSelectOption = (questionId: string, optionIndex: number) => {
+    if (showingResult) return; // Prevent selecting while showing result
+
+    const currentQuestion = quiz?.questions[currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    // Record the answer
     setAnswers((prev) => ({
       ...prev,
       [questionId]: optionIndex,
     }));
+
+    // Check if correct and update score
+    const isCorrect = currentQuestion.correctOptionIndex === optionIndex;
+    if (isCorrect) {
+      setScore((prev) => prev + 1);
+    }
+
+    // Show the result (correct/incorrect highlighting)
+    setShowingResult(true);
+
+    // Auto-advance after delay
+    autoAdvanceTimer.current = setTimeout(() => {
+      setShowingResult(false);
+
+      const isLastQuestion = currentQuestionIndex === (quiz?.questions.length ?? 0) - 1;
+
+      if (isLastQuestion) {
+        // Submit quiz automatically
+        const formattedAnswers = Object.entries({
+          ...answers,
+          [questionId]: optionIndex,
+        }).map(([qId, selectedOptionIndex]) => ({
+          questionId: qId,
+          selectedOptionIndex,
+        }));
+        submitQuizAnswers(formattedAnswers);
+      } else {
+        // Move to next question
+        setCurrentQuestionIndex((prev) => prev + 1);
+      }
+    }, AUTO_ADVANCE_DELAY);
   };
 
-  const allQuestionsAnswered = quiz?.questions.every((q) => answers[q.id] !== undefined) ?? false;
   const totalQuestions = quiz?.questions.length ?? 0;
   const currentQuestion = quiz?.questions[currentQuestionIndex];
   const currentAnswer =
     currentQuestion && answers[currentQuestion.id] !== undefined
       ? answers[currentQuestion.id]
       : null;
-  const isLastQuestion = totalQuestions > 0 && currentQuestionIndex === totalQuestions - 1;
-  const canAdvance = currentQuestion && answers[currentQuestion.id] !== undefined;
-
-  const handleSubmit = () => {
-    if (!quiz) return;
-
-    const formattedAnswers = Object.entries(answers).map(([questionId, selectedOptionIndex]) => ({
-      questionId,
-      selectedOptionIndex,
-    }));
-
-    submitQuizAnswers(formattedAnswers);
-  };
 
   const handleCloseResults = () => {
     setAnswers({});
+    setScore(0);
+    setQuizStarted(false);
     resetQuiz();
     fetchQuiz();
   };
 
-  const goToNextQuestion = () => {
-    if (!quiz) return;
-    setCurrentQuestionIndex((prev) => Math.min(prev + 1, quiz.questions.length - 1));
+  const handleStartQuiz = () => {
+    setQuizStarted(true);
   };
+
+  // Show welcome screen before quiz starts
+  if (!quizStarted) {
+    return <WelcomeScreen onStartQuiz={handleStartQuiz} />;
+  }
 
   if (loading) {
     return (
@@ -113,7 +160,7 @@ export default function DailyQuizScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.subtitle}>Question {currentQuestionIndex + 1} of {totalQuestions}</Text>
-          <Text style={styles.subtitle}>SCORE: 0</Text>
+          <Text style={styles.subtitle}>SCORE: {score}</Text>
         </View>
 
         {currentQuestion && (
@@ -122,34 +169,12 @@ export default function DailyQuizScreen() {
             question={currentQuestion}
             selectedOption={currentAnswer}
             onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
+            showResult={showingResult}
+            correctOptionIndex={currentQuestion.correctOptionIndex}
           />
         )}
 
       </ScrollView>
-
-      <View style={styles.bottomAction}>
-        {!isLastQuestion ? (
-          <TouchableOpacity
-            style={[styles.primaryActionButton, !canAdvance && styles.navButtonDisabled]}
-            onPress={goToNextQuestion}
-            disabled={!canAdvance}
-          >
-            <Text style={[styles.primaryActionText, !canAdvance && styles.navButtonTextDisabled]}>
-              Next
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.submitButton, !allQuestionsAnswered && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={!allQuestionsAnswered}
-          >
-            <Text style={[styles.submitButtonText, !allQuestionsAnswered && styles.submitButtonTextDisabled]}>
-              Submit Answers
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
       {result && <ResultsModal visible={true} result={result} onClose={handleCloseResults} />}
     </SafeAreaView>
@@ -196,7 +221,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: theme.spacing.md,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: theme.spacing.lg,
   },
   header: {
     marginBottom: theme.spacing.md,
@@ -213,47 +238,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
-  },
-  submitButton: {
-    backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.borderRadius.sm,
-    alignItems: 'center',
-    marginTop: theme.spacing.sm,
-  },
-  submitButtonDisabled: {
-    backgroundColor: theme.colors.lightGray,
-  },
-  submitButtonText: {
-    color: theme.colors.white,
-    fontSize: 14,
-    fontFamily: theme.fonts.gothamMedium,
-  },
-  submitButtonTextDisabled: {
-    color: theme.colors.mediumGray,
-  },
-  bottomAction: {
-    paddingHorizontal: theme.spacing.md,
-    paddingBottom: theme.spacing.md,
-    alignItems: 'center',
-  },
-  primaryActionButton: {
-    backgroundColor: theme.colors.accent,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.sm,
-    alignItems: 'center',
-    minWidth: 220,
-  },
-  navButtonDisabled: {
-    backgroundColor: theme.colors.lightGray,
-  },
-  primaryActionText: {
-    color: theme.colors.white,
-    fontSize: 14,
-    fontFamily: theme.fonts.gothamMedium,
-  },
-  navButtonTextDisabled: {
-    color: theme.colors.mediumGray,
   },
 });

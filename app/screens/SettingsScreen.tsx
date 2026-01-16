@@ -7,7 +7,7 @@ import { useAuthStore } from '../state/useAuthStore';
 import { useAuthRequest, auth0Config } from '../services/auth0';
 import { theme } from '../theme/theme';
 
-const DONATION_URL = process.env.DONATION_URL || 'https://www.buymeacoffee.com';
+const DONATION_URL = process.env.EXPO_PUBLIC_DONATION_URL || 'https://www.buymeacoffee.com';
 
 export default function SettingsScreen() {
   const { userStats, userId, fetchUserStats } = useQuizStore();
