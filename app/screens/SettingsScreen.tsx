@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AuthSession from 'expo-auth-session';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAuthRequest, auth0Config } from '../services/auth0';
+import { clearDailyQuizResult } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
 
 const DONATION_URL = process.env.EXPO_PUBLIC_DONATION_URL || 'https://www.buymeacoffee.com';
@@ -88,6 +89,27 @@ export default function SettingsScreen() {
     Linking.openURL(DONATION_URL);
   };
 
+  const handleClearCache = () => {
+    Alert.alert(
+      'Clear Today\'s Quiz',
+      'This will allow you to replay today\'s quiz. Your score will be reset. Continue?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            await clearDailyQuizResult();
+            Alert.alert('Cache Cleared', 'You can now replay today\'s quiz.');
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.contentContainer}>
@@ -118,17 +140,23 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity
-                style={styles.loginButton}
-                onPress={handleLogin}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Text style={styles.loginButtonText}>Login with Auth0</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.accountCard}>
+                <Text style={styles.accountTitle}>Save Your Progress</Text>
+                <Text style={styles.accountText}>
+                  Create an account to track your streak, best score, and leaderboard ranking.
+                </Text>
+                <TouchableOpacity
+                  style={styles.loginButton}
+                  onPress={handleLogin}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.loginButtonText}>Sign In / Create Account</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         )}
@@ -136,27 +164,24 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Stats</Text>
           <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, !isAuthenticated && styles.statCardMuted]}>
               <Text style={styles.statLabel}>Current Streak</Text>
-              <Text style={styles.statValue}>{userStats?.streak ?? '—'}</Text>
+              <Text style={styles.statValue}>
+                {isAuthenticated ? userStats?.streak ?? '—' : '—'}
+              </Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, !isAuthenticated && styles.statCardMuted]}>
               <Text style={styles.statLabel}>Best Score</Text>
-              <Text style={styles.statValue}>{userStats?.bestScore ?? '—'}/5</Text>
+              <Text style={styles.statValue}>
+                {isAuthenticated ? `${userStats?.bestScore ?? '—'}/5` : '—/5'}
+              </Text>
             </View>
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>User ID</Text>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoText}>
-              {isAuthenticated && user ? user.sub : userId || 'Loading...'}
+          {!isAuthenticated && (
+            <Text style={styles.statsHelperText}>
+              Sign in to save your stats and track your streak.
             </Text>
-            <Text style={styles.infoSubtext}>
-              {isAuthenticated ? 'Auth0 User' : 'Guest User'}
-            </Text>
-          </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -174,6 +199,16 @@ export default function SettingsScreen() {
             <Text style={styles.infoSubtext}>Daily sports trivia challenge</Text>
           </View>
         </View>
+
+        {!isAuthenticated && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Guest Options</Text>
+            <TouchableOpacity style={styles.clearCacheButton} onPress={handleClearCache}>
+              <Text style={styles.clearCacheButtonText}>🔄 Clear Today's Quiz</Text>
+              <Text style={styles.clearCacheSubtext}>Replay today's quiz (resets your score)</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -238,6 +273,16 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.primary,
   },
+  statCardMuted: {
+    opacity: 0.6,
+  },
+  statsHelperText: {
+    marginTop: theme.spacing.md,
+    fontSize: 12,
+    color: theme.colors.mediumGray,
+    textAlign: 'center',
+    fontFamily: theme.fonts.gothamBook,
+  },
   infoCard: {
     backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.md,
@@ -282,6 +327,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
+  },
+  accountCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  accountTitle: {
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.sm,
+  },
+  accountText: {
+    fontSize: 12,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    marginBottom: theme.spacing.md,
+    lineHeight: 18,
   },
   loginButton: {
     backgroundColor: theme.colors.primary,
@@ -342,6 +410,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.incorrect,
     marginTop: theme.spacing.sm,
+    fontFamily: theme.fonts.gothamBook,
+  },
+  clearCacheButton: {
+    backgroundColor: theme.colors.white,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.mediumGray,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  clearCacheButtonText: {
+    color: theme.colors.textDark,
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamMedium,
+    marginBottom: theme.spacing.xs,
+  },
+  clearCacheSubtext: {
+    color: theme.colors.mediumGray,
+    fontSize: 11,
     fontFamily: theme.fonts.gothamBook,
   },
 });

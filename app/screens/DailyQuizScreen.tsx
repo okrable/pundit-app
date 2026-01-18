@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import QuestionCard from '../components/QuestionCard';
 import ResultsScreen from '../components/ResultsScreen';
 import WelcomeScreen from '../components/WelcomeScreen';
+import CompletedQuizScreen from '../components/CompletedQuizScreen';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
+import { getTodayQuizResult, saveDailyQuizResult, CachedQuizResult } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
 
 const AUTO_ADVANCE_DELAY = 2000; // 2 seconds
@@ -17,12 +20,25 @@ export default function DailyQuizScreen() {
   const [showingResult, setShowingResult] = useState(false);
   const [score, setScore] = useState(0);
   const [quizStarted, setQuizStarted] = useState(false);
+  const [cachedResult, setCachedResult] = useState<CachedQuizResult | null>(null);
+  const [checkingCache, setCheckingCache] = useState(true);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
   const { quiz, loading, error, result, fetchQuiz, submitQuizAnswers, setUserId, resetQuiz } = useQuizStore();
   const { user, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     const initialize = async () => {
+      // Check if user has already completed today's quiz
+      const todayResult = await getTodayQuizResult();
+      if (todayResult) {
+        setCachedResult(todayResult);
+        setCheckingCache(false);
+        return;
+      }
+
+      // No cached result, proceed with normal quiz flow
+      setCheckingCache(false);
+
       // Use Auth0 user ID if authenticated, otherwise use guest ID
       const userId = isAuthenticated && user ? user.sub : await getUserId();
       setUserId(userId);
@@ -30,6 +46,35 @@ export default function DailyQuizScreen() {
     };
     initialize();
   }, [isAuthenticated, user]);
+
+  // Re-check cache when screen comes into focus (e.g., after clearing cache in settings)
+  useFocusEffect(
+    useCallback(() => {
+      const checkCache = async () => {
+        const todayResult = await getTodayQuizResult();
+        if (!todayResult && cachedResult) {
+          // Cache was cleared, reset everything to show welcome screen
+          setCachedResult(null);
+          setQuizStarted(false);
+          setAnswers({});
+          setScore(0);
+          setCurrentQuestionIndex(0);
+          resetQuiz();
+
+          // Fetch fresh quiz if we don't have one
+          if (!quiz) {
+            const userId = isAuthenticated && user ? user.sub : await getUserId();
+            setUserId(userId);
+            fetchQuiz();
+          }
+        } else if (todayResult && !cachedResult) {
+          // A result exists but we don't have it in state, set it
+          setCachedResult(todayResult);
+        }
+      };
+      checkCache();
+    }, [cachedResult, quiz, isAuthenticated, user])
+  );
 
   useEffect(() => {
     if (quiz) {
@@ -39,6 +84,13 @@ export default function DailyQuizScreen() {
       setScore(0);
     }
   }, [quiz?.id]);
+
+  // Save result to cache when quiz is completed
+  useEffect(() => {
+    if (result) {
+      saveDailyQuizResult(result);
+    }
+  }, [result]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -100,17 +152,41 @@ export default function DailyQuizScreen() {
       ? answers[currentQuestion.id]
       : null;
 
-  const handleCloseResults = () => {
+  const handleCloseResults = async () => {
     setAnswers({});
     setScore(0);
     setQuizStarted(false);
     resetQuiz();
-    fetchQuiz();
+
+    // Check if there's a cached result for today after closing results
+    const todayResult = await getTodayQuizResult();
+    if (todayResult) {
+      setCachedResult(todayResult);
+    } else {
+      fetchQuiz();
+    }
   };
 
   const handleStartQuiz = () => {
     setQuizStarted(true);
   };
+
+  // Show cached result screen if user already completed today's quiz
+  if (cachedResult) {
+    return <CompletedQuizScreen result={cachedResult} />;
+  }
+
+  // Show loading while checking cache
+  if (checkingCache) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Show welcome screen before quiz starts
   if (!quizStarted) {
