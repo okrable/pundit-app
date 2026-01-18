@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'rea
 import { theme } from '../theme/theme';
 import LawsOfTheGameModal from './LawsOfTheGameModal';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface WelcomeScreenProps {
   onStartQuiz: () => void;
@@ -40,8 +40,6 @@ export default function WelcomeScreen({ onStartQuiz }: WelcomeScreenProps) {
         </View>
       </View>
 
-      <View style={styles.bottomGradient} />
-
       <LawsOfTheGameModal
         visible={showLaws}
         onClose={() => setShowLaws(false)}
@@ -60,6 +58,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: theme.spacing.xl,
+    transform: [{ translateY: -height * 0.125 }],
   },
   logo: {
     width: width * 0.7,
@@ -102,13 +101,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.white,
-  },
-  bottomGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 150,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
   },
 });

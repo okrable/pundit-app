@@ -1,7 +1,11 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, TextStyle, Animated } from 'react-native';
 import { Question } from '../types';
 import { theme } from '../theme/theme';
+
+const TYPING_SPEED = 30; // milliseconds per character
+const OPTION_FADE_DURATION = 200; // milliseconds for each option fade
+const OPTION_STAGGER_DELAY = 100; // milliseconds between each option appearing
 
 interface QuestionCardProps {
   question: Question;
@@ -20,6 +24,59 @@ export default function QuestionCard({
   showResult = false,
   correctOptionIndex,
 }: QuestionCardProps) {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTypingComplete, setIsTypingComplete] = useState(false);
+  const typingTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Create animated values for each option (max 4 options)
+  const optionAnimations = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+
+  // Typewriter effect for question prompt
+  useEffect(() => {
+    // Reset when question changes
+    setDisplayedText('');
+    setIsTypingComplete(false);
+
+    // Reset option animations
+    optionAnimations.forEach(anim => anim.setValue(0));
+
+    const fullText = question.prompt;
+    let currentIndex = 0;
+
+    const typeNextChar = () => {
+      if (currentIndex < fullText.length) {
+        setDisplayedText(fullText.slice(0, currentIndex + 1));
+        currentIndex++;
+        typingTimer.current = setTimeout(typeNextChar, TYPING_SPEED);
+      } else {
+        setIsTypingComplete(true);
+        // Start staggered fade-in for options
+        const animations = question.options.map((_, index) =>
+          Animated.timing(optionAnimations[index], {
+            toValue: 1,
+            duration: OPTION_FADE_DURATION,
+            delay: index * OPTION_STAGGER_DELAY,
+            useNativeDriver: true,
+          })
+        );
+        Animated.parallel(animations).start();
+      }
+    };
+
+    typingTimer.current = setTimeout(typeNextChar, TYPING_SPEED);
+
+    return () => {
+      if (typingTimer.current) {
+        clearTimeout(typingTimer.current);
+      }
+    };
+  }, [question.id]);
+
   const getOptionStyle = (index: number): ViewStyle[] => {
     const baseStyles: ViewStyle[] = [styles.optionButton];
 
@@ -54,21 +111,27 @@ export default function QuestionCard({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.prompt}>{question.prompt}</Text>
-      <View style={styles.optionsContainer}>
-        {question.options.map((option, index) => (
-          <TouchableOpacity
-            key={index}
-            style={getOptionStyle(index)}
-            onPress={() => onSelectOption(index)}
-            disabled={disabled || showResult}
-          >
-            <Text style={getOptionTextStyle(index)}>
-              {option}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <Text style={styles.prompt}>{displayedText}</Text>
+      {isTypingComplete && (
+        <View style={styles.optionsContainer}>
+          {question.options.map((option, index) => (
+            <Animated.View
+              key={index}
+              style={{ opacity: optionAnimations[index], width: '48%' }}
+            >
+              <TouchableOpacity
+                style={getOptionStyle(index)}
+                onPress={() => onSelectOption(index)}
+                disabled={disabled || showResult}
+              >
+                <Text style={getOptionTextStyle(index)}>
+                  {option}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -105,7 +168,6 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.lightGray,
-    width: '48%',
     minHeight: 44,
     justifyContent: 'center',
   },

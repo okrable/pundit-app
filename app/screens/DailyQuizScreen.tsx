@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import QuestionCard from '../components/QuestionCard';
-import ResultsModal from '../components/ResultsModal';
+import ResultsScreen from '../components/ResultsScreen';
 import WelcomeScreen from '../components/WelcomeScreen';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
@@ -117,6 +117,11 @@ export default function DailyQuizScreen() {
     return <WelcomeScreen onStartQuiz={handleStartQuiz} />;
   }
 
+  // Show results screen when quiz is complete
+  if (result && quiz) {
+    return <ResultsScreen result={result} quiz={quiz} onPlayAgain={handleCloseResults} />;
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -175,8 +180,6 @@ export default function DailyQuizScreen() {
         )}
 
       </ScrollView>
-
-      {result && <ResultsModal visible={true} result={result} onClose={handleCloseResults} />}
     </SafeAreaView>
   );
 }
