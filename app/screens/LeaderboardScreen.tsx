@@ -1,18 +1,84 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as AuthSession from 'expo-auth-session';
 import { LeaderboardEntry } from '../types';
 import { getLeaderboard } from '../services/api';
+import { useAuthStore } from '../state/useAuthStore';
+import { useAuthRequest, auth0Config } from '../services/auth0';
 import { theme } from '../theme/theme';
 
 export default function LeaderboardScreen() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+  const { isAuthenticated, isAuth0Available, setAuthResult, clearError } = useAuthStore();
+  const [request, response, promptAsync] = useAuthRequest();
 
   useEffect(() => {
     loadLeaderboard();
   }, []);
+
+  // Handle Auth0 response
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { code } = response.params;
+      exchangeCodeForToken(code);
+    } else if (response) {
+      if (response.type === 'error') {
+        console.error('Auth error:', response.error);
+      }
+      setIsAuthLoading(false);
+    }
+  }, [response]);
+
+  const exchangeCodeForToken = async (code: string) => {
+    try {
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: 'pundit-app',
+      });
+
+      const tokenResponse = await AuthSession.exchangeCodeAsync(
+        {
+          code,
+          clientId: auth0Config.clientId || '',
+          redirectUri,
+          extraParams: {
+            code_verifier: request?.codeVerifier || '',
+          },
+        },
+        {
+          tokenEndpoint: auth0Config.tokenEndpoint,
+        }
+      );
+
+      const { accessToken } = tokenResponse;
+
+      // Fetch user info
+      const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const userInfo = await userInfoResponse.json();
+
+      // Update auth store
+      setAuthResult(accessToken, userInfo);
+      setIsAuthLoading(false);
+    } catch (error) {
+      console.error('Token exchange error:', error);
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleCreateAccount = async () => {
+    setIsAuthLoading(true);
+    clearError();
+    await promptAsync();
+  };
 
   const loadLeaderboard = async () => {
     setLoading(true);
@@ -30,7 +96,7 @@ export default function LeaderboardScreen() {
   const renderItem = ({ item, index }: { item: LeaderboardEntry; index: number }) => (
     <View style={styles.leaderboardItem}>
       <View style={styles.rankContainer}>
-        <Text style={styles.rank}>#{index + 1}</Text>
+        <Text style={styles.rank}>#{item.rank || index + 1}</Text>
       </View>
       <View style={styles.playerInfo}>
         <Text style={styles.playerName}>{item.displayName || 'Anonymous'}</Text>
@@ -40,6 +106,30 @@ export default function LeaderboardScreen() {
       </View>
     </View>
   );
+
+  const renderGuestBanner = () => {
+    if (isAuthenticated || !isAuth0Available) return null;
+
+    return (
+      <View style={styles.guestBanner}>
+        <Text style={styles.guestBannerTitle}>Join our growing community!</Text>
+        <Text style={styles.guestBannerText}>
+          Create a free account to compete on the leaderboard and track your stats.
+        </Text>
+        <TouchableOpacity
+          style={styles.createAccountButton}
+          onPress={handleCreateAccount}
+          disabled={isAuthLoading}
+        >
+          {isAuthLoading ? (
+            <ActivityIndicator size="small" color={theme.colors.white} />
+          ) : (
+            <Text style={styles.createAccountButtonText}>Create Account</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -66,8 +156,9 @@ export default function LeaderboardScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.header}>
         <Text style={styles.title}>Leaderboard</Text>
-        <Text style={styles.subtitle}>Top players this week</Text>
+        <Text style={styles.subtitle}>Today's top players</Text>
       </View>
+      {renderGuestBanner()}
       <FlatList
         data={leaderboard}
         renderItem={renderItem}
@@ -76,6 +167,7 @@ export default function LeaderboardScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No leaderboard data yet</Text>
+            <Text style={styles.emptySubtext}>Be the first to complete today's quiz!</Text>
           </View>
         }
       />
@@ -120,6 +212,45 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
+  },
+  guestBanner: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  guestBannerTitle: {
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.xs,
+  },
+  guestBannerText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    marginBottom: theme.spacing.md,
+    lineHeight: 18,
+  },
+  createAccountButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+  },
+  createAccountButtonText: {
+    color: theme.colors.white,
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamBold,
   },
   listContainer: {
     padding: theme.spacing.lg,
@@ -171,7 +302,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 16,
+    color: theme.colors.textDark,
+    fontFamily: theme.fonts.gothamMedium,
+    marginBottom: theme.spacing.xs,
+  },
+  emptySubtext: {
+    fontSize: 13,
     color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
   },

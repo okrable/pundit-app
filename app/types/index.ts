@@ -33,9 +33,18 @@ export interface LeaderboardEntry {
   displayName: string | null;
   score: number;
   streak: number;
+  rank: number;
 }
 
 export interface UserStats {
   streak: number;
   bestScore: number;
+  totalQuizzes: number;
+  averageScore: number;
+}
+
+export interface UserProfile {
+  displayName?: string;
+  email?: string;
+  avatarUrl?: string;
 }

@@ -21,33 +21,44 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // TODO: This requires a leaderboard/results table
-    // Placeholder response for now
-    const leaderboard = [
-      {
-        userId: 'user1',
-        displayName: 'Guest User 1',
-        score: 5,
-        streak: 3,
-      },
-      {
-        userId: 'user2',
-        displayName: 'Guest User 2',
-        score: 4,
-        streak: 2,
-      },
-      {
-        userId: 'user3',
-        displayName: 'Guest User 3',
-        score: 3,
-        streak: 1,
-      },
-    ];
+    // Get today's date in UTC
+    const today = new Date().toISOString().split('T')[0];
+
+    // Query daily leaderboard (Auth0 users only - guests have no results in DB)
+    const leaderboard = await query<{
+      user_id: string;
+      display_name: string | null;
+      score: number;
+      streak: number;
+      rank: number;
+    }>(
+      `SELECT
+        r.user_id,
+        u.display_name,
+        r.score,
+        u.streak,
+        RANK() OVER (ORDER BY r.score DESC) as rank
+      FROM results r
+      JOIN users u ON r.user_id = u.id
+      WHERE r.quiz_date = $1
+      ORDER BY r.score DESC
+      LIMIT 100`,
+      [today]
+    );
+
+    // Transform to API response format
+    const response = leaderboard.map((entry) => ({
+      userId: entry.user_id,
+      displayName: entry.display_name || 'Anonymous',
+      score: entry.score,
+      streak: entry.streak,
+      rank: Number(entry.rank),
+    }));
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(leaderboard),
+      body: JSON.stringify(response),
     };
   } catch (error) {
     console.error('Error fetching leaderboard:', error);

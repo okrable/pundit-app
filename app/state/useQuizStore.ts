@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { Quiz, QuizResult, UserStats } from '../types';
+import { Quiz, QuizResult, UserStats, UserProfile } from '../types';
 import { getDailyQuiz, submitQuiz, getUserStats } from '../services/api';
 import { getCachedQuiz, setCachedQuiz } from '../storage/quizCache';
+import { useAuthStore } from './useAuthStore';
 
 interface QuizState {
   quiz: Quiz | null;
@@ -62,7 +63,19 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
     set({ loading: true, error: null });
     try {
-      const result = await submitQuiz(quiz.id, userId, answers);
+      // Get Auth0 user profile if authenticated
+      const authState = useAuthStore.getState();
+      let userProfile: UserProfile | undefined;
+
+      if (authState.isAuthenticated && authState.user) {
+        userProfile = {
+          displayName: authState.user.name,
+          email: authState.user.email,
+          avatarUrl: authState.user.picture,
+        };
+      }
+
+      const result = await submitQuiz(quiz.id, userId, answers, userProfile);
       set({ result, loading: false });
     } catch (error) {
       set({

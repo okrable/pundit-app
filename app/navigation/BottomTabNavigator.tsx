@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import DailyQuizScreen from '../screens/DailyQuizScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
-import SettingsScreen from '../screens/SettingsScreen';
+import MeScreen from '../screens/MeScreen';
 import { theme } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
@@ -54,12 +54,12 @@ export default function BottomTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
+        name="Me"
+        component={MeScreen}
         options={{
-          title: 'Settings',
+          title: 'Me',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" color={color} size={size} />
+            <Ionicons name="person-outline" color={color} size={size} />
           ),
         }}
       />
