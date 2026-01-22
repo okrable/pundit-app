@@ -52,22 +52,25 @@
 - Netlify Function at `/submitQuiz`
 - Server verifies answers against DB
 - Returns score, answers with isCorrect flags
-- streak/bestScore currently placeholder values
+- For Auth0 users: persists to database with real streak/bestScore
+- For guests: placeholder values (no DB interaction)
 - Results cached locally to prevent same-day replay
+- Idempotent submission (returns cached result if already submitted)
 
 ---
 
-## Phase 5: Stats and Leaderboards 🚧 PARTIAL
+## Phase 5: Stats and Leaderboards ✅ COMPLETE
 - [x] Implement leaderboard fetch + render
 - [x] Implement personal stats display
-- [ ] **Validation**: shows real data (currently placeholder)
+- [x] **Validation**: shows real data from database
 
 **Implementation Notes**:
-- LeaderboardScreen UI complete
-- SettingsScreen shows stats section
-- Endpoints exist but return hardcoded data
-- **TODO**: Create results/users tables
-- **TODO**: Implement real aggregation queries
+- LeaderboardScreen UI complete with real daily data
+- MeScreen shows stats from database (Auth0 users)
+- Guest users see placeholder zeros (intentional - incentivizes signup)
+- Leaderboard shows daily rankings from results table
+- Guest prompt banner added to LeaderboardScreen to encourage signup
+- See `features/users-results-integration.md` for full details
 
 ---
 
@@ -107,7 +110,7 @@
 - Optional authentication via Auth0
 - Graceful degradation if not configured
 - useAuthStore manages auth state
-- Settings screen has login/logout
+- MeScreen has login/logout
 
 ### Theme System ✅
 - Custom fonts (Gotham, UniSans)
@@ -116,29 +119,38 @@
 - Consistent styling across screens
 
 ### Animations ✅
-- Typewriter effect for questions
+- Typewriter effect for questions (with tap-and-hold speed-up)
 - Staggered option fade-in
 - Correct/incorrect highlighting
+
+### Database Integration ✅
+- `users` table for profiles and stats
+- `results` table for quiz submissions
+- Streak calculation from consecutive days
+- Best score tracking
+- Idempotent submissions
+- See `features/users-results-integration.md`
+
+### "Me" Profile Page ✅
+- Replaced Settings tab with Me tab
+- Settings moved to modal (cog icon)
+- Logged-in: profile picture, name, streak/best stats
+- Logged-out: signup prompt with benefits
+- See `features/me-profile-page.md`
 
 ---
 
 ## Remaining Work
 
-### High Priority
-1. Create `results` table in CockroachDB
-2. Persist quiz submissions to database
-3. Implement real streak calculation
-4. Implement real leaderboard aggregation
-
 ### Medium Priority
-5. Server-side duplicate submission prevention
-6. London timezone for quiz resets
-7. Error boundaries in React
+1. London timezone for quiz resets
+2. Error boundaries in React
+3. Display name editing UI
 
 ### Low Priority
-8. Offline answer queue
-9. Server-side Auth0 token validation
-10. Analytics/telemetry
+4. Offline answer queue
+5. Server-side Auth0 token validation
+6. Analytics/telemetry
 
 ---
 

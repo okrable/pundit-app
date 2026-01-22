@@ -4,6 +4,7 @@ import { Question } from '../types';
 import { theme } from '../theme/theme';
 
 const TYPING_SPEED = 30; // milliseconds per character
+const TYPING_SPEED_FAST = 8; // milliseconds per character when holding
 const OPTION_FADE_DURATION = 200; // milliseconds for each option fade
 const OPTION_STAGGER_DELAY = 100; // milliseconds between each option appearing
 
@@ -14,6 +15,7 @@ interface QuestionCardProps {
   disabled?: boolean;
   showResult?: boolean;
   correctOptionIndex?: number;
+  isHolding?: boolean;
 }
 
 export default function QuestionCard({
@@ -23,10 +25,16 @@ export default function QuestionCard({
   disabled = false,
   showResult = false,
   correctOptionIndex,
+  isHolding = false,
 }: QuestionCardProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const typingTimer = useRef<NodeJS.Timeout | null>(null);
+  const isHoldingRef = useRef(false); // Use ref to access current value in timeout callback
+
+  useEffect(() => {
+    isHoldingRef.current = isHolding;
+  }, [isHolding]);
 
   // Create animated values for each option (max 4 options)
   const optionAnimations = useRef([
@@ -52,7 +60,8 @@ export default function QuestionCard({
       if (currentIndex < fullText.length) {
         setDisplayedText(fullText.slice(0, currentIndex + 1));
         currentIndex++;
-        typingTimer.current = setTimeout(typeNextChar, TYPING_SPEED);
+        const speed = isHoldingRef.current ? TYPING_SPEED_FAST : TYPING_SPEED;
+        typingTimer.current = setTimeout(typeNextChar, speed);
       } else {
         setIsTypingComplete(true);
         // Start staggered fade-in for options

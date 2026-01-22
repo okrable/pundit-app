@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../state/useAuthStore';
-import { clearDailyQuizResult } from '../storage/quizStorage';
+import { clearGuestCache } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
 
 const DONATION_URL = process.env.EXPO_PUBLIC_DONATION_URL || 'https://www.buymeacoffee.com';
@@ -56,7 +56,7 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
           text: 'Clear',
           style: 'destructive',
           onPress: async () => {
-            await clearDailyQuizResult();
+            await clearGuestCache();
             Alert.alert('Cache Cleared', 'You can now replay today\'s quiz.');
           },
         },

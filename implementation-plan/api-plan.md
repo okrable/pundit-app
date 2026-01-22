@@ -49,7 +49,7 @@ GET /.netlify/functions/getDailyQuiz?date=YYYY-MM-DD&language=uk
 ### ✅ submitQuiz (Implemented)
 **File**: `netlify/functions/submitQuiz.ts`
 
-**Purpose**: Submit user answers, compute score, return results
+**Purpose**: Submit user answers, compute score, return results. Persists to database for Auth0 users.
 
 **Request**:
 ```
@@ -58,13 +58,25 @@ Content-Type: application/json
 
 {
   "quizId": "quiz-2026-01-21",
-  "userId": "guest_1705849200000_abc123",
+  "userId": "auth0|abc123",
   "answers": [
     { "questionId": "q_abc123", "selectedOptionIndex": 1 },
     { "questionId": "q_def456", "selectedOptionIndex": 0 }
-  ]
+  ],
+  "userProfile": {
+    "displayName": "John Smith",
+    "email": "john@example.com",
+    "avatarUrl": "https://..."
+  }
 }
 ```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| quizId | Yes | Quiz identifier (e.g., `quiz-2026-01-21`) |
+| userId | Yes | User ID (guest_xxx or auth0\|xxx) |
+| answers | Yes | Array of answer selections |
+| userProfile | No | Auth0 profile data (only for Auth0 users) |
 
 **Response** (200):
 ```json
@@ -73,8 +85,8 @@ Content-Type: application/json
   "quizId": "quiz-2026-01-21",
   "score": 4,
   "totalQuestions": 5,
-  "streak": 1,
-  "bestScore": 4,
+  "streak": 3,
+  "bestScore": 5,
   "answers": [
     {
       "questionId": "q_abc123",
@@ -91,19 +103,29 @@ Content-Type: application/json
 - `404`: Quiz not found
 - `500`: Database error
 
+**Behavior by User Type**:
+
+| User Type | Database | Streak | Best Score |
+|-----------|----------|--------|------------|
+| Guest (`guest_xxx`) | No interaction | Placeholder (1) | Current score |
+| Auth0 (`auth0\|xxx`) | Persisted | Real (consecutive days) | Real (from DB) |
+
 **Implementation Notes**:
-- Fetches correct answers from DB to verify client submissions
-- `streak` and `bestScore` are currently placeholder values (always 1 and score)
-- **TODO**: Persist results to database
-- **TODO**: Calculate actual streak from historical data
-- **TODO**: Implement idempotent submission (prevent duplicates)
+- Guest users: No database interaction, returns placeholder response
+- Auth0 users: Full persistence flow:
+  1. Check for existing submission (idempotent - returns cached if exists)
+  2. Upsert user record with profile data
+  3. Insert result into results table
+  4. Calculate streak from consecutive days
+  5. Update user stats (streak, best_score, total_quizzes, total_correct)
+- See `features/users-results-integration.md` for detailed streak calculation
 
 ---
 
-### 🚧 getLeaderboard (Placeholder)
+### ✅ getLeaderboard (Implemented)
 **File**: `netlify/functions/getLeaderboard.ts`
 
-**Purpose**: Return top players for leaderboard display
+**Purpose**: Return today's top players ranked by score
 
 **Request**:
 ```
@@ -113,38 +135,63 @@ GET /.netlify/functions/getLeaderboard
 **Response** (200):
 ```json
 [
-  { "userId": "user1", "displayName": "Guest 1234", "score": 5, "streak": 3 },
-  { "userId": "user2", "displayName": "Guest 5678", "score": 4, "streak": 2 }
+  {
+    "userId": "auth0|abc123",
+    "displayName": "John Smith",
+    "score": 5,
+    "streak": 7,
+    "rank": 1
+  },
+  {
+    "userId": "auth0|def456",
+    "displayName": "Jane Doe",
+    "score": 4,
+    "streak": 3,
+    "rank": 2
+  }
 ]
 ```
 
-**Current Status**: Returns hardcoded placeholder data
-**TODO**: Query actual results table, aggregate scores, rank users
+**Implementation Notes**:
+- Queries today's results joined with users table
+- Only Auth0 users appear (guests have no database records)
+- Ranked by score descending, then by submission time
+- Limited to 100 entries
+- Returns empty array if no results for today
 
 ---
 
-### 🚧 getUserStats (Placeholder)
+### ✅ getUserStats (Implemented)
 **File**: `netlify/functions/getUserStats.ts`
 
 **Purpose**: Return personal statistics for a user
 
 **Request**:
 ```
-GET /.netlify/functions/getUserStats?userId=guest_123
+GET /.netlify/functions/getUserStats?userId=auth0|abc123
 ```
 
 **Response** (200):
 ```json
 {
-  "streak": 0,
-  "bestScore": 0,
-  "totalQuizzes": 0,
-  "averageScore": 0
+  "streak": 7,
+  "bestScore": 5,
+  "totalQuizzes": 42,
+  "averageScore": 82.5
 }
 ```
 
-**Current Status**: Returns placeholder zeros
-**TODO**: Query results table, calculate actual stats
+**Behavior by User Type**:
+
+| User Type | Response |
+|-----------|----------|
+| Guest (`guest_xxx`) | Returns zeros (no DB record) |
+| Auth0 (`auth0\|xxx`) | Real stats from users table |
+
+**Implementation Notes**:
+- Queries users table for Auth0 users
+- Calculates averageScore as percentage: `(total_correct / (total_quizzes * 5)) * 100`
+- Returns zeros gracefully if user not found
 
 ---
 

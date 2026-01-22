@@ -17,47 +17,40 @@ export default function LawsOfTheGameModal({ visible, onClose }: LawsOfTheGameMo
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          <Text style={styles.title}>Laws of the Game</Text>
+          <Text style={styles.title}>LAWS OF THE GAME</Text>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.rule}>
-              <Text style={styles.ruleNumber}>1.</Text>
+              <Text style={styles.ruleTitle}>Choose Wisely</Text>
               <Text style={styles.ruleText}>
-                Answer 5 questions about football trivia
+                Four choices, but only one winner.{"\n"}
+                Who's your pick?
               </Text>
             </View>
 
             <View style={styles.rule}>
-              <Text style={styles.ruleNumber}>2.</Text>
+              <Text style={styles.ruleTitle}>Beat the Clock</Text>
               <Text style={styles.ruleText}>
-                Tap on your answer - no second chances!
+                You've got 20 seconds per question!{"\n"}
+                Faster answers mean more points.
               </Text>
             </View>
 
             <View style={styles.rule}>
-              <Text style={styles.ruleNumber}>3.</Text>
+              <Text style={styles.ruleTitle}>Score Big</Text>
               <Text style={styles.ruleText}>
-                Correct answers are shown in green, wrong ones in red
+                Points drop from 100 as the clock ticks.{"\n"}
+                Don't get caught in possession!
               </Text>
             </View>
 
-            <View style={styles.rule}>
-              <Text style={styles.ruleNumber}>4.</Text>
-              <Text style={styles.ruleText}>
-                New quiz available daily - come back tomorrow!
-              </Text>
-            </View>
-
-            <View style={styles.rule}>
-              <Text style={styles.ruleNumber}>5.</Text>
-              <Text style={styles.ruleText}>
-                Build your streak by playing every day
-              </Text>
-            </View>
+            <Text style={styles.closingLine}>
+              Think fast, play smart, and let's see what you've got!
+            </Text>
           </ScrollView>
 
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Got it!</Text>
+            <Text style={styles.closeButtonText}>Cheers, Jeff.</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -92,22 +85,29 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
   },
   rule: {
-    flexDirection: 'row',
-    marginBottom: theme.spacing.md,
-    alignItems: 'flex-start',
+    marginBottom: theme.spacing.lg,
   },
-  ruleNumber: {
-    fontSize: 16,
+  ruleTitle: {
+    fontSize: 17,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.accent,
-    width: 24,
+    marginBottom: theme.spacing.xs,
+    textAlign: 'center',
   },
   ruleText: {
     fontSize: 15,
     fontFamily: theme.fonts.gothamBook,
     color: theme.colors.textDark,
-    flex: 1,
     lineHeight: 22,
+    textAlign: 'center',
+  },
+  closingLine: {
+    fontSize: 15,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.textDark,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginTop: theme.spacing.sm,
   },
   closeButton: {
     backgroundColor: theme.colors.primary,

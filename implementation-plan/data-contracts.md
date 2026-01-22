@@ -49,9 +49,10 @@ interface QuizResult {
 ```typescript
 interface LeaderboardEntry {
   userId: string;
-  displayName: string;
+  displayName: string | null;
   score: number;
   streak: number;
+  rank: number;  // Added: position in leaderboard
 }
 ```
 
@@ -60,6 +61,17 @@ interface LeaderboardEntry {
 interface UserStats {
   streak: number;
   bestScore: number;
+  totalQuizzes: number;   // Added: total completed quizzes
+  averageScore: number;   // Added: percentage accuracy
+}
+```
+
+### UserProfile (New)
+```typescript
+interface UserProfile {
+  displayName?: string;
+  email?: string;
+  avatarUrl?: string;
 }
 ```
 
@@ -90,35 +102,62 @@ CREATE TABLE public.pu_player_ques (
 - `[player_0, player_1, player_2, player_3]` → `Question.options[]`
 - Index of `player_name` in options → `Question.correctOptionIndex`
 
-### ❌ Needed Table: `results` (Not Created)
-```sql
--- Proposed schema
-CREATE TABLE results (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id STRING NOT NULL,
-  quiz_id STRING NOT NULL,
-  date DATE NOT NULL,
-  score INT NOT NULL,
-  total_questions INT NOT NULL,
-  answers JSONB NOT NULL,       -- Array of QuizAnswer
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(user_id, quiz_id)     -- Prevent duplicate submissions
-);
-```
+### ✅ Table: `users`
+**Migration**: `db/migrations/001_users.sql`
 
-### ❌ Needed Table: `users` (Not Created)
 ```sql
--- Proposed schema
-CREATE TABLE users (
-  id STRING PRIMARY KEY,        -- guest_xxx or auth0|xxx
+CREATE TABLE IF NOT EXISTS users (
+  id STRING PRIMARY KEY,           -- auth0|xxx (guests don't use DB)
   display_name STRING,
+  email STRING,
+  avatar_url STRING,
   streak INT DEFAULT 0,
   best_score INT DEFAULT 0,
   total_quizzes INT DEFAULT 0,
+  total_correct INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
-  last_played DATE
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 ```
+
+**Notes**:
+- Only Auth0 users are stored (guest users have no DB records)
+- `display_name` is editable in-app (future feature)
+- `streak` is updated after each quiz submission
+- `total_correct` used to calculate average accuracy
+
+### ✅ Table: `results`
+**Migration**: `db/migrations/002_results.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS results (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id STRING NOT NULL REFERENCES users(id),
+  quiz_id STRING NOT NULL,
+  quiz_date DATE NOT NULL,
+  score INT NOT NULL,
+  total_questions INT NOT NULL DEFAULT 5,
+  time_taken_seconds INT,          -- Not populated yet
+  detailed_answers JSONB,          -- Array of QuizAnswer
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, quiz_id)         -- Prevents duplicate submissions
+);
+```
+
+**Notes**:
+- `UNIQUE(user_id, quiz_id)` ensures idempotent submissions
+- `quiz_date` used for streak calculation and leaderboard filtering
+- `detailed_answers` stores full answer data as JSONB
+
+### ❌ Table: `leagues` (Schema Created, Not Implemented)
+**Migration**: `db/migrations/003_leagues.sql`
+
+Future feature for league-based competition.
+
+### ❌ Table: `online_games` (Schema Created, Not Implemented)
+**Migration**: `db/migrations/004_online_games.sql`
+
+Future feature for real-time multiplayer.
 
 ---
 
@@ -164,21 +203,27 @@ CREATE TABLE users (
 ### getLeaderboard Response
 ```json
 [
-  { "userId": "user1", "displayName": "Guest 1234", "score": 5, "streak": 3 }
+  {
+    "userId": "auth0|abc123",
+    "displayName": "John Smith",
+    "score": 5,
+    "streak": 7,
+    "rank": 1
+  }
 ]
 ```
-*Currently placeholder data*
+*Real data from database - only Auth0 users appear*
 
 ### getUserStats Response
 ```json
 {
-  "streak": 0,
-  "bestScore": 0,
-  "totalQuizzes": 0,
-  "averageScore": 0
+  "streak": 7,
+  "bestScore": 5,
+  "totalQuizzes": 42,
+  "averageScore": 82.5
 }
 ```
-*Currently placeholder data*
+*Real data for Auth0 users, zeros for guests*
 
 ---
 

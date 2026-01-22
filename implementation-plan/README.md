@@ -1,10 +1,10 @@
 # Pundit Trivia v0.1 Implementation Plan
 
 > **Last Updated**: January 2026
-> **Status**: MVP Implemented - Core quiz flow working, some features pending
+> **Status**: MVP Complete - Core features and database persistence working
 
 ## What it is
-Pundit Trivia v0.1 is a minimalist daily football quiz mobile app. It delivers one 5-question quiz per day, shows results instantly (score, streak, best score), and provides simple leaderboards plus personal stats. Navigation is via a bottom tab bar with Games, League Tables, and Settings.
+Pundit Trivia v0.1 is a minimalist daily football quiz mobile app. It delivers one 5-question quiz per day, shows results instantly (score, streak, best score), and provides simple leaderboards plus personal stats. Navigation is via a bottom tab bar with Games, Leaderboard, and Me.
 
 ## Problem it solves
 Provides a fast, single-screen daily football trivia experience with lightweight competition signals (leaderboards, streaks) that resets daily.
@@ -19,7 +19,7 @@ Provides a fast, single-screen daily football trivia experience with lightweight
 
 ### ✅ Completed
 - React Native + Expo project setup with TypeScript
-- Bottom tab navigation (Games, League Tables, Settings)
+- Bottom tab navigation (Games, Leaderboard, Me)
 - Daily quiz UI with animated question cards
 - Quiz fetching from CockroachDB via Netlify Functions
 - Quiz submission and server-side scoring
@@ -29,16 +29,23 @@ Provides a fast, single-screen daily football trivia experience with lightweight
 - Auth0 integration (optional, graceful degradation)
 - Welcome screen and completed quiz screen
 - Theme system with custom fonts (Gotham, UniSans)
+- Database tables for users and results (see `db/migrations/`)
+- Persistent streak/best score tracking for Auth0 users
+- Real leaderboard with daily rankings
+- Real user stats from database
+- Idempotent quiz submission (duplicate prevention)
+- "Me" profile page with auth state handling
+- Settings modal (moved from tab to modal)
+- Guest prompt on leaderboard to encourage signup
+- Tap-and-hold to speed up typewriter effect
 
 ### 🚧 Partially Implemented
-- Leaderboard (endpoint exists but returns placeholder data)
-- User stats (endpoint exists but returns placeholder data)
-- Streak/best score calculation (calculated at submit time, not persisted)
+- London timezone for quiz resets (currently UTC)
 
 ### ❌ Not Yet Implemented
-- Database tables for results, users, leaderboard
-- Persistent streak/best score tracking
-- Server-side duplicate submission prevention
+- Display name editing UI
+- Offline answer queue
+- Server-side Auth0 token validation
 
 ## Who this plan is for
 Claude Code (AI agent) responsible for building and maintaining the app.
@@ -50,6 +57,7 @@ Follow the documents in this folder in order:
 3) `data-contracts.md` and `frontend-plan.md` - data shapes and UI behavior
 4) `execution-plan.md` - phase completion status
 5) `assumptions-and-todos.md` - resolved items and remaining work
+6) `features/` - detailed documentation for individual features
 
 ---
 

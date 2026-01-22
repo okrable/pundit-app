@@ -61,3 +61,8 @@ export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
 export async function getUserStats(userId: string): Promise<UserStats> {
   return fetchApi<UserStats>(`/getUserStats?userId=${userId}`);
 }
+
+export async function getTodayResult(userId: string): Promise<QuizResult | null> {
+  const response = await fetchApi<{ result: QuizResult | null }>(`/getTodayResult?userId=${userId}`);
+  return response.result;
+}

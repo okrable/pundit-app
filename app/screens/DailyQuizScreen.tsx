@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import QuestionCard from '../components/QuestionCard';
@@ -9,7 +9,8 @@ import CompletedQuizScreen from '../components/CompletedQuizScreen';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
-import { getTodayQuizResult, saveDailyQuizResult, CachedQuizResult } from '../storage/quizStorage';
+import { getTodayQuizResult, saveDailyQuizResult, getGuestTodayResult, clearGuestCache, CachedQuizResult } from '../storage/quizStorage';
+import { getTodayResult, submitQuiz } from '../services/api';
 import { theme } from '../theme/theme';
 
 const AUTO_ADVANCE_DELAY = 2000; // 2 seconds
@@ -22,26 +23,92 @@ export default function DailyQuizScreen() {
   const [quizStarted, setQuizStarted] = useState(false);
   const [cachedResult, setCachedResult] = useState<CachedQuizResult | null>(null);
   const [checkingCache, setCheckingCache] = useState(true);
+  const [isHolding, setIsHolding] = useState(false);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
   const { quiz, loading, error, result, fetchQuiz, submitQuizAnswers, setUserId, resetQuiz } = useQuizStore();
   const { user, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     const initialize = async () => {
-      // Check if user has already completed today's quiz
-      const todayResult = await getTodayQuizResult();
-      if (todayResult) {
-        setCachedResult(todayResult);
-        setCheckingCache(false);
-        return;
-      }
-
-      // No cached result, proceed with normal quiz flow
-      setCheckingCache(false);
-
-      // Use Auth0 user ID if authenticated, otherwise use guest ID
+      // Determine user ID
       const userId = isAuthenticated && user ? user.sub : await getUserId();
       setUserId(userId);
+
+      if (isAuthenticated && user) {
+        // Auth0 user: check for guest result to migrate, then check DB
+        const guestResult = await getGuestTodayResult();
+
+        if (guestResult) {
+          // Guest played today, now logged in - check if auth0 user already played
+          try {
+            const authResult = await getTodayResult(user.sub);
+            if (!authResult) {
+              // Auth0 user hasn't played today - submit guest result as theirs
+              const migratedResult = await submitQuiz(
+                guestResult.quizId,
+                user.sub,
+                guestResult.answers.map(a => ({
+                  questionId: a.questionId,
+                  selectedOptionIndex: a.selectedOptionIndex,
+                })),
+                {
+                  displayName: user.name,
+                  email: user.email,
+                  avatarUrl: user.picture,
+                }
+              );
+              // Save to auth0 user's cache and clear guest cache
+              await saveDailyQuizResult(migratedResult, user.sub);
+              await clearGuestCache();
+              setCachedResult({ ...migratedResult, cachedAt: new Date().toISOString() });
+              setCheckingCache(false);
+              return;
+            } else {
+              // Auth0 user already played - just clear guest cache and show auth result
+              await clearGuestCache();
+              await saveDailyQuizResult(authResult, user.sub);
+              setCachedResult({ ...authResult, cachedAt: new Date().toISOString() });
+              setCheckingCache(false);
+              return;
+            }
+          } catch (error) {
+            console.error('Error migrating guest result:', error);
+          }
+        }
+
+        // Check auth0 user's local cache first
+        const localResult = await getTodayQuizResult(user.sub);
+        if (localResult) {
+          setCachedResult(localResult);
+          setCheckingCache(false);
+          return;
+        }
+
+        // Check database for auth0 user's result
+        try {
+          const dbResult = await getTodayResult(user.sub);
+          if (dbResult) {
+            // Found in DB, cache it locally
+            await saveDailyQuizResult(dbResult, user.sub);
+            setCachedResult({ ...dbResult, cachedAt: new Date().toISOString() });
+            setCheckingCache(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error fetching today result:', error);
+        }
+      } else {
+        // Guest user: check local cache only
+        const localResult = await getTodayQuizResult(userId);
+        if (localResult) {
+          setCachedResult(localResult);
+          setCheckingCache(false);
+          return;
+        }
+      }
+
+      // No cached result found, proceed with quiz
+      setCheckingCache(false);
       fetchQuiz();
     };
     initialize();
@@ -51,7 +118,8 @@ export default function DailyQuizScreen() {
   useFocusEffect(
     useCallback(() => {
       const checkCache = async () => {
-        const todayResult = await getTodayQuizResult();
+        const userId = isAuthenticated && user ? user.sub : await getUserId();
+        const todayResult = await getTodayQuizResult(userId);
         if (!todayResult && cachedResult) {
           // Cache was cleared, reset everything to show welcome screen
           setCachedResult(null);
@@ -63,7 +131,6 @@ export default function DailyQuizScreen() {
 
           // Fetch fresh quiz if we don't have one
           if (!quiz) {
-            const userId = isAuthenticated && user ? user.sub : await getUserId();
             setUserId(userId);
             fetchQuiz();
           }
@@ -88,9 +155,10 @@ export default function DailyQuizScreen() {
   // Save result to cache when quiz is completed
   useEffect(() => {
     if (result) {
-      saveDailyQuizResult(result);
+      const userId = isAuthenticated && user ? user.sub : undefined;
+      saveDailyQuizResult(result, userId);
     }
-  }, [result]);
+  }, [result, isAuthenticated, user]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -159,7 +227,8 @@ export default function DailyQuizScreen() {
     resetQuiz();
 
     // Check if there's a cached result for today after closing results
-    const todayResult = await getTodayQuizResult();
+    const userId = isAuthenticated && user ? user.sub : await getUserId();
+    const todayResult = await getTodayQuizResult(userId);
     if (todayResult) {
       setCachedResult(todayResult);
     } else {
@@ -234,28 +303,34 @@ export default function DailyQuizScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
+      <Pressable
+        style={styles.pressable}
+        onPressIn={() => setIsHolding(true)}
+        onPressOut={() => setIsHolding(false)}
       >
-        <View style={styles.header}>
-          <Text style={styles.subtitle}>Question {currentQuestionIndex + 1} of {totalQuestions}</Text>
-          <Text style={styles.subtitle}>SCORE: {score}</Text>
-        </View>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Text style={styles.subtitle}>Question {currentQuestionIndex + 1} of {totalQuestions}</Text>
+            <Text style={styles.subtitle}>SCORE: {score}</Text>
+          </View>
 
-        {currentQuestion && (
-          <QuestionCard
-            key={currentQuestion.id}
-            question={currentQuestion}
-            selectedOption={currentAnswer}
-            onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
-            showResult={showingResult}
-            correctOptionIndex={currentQuestion.correctOptionIndex}
-          />
-        )}
-
-      </ScrollView>
+          {currentQuestion && (
+            <QuestionCard
+              key={currentQuestion.id}
+              question={currentQuestion}
+              selectedOption={currentAnswer}
+              onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
+              showResult={showingResult}
+              correctOptionIndex={currentQuestion.correctOptionIndex}
+              isHolding={isHolding}
+            />
+          )}
+        </ScrollView>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -296,6 +371,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.gothamMedium,
   },
   scrollView: {
+    flex: 1,
+  },
+  pressable: {
     flex: 1,
   },
   contentContainer: {
