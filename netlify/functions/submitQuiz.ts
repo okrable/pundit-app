@@ -22,7 +22,7 @@ interface DbResult {
   quiz_date: string;
   score: number;
   total_questions: number;
-  answers: any;
+  answers: boolean[];
   created_at: string;
 }
 
@@ -119,17 +119,12 @@ export const handler: Handler = async (event) => {
       [questionIds]
     );
 
-    // Calculate score
+    // Calculate score and build boolean answers array
     let score = 0;
-    const detailedAnswers = answers.map((userAnswer) => {
+    const answersCorrect: boolean[] = answers.map((userAnswer) => {
       const correct = correctAnswers.find((q) => q.question_id === userAnswer.questionId);
       if (!correct) {
-        return {
-          questionId: userAnswer.questionId,
-          selectedOptionIndex: userAnswer.selectedOptionIndex,
-          correctOptionIndex: 0,
-          isCorrect: false,
-        };
+        return false;
       }
 
       const options = [correct.player_0, correct.player_1, correct.player_2, correct.player_3].filter(Boolean);
@@ -140,12 +135,7 @@ export const handler: Handler = async (event) => {
         score++;
       }
 
-      return {
-        questionId: userAnswer.questionId,
-        selectedOptionIndex: userAnswer.selectedOptionIndex,
-        correctOptionIndex: correctIndex,
-        isCorrect,
-      };
+      return isCorrect;
     });
 
     const quizDate = quizId.replace('quiz-', '');
@@ -157,7 +147,7 @@ export const handler: Handler = async (event) => {
         quizId,
         score,
         totalQuestions: answers.length,
-        answers: detailedAnswers,
+        answers: answersCorrect,
         streak: 1,
         bestScore: score,
       };
@@ -207,12 +197,12 @@ export const handler: Handler = async (event) => {
       [userId, userProfile?.displayName || null, userProfile?.email || null, userProfile?.avatarUrl || null]
     );
 
-    // Insert result
+    // Insert result with boolean array
     await query(
       `INSERT INTO results (user_id, quiz_id, quiz_date, score, total_questions, answers)
        VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (user_id, quiz_id) DO NOTHING`,
-      [userId, quizId, quizDate, score, answers.length, JSON.stringify(detailedAnswers)]
+      [userId, quizId, quizDate, score, answers.length, answersCorrect]
     );
 
     // Calculate streak (after inserting today's result)
@@ -241,7 +231,7 @@ export const handler: Handler = async (event) => {
       quizId,
       score,
       totalQuestions: answers.length,
-      answers: detailedAnswers,
+      answers: answersCorrect,
       streak: newStreak,
       bestScore: updatedUser[0]?.best_score || score,
     };

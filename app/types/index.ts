@@ -11,13 +11,6 @@ export interface Quiz {
   questions: Question[];
 }
 
-export interface QuizAnswer {
-  questionId: string;
-  selectedOptionIndex: number;
-  correctOptionIndex?: number;
-  isCorrect?: boolean;
-}
-
 export interface QuizResult {
   date: string;
   quizId: string;
@@ -25,7 +18,7 @@ export interface QuizResult {
   totalQuestions: number;
   streak: number;
   bestScore: number;
-  answers: QuizAnswer[];
+  answers: boolean[];  // Array of correct/incorrect booleans
 }
 
 export interface LeaderboardEntry {

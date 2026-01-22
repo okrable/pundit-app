@@ -10,7 +10,7 @@ import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
 import { getTodayQuizResult, saveDailyQuizResult, getGuestTodayResult, clearGuestCache, CachedQuizResult } from '../storage/quizStorage';
-import { getTodayResult, submitQuiz } from '../services/api';
+import { getTodayResult } from '../services/api';
 import { theme } from '../theme/theme';
 
 const AUTO_ADVANCE_DELAY = 2000; // 2 seconds
@@ -39,40 +39,22 @@ export default function DailyQuizScreen() {
         const guestResult = await getGuestTodayResult();
 
         if (guestResult) {
-          // Guest played today, now logged in - check if auth0 user already played
+          // Guest played today, now logged in - clear guest cache
+          // Note: We can't migrate guest results since we only store boolean answers
+          // The user will need to wait until tomorrow to play as an authenticated user
+          await clearGuestCache();
+
+          // Check if auth0 user already has a result for today
           try {
             const authResult = await getTodayResult(user.sub);
-            if (!authResult) {
-              // Auth0 user hasn't played today - submit guest result as theirs
-              const migratedResult = await submitQuiz(
-                guestResult.quizId,
-                user.sub,
-                guestResult.answers.map(a => ({
-                  questionId: a.questionId,
-                  selectedOptionIndex: a.selectedOptionIndex,
-                })),
-                {
-                  displayName: user.name,
-                  email: user.email,
-                  avatarUrl: user.picture,
-                }
-              );
-              // Save to auth0 user's cache and clear guest cache
-              await saveDailyQuizResult(migratedResult, user.sub);
-              await clearGuestCache();
-              setCachedResult({ ...migratedResult, cachedAt: new Date().toISOString() });
-              setCheckingCache(false);
-              return;
-            } else {
-              // Auth0 user already played - just clear guest cache and show auth result
-              await clearGuestCache();
+            if (authResult) {
               await saveDailyQuizResult(authResult, user.sub);
               setCachedResult({ ...authResult, cachedAt: new Date().toISOString() });
               setCheckingCache(false);
               return;
             }
           } catch (error) {
-            console.error('Error migrating guest result:', error);
+            console.error('Error fetching auth result:', error);
           }
         }
 

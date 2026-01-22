@@ -22,13 +22,12 @@ interface Quiz {
 }
 ```
 
-### QuizAnswer
+### QuizAnswerSubmission (Request Only)
 ```typescript
-interface QuizAnswer {
+// Used when submitting answers to the server
+interface QuizAnswerSubmission {
   questionId: string;
   selectedOptionIndex: number;
-  correctOptionIndex?: number;  // Filled by server
-  isCorrect?: boolean;          // Filled by server
 }
 ```
 
@@ -41,7 +40,7 @@ interface QuizResult {
   totalQuestions: number;
   streak: number;
   bestScore: number;
-  answers: QuizAnswer[];
+  answers: boolean[];  // Array of correct/incorrect booleans
 }
 ```
 
@@ -137,8 +136,8 @@ CREATE TABLE IF NOT EXISTS results (
   quiz_date DATE NOT NULL,
   score INT NOT NULL,
   total_questions INT NOT NULL DEFAULT 5,
+  answers BOOL[] NOT NULL,         -- Array of correct/incorrect booleans
   time_taken_seconds INT,          -- Not populated yet
-  detailed_answers JSONB,          -- Array of QuizAnswer
   created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(user_id, quiz_id)         -- Prevents duplicate submissions
 );
@@ -147,7 +146,7 @@ CREATE TABLE IF NOT EXISTS results (
 **Notes**:
 - `UNIQUE(user_id, quiz_id)` ensures idempotent submissions
 - `quiz_date` used for streak calculation and leaderboard filtering
-- `detailed_answers` stores full answer data as JSONB
+- `answers` stores compact boolean array (true = correct, false = incorrect)
 
 ### ❌ Table: `leagues` (Schema Created, Not Implemented)
 **Migration**: `db/migrations/003_leagues.sql`

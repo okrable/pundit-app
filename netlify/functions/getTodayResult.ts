@@ -6,7 +6,7 @@ interface DbResult {
   quiz_id: string;
   score: number;
   total_questions: number;
-  detailed_answers: any;
+  answers: boolean[];
 }
 
 interface DbUser {
@@ -58,7 +58,7 @@ export const handler: Handler = async (event) => {
 
     // Check for existing result for today
     const results = await query<DbResult>(
-      `SELECT quiz_date::TEXT as quiz_date, quiz_id, score, total_questions, detailed_answers
+      `SELECT quiz_date::TEXT as quiz_date, quiz_id, score, total_questions, answers
        FROM results
        WHERE user_id = $1 AND quiz_date = $2`,
       [userId, today]
@@ -84,7 +84,7 @@ export const handler: Handler = async (event) => {
       quizId: dbResult.quiz_id,
       score: dbResult.score,
       totalQuestions: dbResult.total_questions,
-      answers: dbResult.detailed_answers || [],
+      answers: dbResult.answers ?? [],
       streak: userStats[0]?.streak || 0,
       bestScore: userStats[0]?.best_score || 0,
     };

@@ -130,6 +130,6 @@ export async function clearGuestCache(): Promise<void> {
  */
 export function generateResultEmojis(result: QuizResult | CachedQuizResult): string {
   return result.answers
-    .map(answer => answer.isCorrect ? '⚽️' : '❌')
+    .map(isCorrect => isCorrect ? '⚽️' : '❌')
     .join('');
 }

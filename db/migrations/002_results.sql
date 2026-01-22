@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS results (
   quiz_date DATE NOT NULL,                  -- For querying by date
   score INT NOT NULL,                       -- 0-5 for daily quiz
   total_questions INT NOT NULL,             -- Usually 5
-  answers JSONB NOT NULL,                   -- Array of QuizAnswer objects
+  answers BOOL[] NOT NULL,                  -- Array of correct/incorrect booleans
   time_taken_seconds INT,                   -- Optional: how long to complete
   created_at TIMESTAMPTZ DEFAULT now(),
 
