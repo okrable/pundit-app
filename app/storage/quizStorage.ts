@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { QuizResult } from '../types';
+import { QuizResult, QuizResultImmediate } from '../types';
 
 // Cache keys are now user-specific to keep guest and auth0 results separate
 const GUEST_RESULT_KEY = '@pundit_daily_quiz_result_guest';
@@ -8,6 +8,28 @@ const AUTH_RESULT_KEY_PREFIX = '@pundit_daily_quiz_result_auth_';
 export interface CachedQuizResult extends QuizResult {
   cachedAt: string; // ISO date string
   userId?: string; // Track which user this result belongs to
+}
+
+/**
+ * Convert immediate result (with detailed answers) to compact result (boolean array)
+ */
+function toCompactResult(result: QuizResultImmediate | QuizResult): QuizResult {
+  // If already compact (answers are booleans), return as-is
+  if (result.answers.length === 0 || typeof result.answers[0] === 'boolean') {
+    return result as QuizResult;
+  }
+
+  // Convert detailed answers to boolean array
+  const immediateResult = result as QuizResultImmediate;
+  return {
+    date: immediateResult.date,
+    quizId: immediateResult.quizId,
+    score: immediateResult.score,
+    totalQuestions: immediateResult.totalQuestions,
+    streak: immediateResult.streak,
+    bestScore: immediateResult.bestScore,
+    answers: immediateResult.answers.map(a => a.isCorrect),
+  };
 }
 
 /**
@@ -31,11 +53,13 @@ function getCacheKey(userId: string | null): string {
 
 /**
  * Save a quiz result to local storage for a specific user
+ * Accepts both immediate (detailed) and compact (boolean) result formats
  */
-export async function saveDailyQuizResult(result: QuizResult, userId?: string): Promise<void> {
+export async function saveDailyQuizResult(result: QuizResult | QuizResultImmediate, userId?: string): Promise<void> {
   try {
+    const compactResult = toCompactResult(result);
     const cachedResult: CachedQuizResult = {
-      ...result,
+      ...compactResult,
       cachedAt: new Date().toISOString(),
       userId,
     };

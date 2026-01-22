@@ -1,4 +1,4 @@
-import { Quiz, QuizResult, LeaderboardEntry, UserStats, UserProfile } from '../types';
+import { Quiz, QuizResult, QuizResultImmediate, LeaderboardEntry, UserStats, UserProfile } from '../types';
 import { useAuthStore } from '../state/useAuthStore';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
@@ -47,8 +47,8 @@ export async function submitQuiz(
   userId: string,
   answers: { questionId: string; selectedOptionIndex: number }[],
   userProfile?: UserProfile
-): Promise<QuizResult> {
-  return fetchApi<QuizResult>('/submitQuiz', {
+): Promise<QuizResultImmediate> {
+  return fetchApi<QuizResultImmediate>('/submitQuiz', {
     method: 'POST',
     body: JSON.stringify({ quizId, userId, answers, userProfile }),
   });

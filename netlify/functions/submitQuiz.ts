@@ -119,12 +119,27 @@ export const handler: Handler = async (event) => {
       [questionIds]
     );
 
-    // Calculate score and build boolean answers array
+    // Calculate score and build both detailed and boolean answers
     let score = 0;
-    const answersCorrect: boolean[] = answers.map((userAnswer) => {
+    const detailedAnswers: {
+      questionId: string;
+      selectedOptionIndex: number;
+      correctOptionIndex: number;
+      isCorrect: boolean;
+    }[] = [];
+    const answersCorrect: boolean[] = [];
+
+    for (const userAnswer of answers) {
       const correct = correctAnswers.find((q) => q.question_id === userAnswer.questionId);
       if (!correct) {
-        return false;
+        detailedAnswers.push({
+          questionId: userAnswer.questionId,
+          selectedOptionIndex: userAnswer.selectedOptionIndex,
+          correctOptionIndex: 0,
+          isCorrect: false,
+        });
+        answersCorrect.push(false);
+        continue;
       }
 
       const options = [correct.player_0, correct.player_1, correct.player_2, correct.player_3].filter(Boolean);
@@ -135,8 +150,14 @@ export const handler: Handler = async (event) => {
         score++;
       }
 
-      return isCorrect;
-    });
+      detailedAnswers.push({
+        questionId: userAnswer.questionId,
+        selectedOptionIndex: userAnswer.selectedOptionIndex,
+        correctOptionIndex: correctIndex,
+        isCorrect,
+      });
+      answersCorrect.push(isCorrect);
+    }
 
     const quizDate = quizId.replace('quiz-', '');
 
@@ -147,7 +168,7 @@ export const handler: Handler = async (event) => {
         quizId,
         score,
         totalQuestions: answers.length,
-        answers: answersCorrect,
+        answers: detailedAnswers,  // Return detailed for immediate display
         streak: 1,
         bestScore: score,
       };
@@ -231,7 +252,7 @@ export const handler: Handler = async (event) => {
       quizId,
       score,
       totalQuestions: answers.length,
-      answers: answersCorrect,
+      answers: detailedAnswers,  // Return detailed for immediate display
       streak: newStreak,
       bestScore: updatedUser[0]?.best_score || score,
     };

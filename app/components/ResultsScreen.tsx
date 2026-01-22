@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Quiz, QuizResult } from '../types';
+import { Quiz, QuizResultImmediate } from '../types';
 import { theme } from '../theme/theme';
 
 interface ResultsScreenProps {
-  result: QuizResult;
+  result: QuizResultImmediate;
   quiz: Quiz;
   onPlayAgain: () => void;
 }

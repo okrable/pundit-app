@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Quiz, QuizResult, UserStats, UserProfile } from '../types';
+import { Quiz, QuizResultImmediate, UserStats, UserProfile } from '../types';
 import { getDailyQuiz, submitQuiz, getUserStats } from '../services/api';
 import { getCachedQuiz, setCachedQuiz } from '../storage/quizCache';
 import { useAuthStore } from './useAuthStore';
@@ -8,7 +8,7 @@ interface QuizState {
   quiz: Quiz | null;
   loading: boolean;
   error: string | null;
-  result: QuizResult | null;
+  result: QuizResultImmediate | null;
   userStats: UserStats | null;
   userId: string | null;
 

@@ -42,17 +42,17 @@ export default function ResultsModal({ visible, result, onClose }: ResultsModalP
 
           <View style={styles.answersSection}>
             <Text style={styles.answersTitle}>Answer Breakdown</Text>
-            {result.answers.map((answer, index) => (
-              <View key={answer.questionId} style={styles.answerItem}>
+            {result.answers.map((isCorrect, index) => (
+              <View key={index} style={styles.answerItem}>
                 <View style={styles.answerHeader}>
                   <Text style={styles.answerNumber}>Question {index + 1}</Text>
                   <Text
                     style={[
                       styles.answerIcon,
-                      answer.isCorrect ? styles.answerIconCorrect : styles.answerIconIncorrect,
+                      isCorrect ? styles.answerIconCorrect : styles.answerIconIncorrect,
                     ]}
                   >
-                    {answer.isCorrect ? '⚽️' : '❌'}
+                    {isCorrect ? '⚽️' : '❌'}
                   </Text>
                 </View>
               </View>

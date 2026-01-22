@@ -11,6 +11,26 @@ export interface Quiz {
   questions: Question[];
 }
 
+// Detailed answer info returned immediately after quiz submission
+export interface QuizAnswerDetail {
+  questionId: string;
+  selectedOptionIndex: number;
+  correctOptionIndex: number;
+  isCorrect: boolean;
+}
+
+// Result returned immediately after submitting (has detailed answers for display)
+export interface QuizResultImmediate {
+  date: string;
+  quizId: string;
+  score: number;
+  totalQuestions: number;
+  streak: number;
+  bestScore: number;
+  answers: QuizAnswerDetail[];
+}
+
+// Result stored in DB/cache (compact boolean array)
 export interface QuizResult {
   date: string;
   quizId: string;
@@ -18,7 +38,7 @@ export interface QuizResult {
   totalQuestions: number;
   streak: number;
   bestScore: number;
-  answers: boolean[];  // Array of correct/incorrect booleans
+  answers: boolean[];
 }
 
 export interface LeaderboardEntry {
