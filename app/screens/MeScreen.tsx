@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Dimensions } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,8 +11,6 @@ import { getUserStats } from '../services/api';
 import { theme } from '../theme/theme';
 import SettingsModal from '../components/SettingsModal';
 
-const { width } = Dimensions.get('window');
-
 export default function MeScreen() {
   const { userStats } = useQuizStore();
   const { user, isAuthenticated, isAuth0Available, setAuthResult, clearError } = useAuthStore();
@@ -20,24 +18,33 @@ export default function MeScreen() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
   const [localStats, setLocalStats] = useState(userStats);
+  const hasLoadedStats = useRef(false);
 
   // Set up Auth0 authentication requests - one for signup, one for login
   const [signupRequest, signupResponse, promptSignup] = useAuthRequest('signup');
   const [loginRequest, loginResponse, promptLogin] = useAuthRequest('login');
 
   // Fetch fresh stats from DB when screen comes into focus
+  // Only show loading spinner on first load
   useFocusEffect(
     useCallback(() => {
       const loadFreshStats = async () => {
         if (isAuthenticated && user?.sub) {
-          setLoadingStats(true);
+          // Only show spinner if we haven't loaded stats before
+          const showSpinner = !hasLoadedStats.current;
+          if (showSpinner) {
+            setLoadingStats(true);
+          }
           try {
             const freshStats = await getUserStats(user.sub);
             setLocalStats(freshStats);
+            hasLoadedStats.current = true;
           } catch (error) {
             console.error('Error fetching fresh stats:', error);
           } finally {
-            setLoadingStats(false);
+            if (showSpinner) {
+              setLoadingStats(false);
+            }
           }
         }
       };
@@ -150,12 +157,6 @@ export default function MeScreen() {
         </TouchableOpacity>
 
         <View style={styles.loggedOutContent}>
-          <Image
-            source={require('../../assets/images/Asset 4@4x.png')}
-            style={styles.promoImage}
-            resizeMode="contain"
-          />
-
           <Text style={styles.promoTitle}>Join our growing community!</Text>
           <Text style={styles.promoSubtitle}>
             View your stats, streak, leaderboards and more
@@ -275,12 +276,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.xl,
   },
-  promoImage: {
-    width: width * 0.5,
-    height: width * 0.5,
-    marginBottom: theme.spacing.xl,
-  },
-  promoTitle: {
+promoTitle: {
     fontSize: 22,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
