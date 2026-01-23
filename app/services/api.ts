@@ -66,3 +66,24 @@ export async function getTodayResult(userId: string): Promise<QuizResult | null>
   const response = await fetchApi<{ result: QuizResult | null }>(`/getTodayResult?userId=${userId}`);
   return response.result;
 }
+
+export interface MigrateGuestResultResponse {
+  migrated: boolean;
+  message?: string;
+  streak: number;
+  bestScore: number;
+}
+
+export async function migrateGuestResult(
+  userId: string,
+  quizId: string,
+  score: number,
+  totalQuestions: number,
+  answers: boolean[],
+  userProfile?: UserProfile
+): Promise<MigrateGuestResultResponse> {
+  return fetchApi<MigrateGuestResultResponse>('/migrateGuestResult', {
+    method: 'POST',
+    body: JSON.stringify({ userId, quizId, score, totalQuestions, answers, userProfile }),
+  });
+}

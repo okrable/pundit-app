@@ -2,16 +2,17 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme/theme';
-import { CachedQuizResult, generateResultEmojis } from '../storage/quizStorage';
+import { CachedQuizResult } from '../storage/quizStorage';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 interface CompletedQuizScreenProps {
   result: CachedQuizResult;
 }
 
 export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps) {
-  const emojis = generateResultEmojis(result);
+  // Convert boolean array directly to emojis
+  const emojis = result.answers.map(isCorrect => isCorrect ? '⚽️' : '❌').join('');
   const percentage = Math.round((result.score / result.totalQuestions) * 100);
 
   const handleShare = async () => {

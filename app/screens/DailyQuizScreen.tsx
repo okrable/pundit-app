@@ -10,7 +10,7 @@ import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
 import { getTodayQuizResult, saveDailyQuizResult, getGuestTodayResult, clearGuestCache, CachedQuizResult } from '../storage/quizStorage';
-import { getTodayResult } from '../services/api';
+import { getTodayResult, migrateGuestResult } from '../services/api';
 import { theme } from '../theme/theme';
 
 const AUTO_ADVANCE_DELAY = 2000; // 2 seconds
@@ -39,23 +39,47 @@ export default function DailyQuizScreen() {
         const guestResult = await getGuestTodayResult();
 
         if (guestResult) {
-          // Guest played today, now logged in - clear guest cache
-          // Note: We can't migrate guest results since we only store boolean answers
-          // The user will need to wait until tomorrow to play as an authenticated user
-          await clearGuestCache();
-
-          // Check if auth0 user already has a result for today
+          // Guest played today, now logged in - migrate result to auth0 user
           try {
-            const authResult = await getTodayResult(user.sub);
-            if (authResult) {
-              await saveDailyQuizResult(authResult, user.sub);
-              setCachedResult({ ...authResult, cachedAt: new Date().toISOString() });
-              setCheckingCache(false);
-              return;
-            }
-          } catch (error) {
-            console.error('Error fetching auth result:', error);
+            const userProfile = {
+              displayName: user.name,
+              email: user.email,
+              avatarUrl: user.picture,
+            };
+
+            // Migrate the guest result to the authenticated user's account
+            const migrationResult = await migrateGuestResult(
+              user.sub,
+              guestResult.quizId,
+              guestResult.score,
+              guestResult.totalQuestions,
+              guestResult.answers,
+              userProfile
+            );
+
+            // Clear guest cache after successful migration
+            await clearGuestCache();
+
+            // Update the cached result with the new streak/bestScore from DB
+            const migratedResult: CachedQuizResult = {
+              ...guestResult,
+              streak: migrationResult.streak,
+              bestScore: migrationResult.bestScore,
+              cachedAt: new Date().toISOString(),
+              userId: user.sub,
+            };
+
+            await saveDailyQuizResult(migratedResult, user.sub);
+            setCachedResult(migratedResult);
+            setCheckingCache(false);
+            return;
+          } catch (migrationError) {
+            console.error('Error migrating guest result:', migrationError);
+            // Fall through to check DB in case user already has a result
           }
+
+          // Clear guest cache even if migration failed
+          await clearGuestCache();
         }
 
         // Check auth0 user's local cache first

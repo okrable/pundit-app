@@ -148,12 +148,3 @@ export async function clearGuestCache(): Promise<void> {
     console.error('Error clearing guest cache:', error);
   }
 }
-
-/**
- * Generate emoji string representing quiz results (⚽️ for correct, ❌ for incorrect)
- */
-export function generateResultEmojis(result: QuizResult | CachedQuizResult): string {
-  return result.answers
-    .map(isCorrect => isCorrect ? '⚽️' : '❌')
-    .join('');
-}
