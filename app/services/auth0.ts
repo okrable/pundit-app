@@ -28,22 +28,21 @@ export const isAuth0Configured = (): boolean => {
 };
 
 // Create redirect URI for Expo
-export const useAuthRequest = () => {
+export const useAuthRequest = (screenHint?: 'signup' | 'login') => {
   const discovery = {
     authorizationEndpoint: auth0Config.authorizationEndpoint,
     tokenEndpoint: auth0Config.tokenEndpoint,
     revocationEndpoint: auth0Config.revocationEndpoint,
   };
 
-const redirectUri = AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
-console.log('Auth0 redirectUri:', redirectUri);
-
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
 
   return AuthSession.useAuthRequest(
     {
       clientId: auth0ClientId || '',
       scopes: ['openid', 'profile', 'email'],
       redirectUri,
+      extraParams: screenHint ? { screen_hint: screenHint } : undefined,
     },
     discovery
   );

@@ -1,44 +1,84 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAuthRequest, auth0Config } from '../services/auth0';
+import { getUserStats } from '../services/api';
 import { theme } from '../theme/theme';
 import SettingsModal from '../components/SettingsModal';
 
+const { width } = Dimensions.get('window');
+
 export default function MeScreen() {
-  const { userStats, userId, fetchUserStats } = useQuizStore();
+  const { userStats } = useQuizStore();
   const { user, isAuthenticated, isAuth0Available, setAuthResult, clearError } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [localStats, setLocalStats] = useState(userStats);
 
-  // Set up Auth0 authentication request
-  const [request, response, promptAsync] = useAuthRequest();
+  // Set up Auth0 authentication requests - one for signup, one for login
+  const [signupRequest, signupResponse, promptSignup] = useAuthRequest('signup');
+  const [loginRequest, loginResponse, promptLogin] = useAuthRequest('login');
 
+  // Fetch fresh stats from DB when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadFreshStats = async () => {
+        if (isAuthenticated && user?.sub) {
+          setLoadingStats(true);
+          try {
+            const freshStats = await getUserStats(user.sub);
+            setLocalStats(freshStats);
+          } catch (error) {
+            console.error('Error fetching fresh stats:', error);
+          } finally {
+            setLoadingStats(false);
+          }
+        }
+      };
+      loadFreshStats();
+    }, [isAuthenticated, user?.sub])
+  );
+
+  // Update local stats when store stats change
   useEffect(() => {
-    if (userId) {
-      fetchUserStats();
+    if (userStats) {
+      setLocalStats(userStats);
     }
-  }, [userId]);
+  }, [userStats]);
 
-  // Handle Auth0 response
+  // Handle Auth0 signup response
   useEffect(() => {
-    if (response?.type === 'success') {
-      const { code } = response.params;
-      exchangeCodeForToken(code);
-    } else if (response) {
-      // Handle dismiss, cancel, error, locked, or any other non-success type
-      if (response.type === 'error') {
-        console.error('Auth error:', response.error);
+    if (signupResponse?.type === 'success') {
+      const { code } = signupResponse.params;
+      exchangeCodeForToken(code, signupRequest?.codeVerifier);
+    } else if (signupResponse) {
+      if (signupResponse.type === 'error') {
+        console.error('Auth error:', signupResponse.error);
       }
       setIsLoading(false);
     }
-  }, [response]);
+  }, [signupResponse]);
 
-  const exchangeCodeForToken = async (code: string) => {
+  // Handle Auth0 login response
+  useEffect(() => {
+    if (loginResponse?.type === 'success') {
+      const { code } = loginResponse.params;
+      exchangeCodeForToken(code, loginRequest?.codeVerifier);
+    } else if (loginResponse) {
+      if (loginResponse.type === 'error') {
+        console.error('Auth error:', loginResponse.error);
+      }
+      setIsLoading(false);
+    }
+  }, [loginResponse]);
+
+  const exchangeCodeForToken = async (code: string, codeVerifier?: string) => {
     try {
       const redirectUri = AuthSession.makeRedirectUri({
         scheme: 'pundit-app',
@@ -50,7 +90,7 @@ export default function MeScreen() {
           clientId: auth0Config.clientId || '',
           redirectUri,
           extraParams: {
-            code_verifier: request?.codeVerifier || '',
+            code_verifier: codeVerifier || '',
           },
         },
         {
@@ -78,10 +118,16 @@ export default function MeScreen() {
     }
   };
 
+  const handleSignup = async () => {
+    setIsLoading(true);
+    clearError();
+    await promptSignup();
+  };
+
   const handleLogin = async () => {
     setIsLoading(true);
     clearError();
-    await promptAsync();
+    await promptLogin();
   };
 
   const getStreakMessage = (streak: number): string => {
@@ -104,52 +150,40 @@ export default function MeScreen() {
         </TouchableOpacity>
 
         <View style={styles.loggedOutContent}>
-          <View style={styles.avatarPlaceholder}>
-            <Ionicons name="person" size={64} color={theme.colors.mediumGray} />
-          </View>
+          <Image
+            source={require('../../assets/images/Asset 4@4x.png')}
+            style={styles.promoImage}
+            resizeMode="contain"
+          />
 
-          <Text style={styles.promoTitle}>Create an account to{'\n'}track your progress</Text>
+          <Text style={styles.promoTitle}>Join our growing community!</Text>
+          <Text style={styles.promoSubtitle}>
+            View your stats, streak, leaderboards and more
+          </Text>
 
           {isAuth0Available && (
             <>
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={handleLogin}
+                onPress={handleSignup}
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <ActivityIndicator size="small" color={theme.colors.white} />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Create Free Account</Text>
+                  <Text style={styles.primaryButtonText}>Create a free account</Text>
                 )}
               </TouchableOpacity>
 
-              <Text style={styles.orText}>Already have an account?</Text>
-
               <TouchableOpacity
-                style={styles.secondaryButton}
                 onPress={handleLogin}
                 disabled={isLoading}
+                style={styles.loginLink}
               >
-                <Text style={styles.secondaryButtonText}>Log In</Text>
+                <Text style={styles.loginLinkText}>Log In</Text>
               </TouchableOpacity>
             </>
           )}
-
-          <View style={styles.benefitsList}>
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
-              <Text style={styles.benefitText}>Track your streak</Text>
-            </View>
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
-              <Text style={styles.benefitText}>Compete on the leaderboard</Text>
-            </View>
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
-              <Text style={styles.benefitText}>Never lose your progress</Text>
-            </View>
-          </View>
         </View>
 
         <SettingsModal
@@ -187,12 +221,20 @@ export default function MeScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={styles.statEmoji}>🔥</Text>
-            <Text style={styles.statValue}>{userStats?.streak ?? 0}</Text>
+            {loadingStats ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
+            ) : (
+              <Text style={styles.statValue}>{localStats?.streak ?? 0}</Text>
+            )}
             <Text style={styles.statLabel}>Streak</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statEmoji}>⭐</Text>
-            <Text style={styles.statValue}>{userStats?.bestScore ?? 0}/5</Text>
+            {loadingStats ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
+            ) : (
+              <Text style={styles.statValue}>{localStats?.bestScore ?? 0}/5</Text>
+            )}
             <Text style={styles.statLabel}>Best</Text>
           </View>
         </View>
@@ -201,7 +243,7 @@ export default function MeScreen() {
         <View style={styles.streakSection}>
           <View style={styles.divider} />
           <Text style={styles.streakTitle}>Streak Status</Text>
-          <Text style={styles.streakMessage}>{getStreakMessage(userStats?.streak ?? 0)}</Text>
+          <Text style={styles.streakMessage}>{getStreakMessage(localStats?.streak ?? 0)}</Text>
           <Text style={styles.streakCta}>Play today to keep your streak!</Text>
         </View>
       </View>
@@ -233,26 +275,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.xl,
   },
-  avatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: theme.colors.lightGray,
-    alignItems: 'center',
-    justifyContent: 'center',
+  promoImage: {
+    width: width * 0.5,
+    height: width * 0.5,
     marginBottom: theme.spacing.xl,
   },
   promoTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
     textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  promoSubtitle: {
+    fontSize: 15,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    textAlign: 'center',
     marginBottom: theme.spacing.xl,
-    lineHeight: 28,
+    lineHeight: 22,
   },
   primaryButton: {
     backgroundColor: theme.colors.accent,
-    paddingVertical: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.xxl,
     borderRadius: theme.borderRadius.md,
     width: '100%',
@@ -262,44 +307,15 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: theme.colors.white,
     fontSize: 16,
-    fontFamily: theme.fonts.gothamBold,
+    fontFamily: theme.fonts.gothamMedium,
   },
-  orText: {
-    fontSize: 13,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.mediumGray,
-    marginBottom: theme.spacing.md,
+  loginLink: {
+    paddingVertical: theme.spacing.sm,
   },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xxl,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 2,
-    borderColor: theme.colors.accent,
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-  },
-  secondaryButtonText: {
-    color: theme.colors.accent,
-    fontSize: 16,
-    fontFamily: theme.fonts.gothamBold,
-  },
-  benefitsList: {
-    alignSelf: 'flex-start',
-    marginTop: theme.spacing.md,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  benefitText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.gothamBook,
+  loginLinkText: {
     color: theme.colors.textDark,
-    marginLeft: theme.spacing.sm,
+    fontSize: 15,
+    fontFamily: theme.fonts.gothamBook,
   },
   // Logged in styles
   loggedInContent: {
@@ -356,6 +372,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.primary,
+  },
+  statLoader: {
+    height: 34,
   },
   statLabel: {
     fontSize: 12,
