@@ -11,13 +11,16 @@ interface ResultsScreenProps {
 }
 
 export default function ResultsScreen({ result, quiz, onPlayAgain }: ResultsScreenProps) {
-  const percentage = Math.round((result.score / result.answers.length) * 100);
+  const maxScore = result.totalQuestions * 100; // 500 for 5 questions
+  const percentage = Math.round((result.score / maxScore) * 100);
+  const correctCount = result.answers.filter(a => a.isCorrect).length;
 
   const getMessage = () => {
     if (percentage === 100) return "Perfect! You're a true pundit!";
-    if (percentage >= 80) return "Great job! Almost perfect!";
-    if (percentage >= 60) return "Not bad! Keep practicing!";
-    if (percentage >= 40) return "Room for improvement!";
+    if (percentage >= 80) return "Great job! Lightning fast!";
+    if (percentage >= 60) return "Solid performance!";
+    if (percentage >= 40) return "Not bad! Keep practicing!";
+    if (percentage >= 20) return "Room for improvement!";
     return "Better luck next time!";
   };
 
@@ -41,10 +44,9 @@ export default function ResultsScreen({ result, quiz, onPlayAgain }: ResultsScre
 
         <View style={styles.scoreRow}>
           <View style={styles.scoreCard}>
-            <Text style={styles.scoreValue}>
-              {result.score}/{result.answers.length}
-            </Text>
-            <Text style={styles.scoreLabel}>{percentage}%</Text>
+            <Text style={styles.scoreValue}>{result.score}</Text>
+            <Text style={styles.scoreLabel}>points</Text>
+            <Text style={styles.correctCount}>{correctCount}/{result.totalQuestions} correct</Text>
           </View>
           <View style={styles.statsColumn}>
             <View style={styles.statItem}>
@@ -154,6 +156,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
+  },
+  correctCount: {
+    fontSize: 12,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
+    marginTop: theme.spacing.xs,
   },
   statsColumn: {
     flex: 1,

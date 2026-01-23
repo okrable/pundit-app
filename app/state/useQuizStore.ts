@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Quiz, QuizResultImmediate, UserStats, UserProfile } from '../types';
+import { Quiz, QuizResultImmediate, UserStats, UserProfile, AnswerWithTiming } from '../types';
 import { getDailyQuiz, submitQuiz, getUserStats } from '../services/api';
 import { getCachedQuiz, setCachedQuiz } from '../storage/quizCache';
 import { useAuthStore } from './useAuthStore';
@@ -15,7 +15,7 @@ interface QuizState {
   // Actions
   setUserId: (userId: string) => void;
   fetchQuiz: (date?: string) => Promise<void>;
-  submitQuizAnswers: (answers: { questionId: string; selectedOptionIndex: number }[]) => Promise<void>;
+  submitQuizAnswers: (answers: AnswerWithTiming[]) => Promise<void>;
   fetchUserStats: () => Promise<void>;
   resetQuiz: () => void;
 }

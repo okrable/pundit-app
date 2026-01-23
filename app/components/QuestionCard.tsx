@@ -16,6 +16,7 @@ interface QuestionCardProps {
   showResult?: boolean;
   correctOptionIndex?: number;
   isHolding?: boolean;
+  onTypingComplete?: () => void;
 }
 
 export default function QuestionCard({
@@ -26,6 +27,7 @@ export default function QuestionCard({
   showResult = false,
   correctOptionIndex,
   isHolding = false,
+  onTypingComplete,
 }: QuestionCardProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [isTypingComplete, setIsTypingComplete] = useState(false);
@@ -73,7 +75,10 @@ export default function QuestionCard({
             useNativeDriver: true,
           })
         );
-        Animated.parallel(animations).start();
+        Animated.parallel(animations).start(() => {
+          // Notify parent that typing and option display is complete
+          onTypingComplete?.();
+        });
       }
     };
 

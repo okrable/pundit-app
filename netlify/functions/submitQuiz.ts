@@ -7,12 +7,25 @@ interface SubmitQuizRequest {
   answers: {
     questionId: string;
     selectedOptionIndex: number;
+    timeRemainingMs?: number;
   }[];
   userProfile?: {
     displayName?: string;
     email?: string;
     avatarUrl?: string;
   };
+}
+
+// Calculate points based on time remaining (correct answers only)
+// Max 100 points per question, 500 total for 5 questions
+function calculatePoints(timeRemainingMs: number | undefined): number {
+  if (timeRemainingMs === undefined) return 60; // Default for legacy submissions
+  const seconds = timeRemainingMs / 1000;
+  if (seconds >= 16) return 100; // Lightning
+  if (seconds >= 12) return 80;  // Quick
+  if (seconds >= 8) return 60;   // Steady
+  if (seconds >= 4) return 40;   // Careful
+  return 20;                      // Slow (including timer expired)
 }
 
 interface DbResult {
@@ -120,6 +133,7 @@ export const handler: Handler = async (event) => {
     );
 
     // Calculate score and build both detailed and boolean answers
+    // Score is now speed-based: 0-100 points per question, max 500 total
     let score = 0;
     const detailedAnswers: {
       questionId: string;
@@ -147,7 +161,9 @@ export const handler: Handler = async (event) => {
       const isCorrect = userAnswer.selectedOptionIndex === correctIndex;
 
       if (isCorrect) {
-        score++;
+        // Award points based on time remaining
+        const points = calculatePoints(userAnswer.timeRemainingMs);
+        score += points;
       }
 
       detailedAnswers.push({

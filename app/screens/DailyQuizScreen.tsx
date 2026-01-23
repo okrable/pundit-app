@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import QuestionCard from '../components/QuestionCard';
+import CountdownTimer from '../components/CountdownTimer';
 import ResultsScreen from '../components/ResultsScreen';
 import WelcomeScreen from '../components/WelcomeScreen';
 import CompletedQuizScreen from '../components/CompletedQuizScreen';
@@ -14,6 +15,16 @@ import { getTodayResult, migrateGuestResult } from '../services/api';
 import { theme } from '../theme/theme';
 
 const AUTO_ADVANCE_DELAY = 2000; // 2 seconds
+const TIMER_DURATION = 20; // 20 seconds per question
+
+// Calculate points based on time remaining (correct answers only)
+function calculatePoints(timeRemaining: number): number {
+  if (timeRemaining >= 16) return 100; // Lightning
+  if (timeRemaining >= 12) return 80;  // Quick
+  if (timeRemaining >= 8) return 60;   // Steady
+  if (timeRemaining >= 4) return 40;   // Careful
+  return 20;                            // Slow (including timer expired)
+}
 
 export default function DailyQuizScreen() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -24,6 +35,9 @@ export default function DailyQuizScreen() {
   const [cachedResult, setCachedResult] = useState<CachedQuizResult | null>(null);
   const [checkingCache, setCheckingCache] = useState(true);
   const [isHolding, setIsHolding] = useState(false);
+  const [timerActive, setTimerActive] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(TIMER_DURATION);
+  const [answerTimings, setAnswerTimings] = useState<Record<string, number>>({});
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
   const { quiz, loading, error, result, fetchQuiz, submitQuizAnswers, setUserId, resetQuiz } = useQuizStore();
   const { user, isAuthenticated } = useAuthStore();
@@ -155,6 +169,9 @@ export default function DailyQuizScreen() {
       setAnswers({});
       setShowingResult(false);
       setScore(0);
+      setTimerActive(false);
+      setTimeRemaining(TIMER_DURATION);
+      setAnswerTimings({});
     }
   }, [quiz?.id]);
 
@@ -181,16 +198,25 @@ export default function DailyQuizScreen() {
     const currentQuestion = quiz?.questions[currentQuestionIndex];
     if (!currentQuestion) return;
 
-    // Record the answer
+    // Stop the timer and capture time remaining
+    setTimerActive(false);
+    const capturedTime = timeRemaining;
+
+    // Record the answer and timing
     setAnswers((prev) => ({
       ...prev,
       [questionId]: optionIndex,
     }));
+    setAnswerTimings((prev) => ({
+      ...prev,
+      [questionId]: capturedTime * 1000, // Convert to ms
+    }));
 
-    // Check if correct and update score
+    // Check if correct and update score with speed-based points
     const isCorrect = currentQuestion.correctOptionIndex === optionIndex;
     if (isCorrect) {
-      setScore((prev) => prev + 1);
+      const points = calculatePoints(capturedTime);
+      setScore((prev) => prev + points);
     }
 
     // Show the result (correct/incorrect highlighting)
@@ -203,20 +229,33 @@ export default function DailyQuizScreen() {
       const isLastQuestion = currentQuestionIndex === (quiz?.questions.length ?? 0) - 1;
 
       if (isLastQuestion) {
-        // Submit quiz automatically
-        const formattedAnswers = Object.entries({
-          ...answers,
-          [questionId]: optionIndex,
-        }).map(([qId, selectedOptionIndex]) => ({
+        // Submit quiz automatically with timing data
+        const updatedAnswers = { ...answers, [questionId]: optionIndex };
+        const updatedTimings = { ...answerTimings, [questionId]: capturedTime * 1000 };
+        const formattedAnswers = Object.entries(updatedAnswers).map(([qId, selectedOptionIndex]) => ({
           questionId: qId,
           selectedOptionIndex,
+          timeRemainingMs: updatedTimings[qId] ?? 0,
         }));
         submitQuizAnswers(formattedAnswers);
       } else {
-        // Move to next question
+        // Move to next question and reset timer
         setCurrentQuestionIndex((prev) => prev + 1);
+        setTimeRemaining(TIMER_DURATION);
       }
     }, AUTO_ADVANCE_DELAY);
+  };
+
+  // Handle timer expiry - allow answer but with minimum points
+  const handleTimeUp = () => {
+    setTimerActive(false);
+    // Timer expired - user can still answer but timeRemaining is 0
+    // Points will be minimum (20) if they answer correctly
+  };
+
+  // Start timer when question typing completes
+  const handleTypingComplete = () => {
+    setTimerActive(true);
   };
 
   const totalQuestions = quiz?.questions.length ?? 0;
@@ -230,6 +269,9 @@ export default function DailyQuizScreen() {
     setAnswers({});
     setScore(0);
     setQuizStarted(false);
+    setTimerActive(false);
+    setTimeRemaining(TIMER_DURATION);
+    setAnswerTimings({});
     resetQuiz();
 
     // Check if there's a cached result for today after closing results
@@ -321,6 +363,13 @@ export default function DailyQuizScreen() {
         >
           <View style={styles.header}>
             <Text style={styles.subtitle}>Question {currentQuestionIndex + 1} of {totalQuestions}</Text>
+            <CountdownTimer
+              duration={TIMER_DURATION}
+              isActive={timerActive}
+              onTimeUp={handleTimeUp}
+              timeRemaining={timeRemaining}
+              setTimeRemaining={setTimeRemaining}
+            />
             <Text style={styles.subtitle}>SCORE: {score}</Text>
           </View>
 
@@ -333,6 +382,7 @@ export default function DailyQuizScreen() {
               showResult={showingResult}
               correctOptionIndex={currentQuestion.correctOptionIndex}
               isHolding={isHolding}
+              onTypingComplete={handleTypingComplete}
             />
           )}
         </ScrollView>

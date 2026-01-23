@@ -13,11 +13,11 @@ interface CompletedQuizScreenProps {
 export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps) {
   // Convert boolean array directly to emojis
   const emojis = result.answers.map(isCorrect => isCorrect ? '⚽️' : '❌').join('');
-  const percentage = Math.round((result.score / result.totalQuestions) * 100);
+  const correctCount = result.answers.filter(isCorrect => isCorrect).length;
 
   const handleShare = async () => {
     try {
-      const shareText = `Pundit - ${result.date}\n${emojis}\n${result.score}/${result.totalQuestions} (${percentage}%)\n🔥 Streak: ${result.streak}\n\nPlay at: [app link]`;
+      const shareText = `Pundit - ${result.date}\n${emojis}\n${result.score} points (${correctCount}/${result.totalQuestions} correct)\n🔥 Streak: ${result.streak}\n\nPlay at: [app link]`;
 
       await Share.share({
         message: shareText,
@@ -41,8 +41,9 @@ export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps
         <Text style={styles.subtitle}>Well played in today's game!</Text>
 
         <View style={styles.scoreBlock}>
-          <Text style={styles.scoreText}>SCORE: {result.score}</Text>
+          <Text style={styles.scoreText}>{result.score} POINTS</Text>
           <Text style={styles.emojiText}>{emojis}</Text>
+          <Text style={styles.correctText}>{correctCount}/{result.totalQuestions} correct</Text>
         </View>
 
         <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
@@ -94,6 +95,12 @@ const styles = StyleSheet.create({
     fontSize: 26,
     letterSpacing: 6,
     textAlign: 'center',
+  },
+  correctText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.textDark,
+    marginTop: theme.spacing.xs,
   },
   shareButton: {
     backgroundColor: theme.colors.primary,

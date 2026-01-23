@@ -11,6 +11,13 @@ export interface Quiz {
   questions: Question[];
 }
 
+// Answer submitted with timing info
+export interface AnswerWithTiming {
+  questionId: string;
+  selectedOptionIndex: number;
+  timeRemainingMs: number;
+}
+
 // Detailed answer info returned immediately after quiz submission
 export interface QuizAnswerDetail {
   questionId: string;

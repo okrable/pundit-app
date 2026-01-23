@@ -101,7 +101,7 @@ export default function LeaderboardScreen() {
       <View style={styles.playerInfo}>
         <Text style={styles.playerName}>{item.displayName || 'Anonymous'}</Text>
         <Text style={styles.playerStats}>
-          Score: {item.score} • Streak: {item.streak}
+          {item.score} pts • Streak: {item.streak}
         </Text>
       </View>
     </View>

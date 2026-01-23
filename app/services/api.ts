@@ -1,4 +1,4 @@
-import { Quiz, QuizResult, QuizResultImmediate, LeaderboardEntry, UserStats, UserProfile } from '../types';
+import { Quiz, QuizResult, QuizResultImmediate, LeaderboardEntry, UserStats, UserProfile, AnswerWithTiming } from '../types';
 import { useAuthStore } from '../state/useAuthStore';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
@@ -45,7 +45,7 @@ export async function getDailyQuiz(date?: string): Promise<Quiz> {
 export async function submitQuiz(
   quizId: string,
   userId: string,
-  answers: { questionId: string; selectedOptionIndex: number }[],
+  answers: AnswerWithTiming[],
   userProfile?: UserProfile
 ): Promise<QuizResultImmediate> {
   return fetchApi<QuizResultImmediate>('/submitQuiz', {
