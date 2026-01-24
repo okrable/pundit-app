@@ -42,13 +42,44 @@ export default function DailyQuizScreen() {
   const { user, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
+    // Reset state when auth changes to prevent showing stale cached result
+    setCachedResult(null);
+    setCheckingCache(true);
+
     const initialize = async () => {
       // Determine user ID
       const userId = isAuthenticated && user ? user.sub : await getUserId();
       setUserId(userId);
 
       if (isAuthenticated && user) {
-        // Auth0 user: check for guest result to migrate, then check DB
+        // Auth0 user: check for existing result FIRST before considering migration
+
+        // Check auth0 user's local cache first
+        const localResult = await getTodayQuizResult(user.sub);
+        if (localResult) {
+          // User already has a result - clear any stale guest cache and use their result
+          await clearGuestCache();
+          setCachedResult(localResult);
+          setCheckingCache(false);
+          return;
+        }
+
+        // Check database for auth0 user's result
+        try {
+          const dbResult = await getTodayResult(user.sub);
+          if (dbResult) {
+            // User already played today - clear guest cache and use their DB result
+            await clearGuestCache();
+            await saveDailyQuizResult(dbResult, user.sub);
+            setCachedResult({ ...dbResult, cachedAt: new Date().toISOString() });
+            setCheckingCache(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error fetching today result:', error);
+        }
+
+        // Auth0 user has NOT played today - now check for guest result to migrate
         const guestResult = await getGuestTodayResult();
 
         if (guestResult) {
@@ -88,33 +119,10 @@ export default function DailyQuizScreen() {
             return;
           } catch (migrationError) {
             console.error('Error migrating guest result:', migrationError);
-            // Fall through to check DB in case user already has a result
           }
 
           // Clear guest cache even if migration failed
           await clearGuestCache();
-        }
-
-        // Check auth0 user's local cache first
-        const localResult = await getTodayQuizResult(user.sub);
-        if (localResult) {
-          setCachedResult(localResult);
-          setCheckingCache(false);
-          return;
-        }
-
-        // Check database for auth0 user's result
-        try {
-          const dbResult = await getTodayResult(user.sub);
-          if (dbResult) {
-            // Found in DB, cache it locally
-            await saveDailyQuizResult(dbResult, user.sub);
-            setCachedResult({ ...dbResult, cachedAt: new Date().toISOString() });
-            setCheckingCache(false);
-            return;
-          }
-        } catch (error) {
-          console.error('Error fetching today result:', error);
         }
       } else {
         // Guest user: check local cache only
