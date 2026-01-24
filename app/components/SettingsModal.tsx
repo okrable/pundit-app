@@ -141,7 +141,7 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
           </View>
 
           {/* Guest Options - Only show if not logged in */}
-          {!isAuthenticated && (
+          {/*!isAuthenticated &&*/( 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>GUEST OPTIONS</Text>
               <TouchableOpacity style={styles.listItem} onPress={handleClearCache}>

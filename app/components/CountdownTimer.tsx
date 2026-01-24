@@ -1,9 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { theme } from '../theme/theme';
 
-const TIMER_SIZE = 56;
+const SIZE = 56;
 const STROKE_WIDTH = 4;
+const RADIUS = (SIZE - STROKE_WIDTH) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 interface CountdownTimerProps {
   duration: number;
@@ -27,7 +30,7 @@ export default function CountdownTimer({
   const getColor = () => {
     const ratio = timeRemaining / duration;
     if (ratio > 0.5) return theme.colors.correct; // Green
-    if (ratio > 0.25) return '#FFC107'; // Yellow/Amber
+    if (ratio > 0.25) return '#FFA500'; // Orange
     return theme.colors.incorrect; // Red
   };
 
@@ -53,13 +56,13 @@ export default function CountdownTimer({
     if (isActive && timeRemaining <= 5 && timeRemaining > 0) {
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.15,
-          duration: 150,
+          toValue: 1.1,
+          duration: 100,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 150,
+          duration: 100,
           useNativeDriver: true,
         }),
       ]).start();
@@ -68,9 +71,8 @@ export default function CountdownTimer({
 
   const color = getColor();
   const progress = timeRemaining / duration;
-
-  // Calculate rotation for progress indicator
-  const progressDegrees = progress * 360;
+  // strokeDashoffset: 0 = full circle, CIRCUMFERENCE = empty circle
+  const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
 
   return (
     <Animated.View
@@ -79,47 +81,32 @@ export default function CountdownTimer({
         { transform: [{ scale: pulseAnim }] },
       ]}
     >
-      {/* Background circle */}
-      <View style={[styles.backgroundCircle, { borderColor: theme.colors.lightGray }]} />
-
-      {/* Progress circle using clip and rotation */}
-      <View style={styles.progressContainer}>
-        {/* Right half */}
-        <View style={styles.halfCircleContainer}>
-          <View
-            style={[
-              styles.halfCircle,
-              styles.rightHalf,
-              {
-                borderColor: color,
-                transform: [
-                  { rotate: `${Math.min(progressDegrees, 180)}deg` },
-                ],
-              },
-            ]}
-          />
-        </View>
-        {/* Left half - only visible when > 50% */}
-        {progress > 0.5 && (
-          <View style={[styles.halfCircleContainer, styles.leftContainer]}>
-            <View
-              style={[
-                styles.halfCircle,
-                styles.leftHalf,
-                {
-                  borderColor: color,
-                  transform: [
-                    { rotate: `${progressDegrees - 180}deg` },
-                  ],
-                },
-              ]}
-            />
-          </View>
-        )}
-      </View>
-
+      <Svg width={SIZE} height={SIZE} style={styles.svg}>
+        {/* Background circle (track) */}
+        <Circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          stroke={theme.colors.lightGray}
+          strokeWidth={STROKE_WIDTH}
+          fill="transparent"
+        />
+        {/* Progress circle */}
+        <Circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          stroke={color}
+          strokeWidth={STROKE_WIDTH}
+          fill="transparent"
+          strokeDasharray={CIRCUMFERENCE}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+        />
+      </Svg>
       {/* Center text */}
-      <View style={styles.centerContent}>
+      <View style={styles.textContainer}>
         <Text style={[styles.timeText, { color }]}>
           {timeRemaining}
         </Text>
@@ -130,56 +117,15 @@ export default function CountdownTimer({
 
 const styles = StyleSheet.create({
   container: {
-    width: TIMER_SIZE,
-    height: TIMER_SIZE,
+    width: SIZE,
+    height: SIZE,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backgroundCircle: {
-    position: 'absolute',
-    width: TIMER_SIZE,
-    height: TIMER_SIZE,
-    borderRadius: TIMER_SIZE / 2,
-    borderWidth: STROKE_WIDTH,
-    borderColor: theme.colors.lightGray,
-  },
-  progressContainer: {
-    position: 'absolute',
-    width: TIMER_SIZE,
-    height: TIMER_SIZE,
-  },
-  halfCircleContainer: {
-    position: 'absolute',
-    width: TIMER_SIZE / 2,
-    height: TIMER_SIZE,
-    right: 0,
-    overflow: 'hidden',
-  },
-  leftContainer: {
-    right: undefined,
-    left: 0,
-  },
-  halfCircle: {
-    width: TIMER_SIZE,
-    height: TIMER_SIZE,
-    borderRadius: TIMER_SIZE / 2,
-    borderWidth: STROKE_WIDTH,
-    borderColor: 'transparent',
+  svg: {
     position: 'absolute',
   },
-  rightHalf: {
-    right: 0,
-    borderLeftColor: 'transparent',
-    borderBottomColor: 'transparent',
-    transformOrigin: 'center center',
-  },
-  leftHalf: {
-    left: 0,
-    borderRightColor: 'transparent',
-    borderTopColor: 'transparent',
-    transformOrigin: 'center center',
-  },
-  centerContent: {
+  textContainer: {
     justifyContent: 'center',
     alignItems: 'center',
   },

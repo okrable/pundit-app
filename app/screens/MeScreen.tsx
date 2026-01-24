@@ -7,7 +7,8 @@ import * as AuthSession from 'expo-auth-session';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAuthRequest, auth0Config } from '../services/auth0';
-import { getUserStats } from '../services/api';
+import { getTodayResult, getUserStats } from '../services/api';
+import { getTodayQuizResult } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
 import SettingsModal from '../components/SettingsModal';
 
@@ -18,6 +19,7 @@ export default function MeScreen() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
   const [localStats, setLocalStats] = useState(userStats);
+  const [playedToday, setPlayedToday] = useState(false);
   const hasLoadedStats = useRef(false);
 
   // Set up Auth0 authentication requests - one for signup, one for login
@@ -38,6 +40,21 @@ export default function MeScreen() {
           try {
             const freshStats = await getUserStats(user.sub);
             setLocalStats(freshStats);
+
+            // Determine if the user has already played today's quiz
+            let hasPlayedToday = false;
+            const localResult = await getTodayQuizResult(user.sub);
+            if (localResult) {
+              hasPlayedToday = true;
+            } else {
+              try {
+                const todayResult = await getTodayResult(user.sub);
+                hasPlayedToday = Boolean(todayResult);
+              } catch (todayResultError) {
+                console.error('Error fetching today result:', todayResultError);
+              }
+            }
+            setPlayedToday(hasPlayedToday);
             hasLoadedStats.current = true;
           } catch (error) {
             console.error('Error fetching fresh stats:', error);
@@ -145,6 +162,12 @@ export default function MeScreen() {
     return `${streak} days - legendary!`;
   };
 
+  const getStreakCta = (hasPlayedToday: boolean): string => {
+    return hasPlayedToday
+      ? 'Come back tomorrow to keep your streak!'
+      : 'Play today to keep your streak!';
+  };
+
   // Logged out state
   if (!isAuthenticated) {
     return (
@@ -234,9 +257,9 @@ export default function MeScreen() {
             {loadingStats ? (
               <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
             ) : (
-              <Text style={styles.statValue}>{localStats?.bestScore ?? 0}/5</Text>
+              <Text style={styles.statValue}>{localStats?.bestScore ?? 0}</Text>
             )}
-            <Text style={styles.statLabel}>Best</Text>
+            <Text style={styles.statLabel}>High Score</Text>
           </View>
         </View>
 
@@ -245,7 +268,7 @@ export default function MeScreen() {
           <View style={styles.divider} />
           <Text style={styles.streakTitle}>Streak Status</Text>
           <Text style={styles.streakMessage}>{getStreakMessage(localStats?.streak ?? 0)}</Text>
-          <Text style={styles.streakCta}>Play today to keep your streak!</Text>
+          <Text style={styles.streakCta}>{getStreakCta(playedToday)}</Text>
         </View>
       </View>
 

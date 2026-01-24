@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, TextStyle, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, TextStyle, Animated, Image } from 'react-native';
 import { Question } from '../types';
 import { theme } from '../theme/theme';
+import CountdownTimer from './CountdownTimer';
 
 const TYPING_SPEED = 30; // milliseconds per character
 const TYPING_SPEED_FAST = 8; // milliseconds per character when holding
@@ -17,6 +18,16 @@ interface QuestionCardProps {
   correctOptionIndex?: number;
   isHolding?: boolean;
   onTypingComplete?: () => void;
+  // Header props
+  questionNumber: number;
+  totalQuestions: number;
+  score: number;
+  // Timer props
+  timerDuration: number;
+  timerActive: boolean;
+  timeRemaining: number;
+  setTimeRemaining: (time: number) => void;
+  onTimeUp: () => void;
 }
 
 export default function QuestionCard({
@@ -28,6 +39,14 @@ export default function QuestionCard({
   correctOptionIndex,
   isHolding = false,
   onTypingComplete,
+  questionNumber,
+  totalQuestions,
+  score,
+  timerDuration,
+  timerActive,
+  timeRemaining,
+  setTimeRemaining,
+  onTimeUp,
 }: QuestionCardProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [isTypingComplete, setIsTypingComplete] = useState(false);
@@ -125,6 +144,30 @@ export default function QuestionCard({
 
   return (
     <View style={styles.container}>
+      {/* Header: Logo+Question | Timer | Score */}
+      <View style={styles.headerRow}>
+        <View style={styles.logoSection}>
+          <Image
+            source={require('../../assets/logo/dark/pundit-black.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.questionNumber}>Question {questionNumber} of {totalQuestions}</Text>
+        </View>
+        <CountdownTimer
+          duration={timerDuration}
+          isActive={timerActive}
+          onTimeUp={onTimeUp}
+          timeRemaining={timeRemaining}
+          setTimeRemaining={setTimeRemaining}
+        />
+        <Text style={styles.scoreText}>SCORE: {score}</Text>
+      </View>
+
+      {/* Divider */}
+      <View style={styles.divider} />
+
+      {/* Question Content */}
       <Text style={styles.prompt}>{displayedText}</Text>
       {isTypingComplete && (
         <View style={styles.optionsContainer}>
@@ -158,16 +201,48 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
     elevation: 2,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  logoSection: {
+    alignItems: 'flex-start',
+  },
+  logo: {
+    width: 150,
+    height: 54,
+    marginBottom: 12,
+  },
+  questionNumber: {
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    marginLeft: 12,
+  },
+  scoreText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+    marginRight: 10,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.primary,
+    marginVertical: theme.spacing.md,
+    opacity: 0.3,
+  },
   prompt: {
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: theme.fonts.gothamBook,
     marginBottom: theme.spacing.md,
     color: theme.colors.textDark,
-    lineHeight: 26,
+    lineHeight: 22,
   },
   optionsContainer: {
     gap: theme.spacing.sm,

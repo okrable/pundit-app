@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import QuestionCard from '../components/QuestionCard';
-import CountdownTimer from '../components/CountdownTimer';
 import ResultsScreen from '../components/ResultsScreen';
 import WelcomeScreen from '../components/WelcomeScreen';
 import CompletedQuizScreen from '../components/CompletedQuizScreen';
@@ -361,18 +360,6 @@ export default function DailyQuizScreen() {
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Text style={styles.subtitle}>Question {currentQuestionIndex + 1} of {totalQuestions}</Text>
-            <CountdownTimer
-              duration={TIMER_DURATION}
-              isActive={timerActive}
-              onTimeUp={handleTimeUp}
-              timeRemaining={timeRemaining}
-              setTimeRemaining={setTimeRemaining}
-            />
-            <Text style={styles.subtitle}>SCORE: {score}</Text>
-          </View>
-
           {currentQuestion && (
             <QuestionCard
               key={currentQuestion.id}
@@ -383,6 +370,14 @@ export default function DailyQuizScreen() {
               correctOptionIndex={currentQuestion.correctOptionIndex}
               isHolding={isHolding}
               onTypingComplete={handleTypingComplete}
+              questionNumber={currentQuestionIndex + 1}
+              totalQuestions={totalQuestions}
+              score={score}
+              timerDuration={TIMER_DURATION}
+              timerActive={timerActive}
+              timeRemaining={timeRemaining}
+              setTimeRemaining={setTimeRemaining}
+              onTimeUp={handleTimeUp}
             />
           )}
         </ScrollView>
@@ -435,21 +430,5 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: theme.spacing.md,
     paddingBottom: theme.spacing.lg,
-  },
-  header: {
-    marginBottom: theme.spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 16,
-    fontFamily: theme.fonts.gothamBlack,
-    color: theme.colors.textDark,
-  },
-  subtitle: {
-    fontSize: 11,
-    color: theme.colors.mediumGray,
-    fontFamily: theme.fonts.gothamBook,
   },
 });

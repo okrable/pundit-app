@@ -43,7 +43,6 @@ export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps
         <View style={styles.scoreBlock}>
           <Text style={styles.scoreText}>{result.score} POINTS</Text>
           <Text style={styles.emojiText}>{emojis}</Text>
-          <Text style={styles.correctText}>{correctCount}/{result.totalQuestions} correct</Text>
         </View>
 
         <TouchableOpacity style={styles.shareButton} onPress={handleShare}>

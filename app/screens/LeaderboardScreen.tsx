@@ -154,11 +154,11 @@ export default function LeaderboardScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      {renderGuestBanner()}
       <View style={styles.header}>
         <Text style={styles.title}>Leaderboard</Text>
         <Text style={styles.subtitle}>Today's top players</Text>
       </View>
-      {renderGuestBanner()}
       <FlatList
         data={leaderboard}
         renderItem={renderItem}
@@ -215,16 +215,15 @@ const styles = StyleSheet.create({
   },
   guestBanner: {
     marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.md,
     marginBottom: theme.spacing.md,
     padding: theme.spacing.lg,
     backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.md,
-    borderLeftWidth: 4,
-    borderLeftColor: theme.colors.primary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOpacity: 0.24,
+    shadowRadius: 6,
     elevation: 3,
   },
   guestBannerTitle: {
