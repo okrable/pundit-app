@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DailyQuizScreen from '../screens/DailyQuizScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import MeScreen from '../screens/MeScreen';
+import ChallengeScreen from '../screens/ChallengeScreen';
 import { theme } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
@@ -40,6 +41,16 @@ export default function BottomTabNavigator() {
           title: 'Quiz',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="football-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Challenge"
+        component={ChallengeScreen}
+        options={{
+          title: 'Challenge',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="flash-outline" color={color} size={size} />
           ),
         }}
       />

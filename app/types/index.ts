@@ -68,3 +68,86 @@ export interface UserProfile {
   email?: string;
   avatarUrl?: string;
 }
+
+// Challenge Mode Types
+export interface ChallengeHistoryItem {
+  challengeId: string;
+  opponentDisplayName: string | null;
+  yourScore: number;
+  opponentScore: number;
+  result: 'win' | 'loss' | 'draw';
+  completedAt: string;
+}
+
+export interface ChallengeStats {
+  wins: number;
+  losses: number;
+  draws: number;
+}
+
+export interface ActiveChallenge {
+  challengeId: string;
+  code: string;
+  status: 'pending' | 'active';
+  creatorDisplayName: string | null;
+  opponentDisplayName: string | null;
+  isCreator: boolean;
+  createdAt: string;
+  expiresAt: string;
+  hasCreatorPlayed: boolean;
+  hasOpponentPlayed: boolean;
+}
+
+export interface UserChallenges {
+  active: ActiveChallenge | null;
+  history: ChallengeHistoryItem[];
+  stats: ChallengeStats;
+}
+
+export interface ChallengeAnswer {
+  questionId: string;
+  selectedOptionIndex: number;
+  correctOptionIndex: number;
+  isCorrect: boolean;
+}
+
+export interface ChallengeSubmitResult {
+  status: 'waiting' | 'complete';
+  yourScore: number;
+  yourAnswers: ChallengeAnswer[];
+  result?: 'win' | 'loss' | 'draw';
+  opponentScore?: number;
+  opponentDisplayName?: string;
+  opponentAnswers?: ChallengeAnswer[];
+}
+
+export interface CreateChallengeResponse {
+  challengeId: string;
+  code: string;
+  shareUrl: string;
+  quizId: string;
+  expiresAt: string;
+  questions: Question[];
+}
+
+export interface JoinChallengeResponse {
+  challengeId: string;
+  creator: {
+    displayName: string | null;
+  };
+  questions: Question[];
+}
+
+export interface GetChallengeResponse {
+  challengeId: string;
+  code: string;
+  status: 'pending' | 'active' | 'completed' | 'expired' | 'revoked';
+  creator: {
+    displayName: string | null;
+  };
+  opponent: {
+    displayName: string | null;
+  } | null;
+  canJoin: boolean;
+  expiresAt: string;
+}

@@ -13,6 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../state/useAuthStore';
+import { logoutFromAuth0 } from '../services/auth0';
+import { clearAuthStorage } from '../storage/authStorage';
 import { clearGuestCache } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
 
@@ -25,14 +27,19 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ visible, onClose }: SettingsModalProps) {
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated, logout, token } = useAuthStore();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    logout();
-    setIsLoggingOut(false);
-    onClose();
+    try {
+      await logoutFromAuth0(token);
+    } finally {
+      await clearAuthStorage();
+      logout();
+      setIsLoggingOut(false);
+      onClose();
+    }
   };
 
   const handleDonation = () => {

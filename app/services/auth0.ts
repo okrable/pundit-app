@@ -47,3 +47,48 @@ export const useAuthRequest = (screenHint?: 'signup' | 'login') => {
     discovery
   );
 };
+
+export const getAuth0LogoutUrl = (returnTo: string): string | null => {
+  if (!auth0Domain || !auth0ClientId) {
+    return null;
+  }
+
+  const encodedReturnTo = encodeURIComponent(returnTo);
+  const encodedClientId = encodeURIComponent(auth0ClientId);
+  return `https://${auth0Domain}/v2/logout?client_id=${encodedClientId}&returnTo=${encodedReturnTo}`;
+};
+
+export const logoutFromAuth0 = async (accessToken?: string | null): Promise<void> => {
+  if (!auth0Domain || !auth0ClientId) {
+    return;
+  }
+
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
+
+  if (accessToken && auth0Config.revocationEndpoint) {
+    try {
+      await AuthSession.revokeAsync(
+        {
+          token: accessToken,
+          clientId: auth0ClientId,
+        },
+        {
+          revocationEndpoint: auth0Config.revocationEndpoint,
+        }
+      );
+    } catch (error) {
+      console.warn('Auth0 token revocation failed:', error);
+    }
+  }
+
+  const logoutUrl = getAuth0LogoutUrl(redirectUri);
+  if (!logoutUrl) {
+    return;
+  }
+
+  try {
+    await WebBrowser.openAuthSessionAsync(logoutUrl, redirectUri);
+  } catch (error) {
+    console.warn('Auth0 logout failed:', error);
+  }
+};
