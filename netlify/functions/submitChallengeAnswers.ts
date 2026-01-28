@@ -218,22 +218,34 @@ export const handler: Handler = async (event) => {
         [winnerId, challengeId]
       );
 
-      // Update stats for Auth0 users only
+      // Update stats for Auth0 users only (use upsert in case user doesn't exist yet)
       if (!updatedChallenge.creator_id.startsWith('guest_')) {
-        const creatorStatColumn =
-          creatorResult === 'win' ? 'challenge_wins' : creatorResult === 'loss' ? 'challenge_losses' : 'challenge_draws';
+        const creatorWins = creatorResult === 'win' ? 1 : 0;
+        const creatorLosses = creatorResult === 'loss' ? 1 : 0;
+        const creatorDraws = creatorResult === 'draw' ? 1 : 0;
         await query(
-          `UPDATE users SET ${creatorStatColumn} = ${creatorStatColumn} + 1 WHERE id = $1`,
-          [updatedChallenge.creator_id]
+          `INSERT INTO users (id, challenge_wins, challenge_losses, challenge_draws)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (id) DO UPDATE SET
+             challenge_wins = users.challenge_wins + $2,
+             challenge_losses = users.challenge_losses + $3,
+             challenge_draws = users.challenge_draws + $4`,
+          [updatedChallenge.creator_id, creatorWins, creatorLosses, creatorDraws]
         );
       }
 
       if (updatedChallenge.opponent_id && !updatedChallenge.opponent_id.startsWith('guest_')) {
-        const opponentStatColumn =
-          opponentResult === 'win' ? 'challenge_wins' : opponentResult === 'loss' ? 'challenge_losses' : 'challenge_draws';
+        const opponentWins = opponentResult === 'win' ? 1 : 0;
+        const opponentLosses = opponentResult === 'loss' ? 1 : 0;
+        const opponentDraws = opponentResult === 'draw' ? 1 : 0;
         await query(
-          `UPDATE users SET ${opponentStatColumn} = ${opponentStatColumn} + 1 WHERE id = $1`,
-          [updatedChallenge.opponent_id]
+          `INSERT INTO users (id, challenge_wins, challenge_losses, challenge_draws)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (id) DO UPDATE SET
+             challenge_wins = users.challenge_wins + $2,
+             challenge_losses = users.challenge_losses + $3,
+             challenge_draws = users.challenge_draws + $4`,
+          [updatedChallenge.opponent_id, opponentWins, opponentLosses, opponentDraws]
         );
       }
 

@@ -39,6 +39,7 @@ export default function ChallengeScreen() {
   const [joinCode, setJoinCode] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -56,6 +57,7 @@ export default function ChallengeScreen() {
 
   const handleCreateChallenge = async () => {
     if (!userId) return;
+    setIsCreating(true);
     clearError();
     try {
       const displayName = isAuthenticated && user ? user.name : undefined;
@@ -64,6 +66,8 @@ export default function ChallengeScreen() {
       setShowShareModal(true);
     } catch (err) {
       Alert.alert('Error', error || 'Failed to create challenge');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -277,9 +281,9 @@ export default function ChallengeScreen() {
               <TouchableOpacity
                 style={styles.createButton}
                 onPress={handleCreateChallenge}
-                disabled={isLoading}
+                disabled={isCreating}
               >
-                {isLoading ? (
+                {isCreating ? (
                   <ActivityIndicator size="small" color={theme.colors.white} />
                 ) : (
                   <Text style={styles.createButtonText}>Create Challenge</Text>
