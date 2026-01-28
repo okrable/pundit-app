@@ -47,6 +47,15 @@ export const handler: Handler = async (event) => {
       };
     }
 
+    // Guest users cannot create challenges
+    if (userId.startsWith('guest_')) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'Please sign in to create challenges' }),
+      };
+    }
+
     // Check if user already has an active challenge (pending or active, not expired)
     const existingChallenge = await query<{ id: string; status: string; expires_at: string }>(
       `SELECT id, status, expires_at FROM challenges

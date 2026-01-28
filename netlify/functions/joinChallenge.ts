@@ -50,6 +50,15 @@ export const handler: Handler = async (event) => {
       };
     }
 
+    // Guest users cannot join challenges
+    if (userId.startsWith('guest_')) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'Please sign in to join challenges' }),
+      };
+    }
+
     // Fetch challenge by code
     const challenges = await query<DbChallenge>(
       `SELECT * FROM challenges WHERE code = $1`,

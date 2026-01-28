@@ -14,7 +14,6 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChallengeStore } from '../state/useChallengeStore';
 import { useAuthStore } from '../state/useAuthStore';
-import { getUserId } from '../storage/userStorage';
 import { theme } from '../theme/theme';
 import ShareChallengeModal from '../components/ShareChallengeModal';
 import type { ChallengeHistoryItem } from '../types';
@@ -26,13 +25,11 @@ export default function ChallengeScreen() {
     activeChallenge,
     history,
     stats,
-    isLoading,
-    error,
     fetchUserChallenges,
     createChallenge,
     revokeChallenge,
     joinChallenge,
-    currentChallenge,
+    error,
     clearError,
   } = useChallengeStore();
 
@@ -41,18 +38,16 @@ export default function ChallengeScreen() {
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
 
-  // Fetch challenges and user ID when screen comes into focus
+  const userId = isAuthenticated && user ? user.sub : null;
+
+  // Fetch challenges when screen comes into focus (only for authenticated users)
   useFocusEffect(
     useCallback(() => {
-      const loadData = async () => {
-        const id = isAuthenticated && user ? user.sub : await getUserId();
-        setUserId(id);
-        await fetchUserChallenges(id);
-      };
-      loadData();
-    }, [isAuthenticated, user])
+      if (userId) {
+        fetchUserChallenges(userId);
+      }
+    }, [userId])
   );
 
   const handleCreateChallenge = async () => {
@@ -60,7 +55,7 @@ export default function ChallengeScreen() {
     setIsCreating(true);
     clearError();
     try {
-      const displayName = isAuthenticated && user ? user.name : undefined;
+      const displayName = user?.name;
       const code = await createChallenge(userId, displayName);
       setCreatedCode(code);
       setShowShareModal(true);
@@ -106,10 +101,9 @@ export default function ChallengeScreen() {
     setIsJoining(true);
     clearError();
     try {
-      const displayName = isAuthenticated && user ? user.name : undefined;
+      const displayName = user?.name;
       await joinChallenge(joinCode.toUpperCase().trim(), userId, displayName);
       setJoinCode('');
-      // Navigate to quiz
       navigation.navigate('ChallengeQuiz');
     } catch (err) {
       Alert.alert('Error', error || 'Failed to join challenge');
@@ -126,7 +120,6 @@ export default function ChallengeScreen() {
   const handleShareModalClose = () => {
     setShowShareModal(false);
     setCreatedCode(null);
-    // Refresh challenges to show the new active challenge
     if (userId) {
       fetchUserChallenges(userId);
     }
@@ -134,9 +127,11 @@ export default function ChallengeScreen() {
 
   const handlePlayActiveChallenge = async () => {
     if (!activeChallenge || !userId) return;
-    // Set up the current challenge for playing
-    // The challenge questions need to be fetched - we'll navigate and the quiz screen will handle it
     navigation.navigate('ChallengeQuiz', { challengeId: activeChallenge.challengeId });
+  };
+
+  const handleSignIn = () => {
+    navigation.navigate('Me');
   };
 
   const getResultColor = (result: 'win' | 'loss' | 'draw') => {
@@ -200,8 +195,27 @@ export default function ChallengeScreen() {
     </View>
   );
 
-  const isGuest = userId?.startsWith('guest_');
+  // Guest users see sign-in prompt
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={styles.guestContainer}>
+          <View style={styles.guestContent}>
+            <Ionicons name="flash" size={64} color={theme.colors.accent} />
+            <Text style={styles.guestTitle}>Challenge Mode</Text>
+            <Text style={styles.guestDescription}>
+              Create challenges and compete against friends! Sign in to track your wins, losses, and challenge history.
+            </Text>
+            <TouchableOpacity style={styles.signInButton} onPress={handleSignIn}>
+              <Text style={styles.signInButtonText}>Sign In to Play</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
+  // Authenticated users see full challenge UI
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView
@@ -336,41 +350,29 @@ export default function ChallengeScreen() {
         </View>
 
         {/* Stats Section */}
-        {!isGuest && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Stats</Text>
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.wins}</Text>
-                <Text style={styles.statLabel}>Wins</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.losses}</Text>
-                <Text style={styles.statLabel}>Losses</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.draws}</Text>
-                <Text style={styles.statLabel}>Draws</Text>
-              </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Stats</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.wins}</Text>
+              <Text style={styles.statLabel}>Wins</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.losses}</Text>
+              <Text style={styles.statLabel}>Losses</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.draws}</Text>
+              <Text style={styles.statLabel}>Draws</Text>
             </View>
           </View>
-        )}
+        </View>
 
         {/* History Section */}
-        {!isGuest && history.length > 0 && (
+        {history.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Recent Challenges</Text>
             {history.map(renderHistoryItem)}
-          </View>
-        )}
-
-        {/* Guest Banner */}
-        {isGuest && (
-          <View style={styles.guestBanner}>
-            <Ionicons name="information-circle-outline" size={20} color={theme.colors.mediumGray} />
-            <Text style={styles.guestText}>
-              Create an account to save your challenge history and stats!
-            </Text>
           </View>
         )}
       </ScrollView>
@@ -408,6 +410,53 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
     marginBottom: theme.spacing.md,
+  },
+  // Guest Sign-in Prompt
+  guestContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  guestContent: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.xxl,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    maxWidth: 320,
+  },
+  guestTitle: {
+    fontSize: 24,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+  },
+  guestDescription: {
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: theme.spacing.xl,
+  },
+  signInButton: {
+    backgroundColor: theme.colors.accent,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xxl,
+    borderRadius: theme.borderRadius.md,
+    minWidth: 180,
+    alignItems: 'center',
+  },
+  signInButtonText: {
+    color: theme.colors.white,
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamMedium,
   },
   // Create Challenge Card
   createCard: {
@@ -665,21 +714,6 @@ const styles = StyleSheet.create({
   },
   historyScore: {
     fontSize: 12,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.mediumGray,
-  },
-  // Guest Banner
-  guestBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    gap: theme.spacing.sm,
-  },
-  guestText: {
-    flex: 1,
-    fontSize: 13,
     fontFamily: theme.fonts.gothamBook,
     color: theme.colors.mediumGray,
   },
