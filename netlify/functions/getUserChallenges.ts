@@ -54,18 +54,7 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Guest users get empty response
-    if (userId.startsWith('guest_')) {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          active: null,
-          history: [],
-          stats: { wins: 0, losses: 0, draws: 0 },
-        }),
-      };
-    }
+    const isGuest = userId.startsWith('guest_');
 
     // Find active challenge (pending or active, not expired)
     const activeChallenges = await query<DbChallenge>(
@@ -78,21 +67,27 @@ export const handler: Handler = async (event) => {
       [userId]
     );
 
-    // Find completed challenges (last 10)
-    const completedChallenges = await query<DbChallenge>(
-      `SELECT * FROM challenges
-       WHERE (creator_id = $1 OR opponent_id = $1)
-       AND status = 'completed'
-       ORDER BY completed_at DESC
-       LIMIT 10`,
-      [userId]
-    );
+    // Guest users don't have persistent history or stats
+    let completedChallenges: DbChallenge[] = [];
+    let userStats: DbUserStats[] = [];
 
-    // Get user stats
-    const userStats = await query<DbUserStats>(
-      `SELECT challenge_wins, challenge_losses, challenge_draws FROM users WHERE id = $1`,
-      [userId]
-    );
+    if (!isGuest) {
+      // Find completed challenges (last 10)
+      completedChallenges = await query<DbChallenge>(
+        `SELECT * FROM challenges
+         WHERE (creator_id = $1 OR opponent_id = $1)
+         AND status = 'completed'
+         ORDER BY completed_at DESC
+         LIMIT 10`,
+        [userId]
+      );
+
+      // Get user stats
+      userStats = await query<DbUserStats>(
+        `SELECT challenge_wins, challenge_losses, challenge_draws FROM users WHERE id = $1`,
+        [userId]
+      );
+    }
 
     // Format active challenge
     let active = null;

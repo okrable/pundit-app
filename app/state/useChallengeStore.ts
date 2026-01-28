@@ -61,6 +61,16 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           isCreator: true,
           opponentName: null,
         },
+        activeChallenge: {
+          challengeId: response.challengeId,
+          code: response.code,
+          status: 'pending',
+          isCreator: true,
+          hasCreatorPlayed: false,
+          hasOpponentPlayed: false,
+          opponentDisplayName: null,
+          expiresAt: response.expiresAt,
+        },
         isLoading: false,
       });
       return response.code;

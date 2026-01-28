@@ -96,6 +96,13 @@ export default function ChallengeScreen() {
 
   const handleJoinChallenge = async () => {
     if (!userId || !joinCode.trim()) return;
+
+    // Prevent joining own challenge
+    if (activeChallenge && joinCode.toUpperCase().trim() === activeChallenge.code) {
+      Alert.alert('Error', 'You cannot join your own challenge');
+      return;
+    }
+
     setIsJoining(true);
     clearError();
     try {
