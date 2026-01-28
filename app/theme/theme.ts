@@ -12,6 +12,18 @@ export const theme = {
     correctBg: '#E8F5E9',
     incorrect: '#F44336',
     incorrectBg: '#FFEBEE',
+    // Avatar colors - deterministic by userId hash
+    avatarColors: [
+      '#E57373', // Red
+      '#BA68C8', // Purple
+      '#7986CB', // Indigo
+      '#4FC3F7', // Light Blue
+      '#4DB6AC', // Teal
+      '#81C784', // Green
+      '#FFD54F', // Amber
+      '#FFB74D', // Orange
+      '#A1887F', // Brown
+    ] as const,
   },
   fonts: {
     gothamBlack: 'Gotham-Black',

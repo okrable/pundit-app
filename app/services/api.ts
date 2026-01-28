@@ -1,4 +1,15 @@
-import { Quiz, QuizResult, QuizResultImmediate, LeaderboardEntry, UserStats, UserProfile, AnswerWithTiming } from '../types';
+import {
+  Quiz,
+  QuizResult,
+  QuizResultImmediate,
+  LeaderboardEntry,
+  UserStats,
+  UserProfile,
+  AnswerWithTiming,
+  CheckUsernameResponse,
+  SetUsernameResponse,
+  UpdateProfileResponse,
+} from '../types';
 import { useAuthStore } from '../state/useAuthStore';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
@@ -85,5 +96,28 @@ export async function migrateGuestResult(
   return fetchApi<MigrateGuestResultResponse>('/migrateGuestResult', {
     method: 'POST',
     body: JSON.stringify({ userId, quizId, score, totalQuestions, answers, userProfile }),
+  });
+}
+
+// Username and Profile API functions
+
+export async function checkUsername(username: string): Promise<CheckUsernameResponse> {
+  return fetchApi<CheckUsernameResponse>(`/checkUsername?username=${encodeURIComponent(username)}`);
+}
+
+export async function setUsername(userId: string, username: string): Promise<SetUsernameResponse> {
+  return fetchApi<SetUsernameResponse>('/setUsername', {
+    method: 'POST',
+    body: JSON.stringify({ userId, username }),
+  });
+}
+
+export async function updateProfile(
+  userId: string,
+  displayName: string
+): Promise<UpdateProfileResponse> {
+  return fetchApi<UpdateProfileResponse>('/updateProfile', {
+    method: 'POST',
+    body: JSON.stringify({ userId, displayName }),
   });
 }

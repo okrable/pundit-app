@@ -12,8 +12,10 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useChallengeStore } from '../state/useChallengeStore';
+import { useAuthStore } from '../state/useAuthStore';
 import { theme } from '../theme/theme';
 import type { ChallengeSubmitResult, ChallengeAnswer } from '../types';
+import Avatar from '../components/Avatar';
 
 type RouteParams = {
   ChallengeResults: {
@@ -28,9 +30,13 @@ export default function ChallengeResultsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'ChallengeResults'>>();
   const { clearCurrentChallenge } = useChallengeStore();
+  const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
 
   const { result, code, opponentName, isCreator } = route.params;
+
+  // Generate a deterministic ID for opponent avatar if we don't have their real ID
+  const opponentAvatarId = `opponent_${opponentName || code}`;
   const isWaiting = result.status === 'waiting';
   const isComplete = result.status === 'complete';
 
@@ -223,6 +229,13 @@ export default function ChallengeResultsScreen() {
 
         <View style={styles.comparisonSection}>
           <View style={styles.playerCard}>
+            <Avatar
+              userId={user?.sub || 'you'}
+              displayName={user?.name}
+              username={user?.username}
+              imageUrl={user?.picture}
+              size="lg"
+            />
             <Text style={styles.playerLabel}>You</Text>
             <Text style={styles.playerScore}>{result.yourScore}</Text>
             <Text style={styles.playerCorrect}>
@@ -240,6 +253,11 @@ export default function ChallengeResultsScreen() {
           </View>
 
           <View style={styles.playerCard}>
+            <Avatar
+              userId={opponentAvatarId}
+              displayName={result.opponentDisplayName || opponentName}
+              size="lg"
+            />
             <Text style={styles.playerLabel}>
               {result.opponentDisplayName || opponentName || 'Opponent'}
             </Text>
@@ -417,6 +435,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.textDark,
+    marginTop: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
   },
   playerScore: {

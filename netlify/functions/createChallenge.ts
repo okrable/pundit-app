@@ -4,6 +4,7 @@ import { query } from './lib/db';
 interface CreateChallengeRequest {
   userId: string;
   displayName?: string;
+  username?: string;
 }
 
 // Generate a 6-character alphanumeric code (uppercase, no ambiguous chars)
@@ -37,7 +38,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const body: CreateChallengeRequest = JSON.parse(event.body || '{}');
-    const { userId, displayName } = body;
+    const { userId, displayName, username } = body;
 
     if (!userId) {
       return {
@@ -129,10 +130,10 @@ export const handler: Handler = async (event) => {
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours from now
 
     const result = await query<{ id: string }>(
-      `INSERT INTO challenges (code, quiz_id, quiz_date, creator_id, creator_display_name, expires_at, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+      `INSERT INTO challenges (code, quiz_id, quiz_date, creator_id, creator_display_name, creator_username, expires_at, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
        RETURNING id`,
-      [code, quizId, today, userId, displayName || null, expiresAt.toISOString()]
+      [code, quizId, today, userId, displayName || null, username || null, expiresAt.toISOString()]
     );
 
     const challengeId = result[0].id;

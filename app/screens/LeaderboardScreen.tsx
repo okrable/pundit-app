@@ -7,6 +7,7 @@ import { getLeaderboard } from '../services/api';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAuthRequest, auth0Config } from '../services/auth0';
 import { theme } from '../theme/theme';
+import Avatar from '../components/Avatar';
 
 export default function LeaderboardScreen() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -98,8 +99,16 @@ export default function LeaderboardScreen() {
       <View style={styles.rankContainer}>
         <Text style={styles.rank}>#{item.rank || index + 1}</Text>
       </View>
+      <Avatar
+        userId={item.userId}
+        displayName={item.displayName}
+        username={item.username}
+        size="md"
+      />
       <View style={styles.playerInfo}>
-        <Text style={styles.playerName}>{item.displayName || 'Anonymous'}</Text>
+        <Text style={styles.playerName}>
+          {item.username ? `@${item.username}` : item.displayName || 'Anonymous'}
+        </Text>
         <Text style={styles.playerStats}>
           {item.score} pts • Streak: {item.streak}
         </Text>
@@ -284,6 +293,7 @@ const styles = StyleSheet.create({
   },
   playerInfo: {
     flex: 1,
+    marginLeft: theme.spacing.md,
   },
   playerName: {
     fontSize: 15,

@@ -1,5 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,16 +17,31 @@ import { useAuthRequest, auth0Config } from '../services/auth0';
 import { getTodayResult, getUserStats } from '../services/api';
 import { getTodayQuizResult } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
+import { UserStats } from '../types';
 import SettingsModal from '../components/SettingsModal';
+import Avatar from '../components/Avatar';
+import UsernameModal from '../components/UsernameModal';
+import EditProfileModal from '../components/EditProfileModal';
 
 export default function MeScreen() {
   const { userStats } = useQuizStore();
-  const { user, isAuthenticated, isAuth0Available, setAuthResult, clearError } = useAuthStore();
+  const {
+    user,
+    isAuthenticated,
+    isAuth0Available,
+    setAuthResult,
+    setUsername,
+    setDisplayName,
+    setUsernameRequired,
+    clearError,
+  } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
-  const [localStats, setLocalStats] = useState(userStats);
+  const [localStats, setLocalStats] = useState<UserStats | null>(null);
   const [playedToday, setPlayedToday] = useState(false);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const hasLoadedStats = useRef(false);
 
   // Set up Auth0 authentication requests - one for signup, one for login
@@ -27,12 +49,10 @@ export default function MeScreen() {
   const [loginRequest, loginResponse, promptLogin] = useAuthRequest('login');
 
   // Fetch fresh stats from DB when screen comes into focus
-  // Only show loading spinner on first load
   useFocusEffect(
     useCallback(() => {
       const loadFreshStats = async () => {
         if (isAuthenticated && user?.sub) {
-          // Only show spinner if we haven't loaded stats before
           const showSpinner = !hasLoadedStats.current;
           if (showSpinner) {
             setLoadingStats(true);
@@ -40,6 +60,20 @@ export default function MeScreen() {
           try {
             const freshStats = await getUserStats(user.sub);
             setLocalStats(freshStats);
+
+            // Update auth store with username info from stats
+            if (freshStats.username) {
+              setUsername(freshStats.username);
+            } else if (!user.username) {
+              // User needs to set a username
+              setUsernameRequired(true);
+              setShowUsernameModal(true);
+            }
+
+            // Update display name if different
+            if (freshStats.displayName && freshStats.displayName !== user.name) {
+              setDisplayName(freshStats.displayName);
+            }
 
             // Determine if the user has already played today's quiz
             let hasPlayedToday = false;
@@ -68,13 +102,6 @@ export default function MeScreen() {
       loadFreshStats();
     }, [isAuthenticated, user?.sub])
   );
-
-  // Update local stats when store stats change
-  useEffect(() => {
-    if (userStats) {
-      setLocalStats(userStats);
-    }
-  }, [userStats]);
 
   // Handle Auth0 signup response
   useEffect(() => {
@@ -154,6 +181,36 @@ export default function MeScreen() {
     await promptLogin();
   };
 
+  const handleUsernameSuccess = (username: string) => {
+    setUsername(username);
+    setShowUsernameModal(false);
+    // Update local stats
+    if (localStats) {
+      setLocalStats({ ...localStats, username, canChangeUsername: false });
+    }
+  };
+
+  const handleDisplayNameChange = (name: string) => {
+    setDisplayName(name);
+    if (localStats) {
+      setLocalStats({ ...localStats, displayName: name });
+    }
+  };
+
+  const handleUsernameChange = (username: string) => {
+    setUsername(username);
+    if (localStats) {
+      setLocalStats({
+        ...localStats,
+        username,
+        canChangeUsername: false,
+        usernameChangeAvailableAt: new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+      });
+    }
+  };
+
   const getStreakMessage = (streak: number): string => {
     if (streak === 0) return "Start your streak today!";
     if (streak === 1) return "1 day - keep it going!";
@@ -166,6 +223,16 @@ export default function MeScreen() {
     return hasPlayedToday
       ? 'Come back tomorrow to keep your streak!'
       : 'Play today to keep your streak!';
+  };
+
+  const formatMemberSince = (dateStr: string | null): string => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  };
+
+  const formatChallengeRecord = (wins: number, losses: number, draws: number): string => {
+    return `${wins}-${losses}-${draws}`;
   };
 
   // Logged out state
@@ -228,38 +295,106 @@ export default function MeScreen() {
         <Ionicons name="settings-sharp" size={24} color={theme.colors.textDark} />
       </TouchableOpacity>
 
-      <View style={styles.loggedInContent}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Profile section */}
         <View style={styles.profileSection}>
-          {user?.picture ? (
-            <Image source={{ uri: user.picture }} style={styles.profilePicture} />
-          ) : (
-            <View style={styles.profilePicturePlaceholder}>
-              <Ionicons name="person" size={40} color={theme.colors.mediumGray} />
-            </View>
+          <Avatar
+            userId={user?.sub || ''}
+            displayName={localStats?.displayName || user?.name}
+            username={localStats?.username || user?.username}
+            imageUrl={user?.picture}
+            size="xl"
+          />
+          <Text style={styles.displayName}>
+            {localStats?.displayName || user?.name || user?.email || 'Player'}
+          </Text>
+          {(localStats?.username || user?.username) && (
+            <Text style={styles.username}>@{localStats?.username || user?.username}</Text>
           )}
-          <Text style={styles.displayName}>{user?.name || user?.email || 'Player'}</Text>
+          <TouchableOpacity
+            style={styles.editProfileButton}
+            onPress={() => setShowEditProfileModal(true)}
+          >
+            <Text style={styles.editProfileButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Stats cards */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statEmoji}>🔥</Text>
-            {loadingStats ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
-            ) : (
-              <Text style={styles.statValue}>{localStats?.streak ?? 0}</Text>
-            )}
-            <Text style={styles.statLabel}>Streak</Text>
+        {/* Stats section */}
+        <View style={styles.statsSection}>
+          <Text style={styles.sectionTitle}>STATS</Text>
+
+          {/* First row of stats */}
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statEmoji}>🔥</Text>
+              {loadingStats ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
+              ) : (
+                <Text style={styles.statValue}>{localStats?.streak ?? 0}</Text>
+              )}
+              <Text style={styles.statLabel}>Streak</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statEmoji}>⭐</Text>
+              {loadingStats ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
+              ) : (
+                <Text style={styles.statValue}>{localStats?.bestScore ?? 0}</Text>
+              )}
+              <Text style={styles.statLabel}>High Score</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statEmoji}>🎯</Text>
+              {loadingStats ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
+              ) : (
+                <Text style={styles.statValue}>{localStats?.accuracy ?? 0}%</Text>
+              )}
+              <Text style={styles.statLabel}>Accuracy</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statEmoji}>⭐</Text>
-            {loadingStats ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
-            ) : (
-              <Text style={styles.statValue}>{localStats?.bestScore ?? 0}</Text>
-            )}
-            <Text style={styles.statLabel}>High Score</Text>
+
+          {/* Second row of stats */}
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statEmoji}>📊</Text>
+              {loadingStats ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
+              ) : (
+                <Text style={styles.statValue}>{localStats?.totalQuizzes ?? 0}</Text>
+              )}
+              <Text style={styles.statLabel}>Quizzes</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statEmoji}>🏆</Text>
+              {loadingStats ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
+              ) : (
+                <Text style={styles.statValueSmall}>
+                  {formatChallengeRecord(
+                    localStats?.challengeWins ?? 0,
+                    localStats?.challengeLosses ?? 0,
+                    localStats?.challengeDraws ?? 0
+                  )}
+                </Text>
+              )}
+              <Text style={styles.statLabel}>W-L-D</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statEmoji}>📅</Text>
+              {loadingStats ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
+              ) : (
+                <Text style={styles.statValueSmall}>
+                  {formatMemberSince(localStats?.createdAt ?? null)}
+                </Text>
+              )}
+              <Text style={styles.statLabel}>Joined</Text>
+            </View>
           </View>
         </View>
 
@@ -270,11 +405,30 @@ export default function MeScreen() {
           <Text style={styles.streakMessage}>{getStreakMessage(localStats?.streak ?? 0)}</Text>
           <Text style={styles.streakCta}>{getStreakCta(playedToday)}</Text>
         </View>
-      </View>
+      </ScrollView>
 
       <SettingsModal
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
+      />
+
+      <UsernameModal
+        visible={showUsernameModal}
+        onClose={() => setShowUsernameModal(false)}
+        onSuccess={handleUsernameSuccess}
+        currentUsername={localStats?.username || user?.username}
+        isRequired={user?.usernameRequired}
+      />
+
+      <EditProfileModal
+        visible={showEditProfileModal}
+        onClose={() => setShowEditProfileModal(false)}
+        currentDisplayName={localStats?.displayName || user?.name}
+        currentUsername={localStats?.username || user?.username}
+        canChangeUsername={localStats?.canChangeUsername ?? true}
+        usernameChangeAvailableAt={localStats?.usernameChangeAvailableAt}
+        onDisplayNameChange={handleDisplayNameChange}
+        onUsernameChange={handleUsernameChange}
       />
     </SafeAreaView>
   );
@@ -292,6 +446,14 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 8,
   },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.xxl,
+    paddingBottom: theme.spacing.xxl,
+  },
   // Logged out styles
   loggedOutContent: {
     flex: 1,
@@ -299,7 +461,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.xl,
   },
-promoTitle: {
+  promoTitle: {
     fontSize: 22,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
@@ -336,46 +498,56 @@ promoTitle: {
     fontSize: 15,
     fontFamily: theme.fonts.gothamBook,
   },
-  // Logged in styles
-  loggedInContent: {
-    flex: 1,
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xxl,
-  },
+  // Profile section
   profileSection: {
     alignItems: 'center',
     marginBottom: theme.spacing.xl,
-  },
-  profilePicture: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: theme.spacing.md,
-  },
-  profilePicturePlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: theme.colors.lightGray,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.md,
   },
   displayName: {
     fontSize: 22,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
+    marginTop: theme.spacing.md,
+  },
+  username: {
+    fontSize: 15,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    marginTop: theme.spacing.xs,
+  },
+  editProfileButton: {
+    marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+  },
+  editProfileButtonText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.primary,
+  },
+  // Stats section
+  statsSection: {
+    marginBottom: theme.spacing.xl,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.mediumGray,
+    marginBottom: theme.spacing.sm,
+    marginLeft: theme.spacing.xs,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.xl,
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   statCard: {
     flex: 1,
     backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.lg,
+    padding: theme.spacing.md,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -384,23 +556,29 @@ promoTitle: {
     elevation: 3,
   },
   statEmoji: {
-    fontSize: 24,
+    fontSize: 20,
     marginBottom: theme.spacing.xs,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 24,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.primary,
+  },
+  statValueSmall: {
+    fontSize: 16,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.primary,
   },
   statLoader: {
-    height: 34,
+    height: 28,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: theme.fonts.gothamBook,
     color: theme.colors.mediumGray,
     marginTop: theme.spacing.xs,
   },
+  // Streak section
   streakSection: {
     alignItems: 'center',
   },

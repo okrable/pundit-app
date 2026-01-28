@@ -7,9 +7,11 @@ interface DbChallenge {
   quiz_date: string;
   creator_id: string;
   creator_display_name: string | null;
+  creator_username: string | null;
   creator_score: number | null;
   opponent_id: string | null;
   opponent_display_name: string | null;
+  opponent_username: string | null;
   opponent_score: number | null;
   status: string;
   created_at: string;
@@ -104,7 +106,9 @@ export const handler: Handler = async (event) => {
         code: c.code,
         status: c.status,
         creatorDisplayName: c.creator_display_name,
+        creatorUsername: c.creator_username,
         opponentDisplayName: c.opponent_display_name,
+        opponentUsername: c.opponent_username,
         isCreator,
         createdAt: c.created_at,
         expiresAt: c.expires_at,
@@ -120,6 +124,7 @@ export const handler: Handler = async (event) => {
       const yourScore = isCreator ? c.creator_score : c.opponent_score;
       const opponentScore = isCreator ? c.opponent_score : c.creator_score;
       const opponentDisplayName = isCreator ? c.opponent_display_name : c.creator_display_name;
+      const opponentUsername = isCreator ? c.opponent_username : c.creator_username;
 
       let result: 'win' | 'loss' | 'draw' = 'draw';
       if (c.winner_id === userId) {
@@ -131,6 +136,7 @@ export const handler: Handler = async (event) => {
       return {
         challengeId: c.id,
         opponentDisplayName,
+        opponentUsername,
         yourScore,
         opponentScore,
         result,

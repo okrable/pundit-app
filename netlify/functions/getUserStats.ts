@@ -1,6 +1,8 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 
+const COOLDOWN_DAYS = 30;
+
 export const handler: Handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -40,7 +42,15 @@ export const handler: Handler = async (event) => {
           streak: 0,
           bestScore: 0,
           totalQuizzes: 0,
-          averageScore: 0,
+          accuracy: 0,
+          challengeWins: 0,
+          challengeLosses: 0,
+          challengeDraws: 0,
+          username: null,
+          displayName: null,
+          createdAt: null,
+          canChangeUsername: true,
+          usernameChangeAvailableAt: null,
         }),
       };
     }
@@ -52,6 +62,13 @@ export const handler: Handler = async (event) => {
       total_quizzes: number;
       total_correct: number;
       accuracy_pct: number;
+      challenge_wins: number;
+      challenge_losses: number;
+      challenge_draws: number;
+      username: string | null;
+      display_name: string | null;
+      created_at: string;
+      username_last_changed_at: string | null;
     }>(
       `SELECT
         streak,
@@ -61,29 +78,74 @@ export const handler: Handler = async (event) => {
         CASE WHEN total_quizzes > 0
           THEN ROUND(total_correct::DECIMAL / (total_quizzes * 5) * 100, 1)
           ELSE 0
-        END as accuracy_pct
+        END as accuracy_pct,
+        COALESCE(challenge_wins, 0) as challenge_wins,
+        COALESCE(challenge_losses, 0) as challenge_losses,
+        COALESCE(challenge_draws, 0) as challenge_draws,
+        username,
+        display_name,
+        created_at,
+        username_last_changed_at
       FROM users
       WHERE id = $1`,
       [userId]
     );
 
     // Return zeros if user doesn't exist
-    const userStats = stats[0] || {
-      streak: 0,
-      best_score: 0,
-      total_quizzes: 0,
-      total_correct: 0,
-      accuracy_pct: 0,
-    };
+    if (stats.length === 0) {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          streak: 0,
+          bestScore: 0,
+          totalQuizzes: 0,
+          accuracy: 0,
+          challengeWins: 0,
+          challengeLosses: 0,
+          challengeDraws: 0,
+          username: null,
+          displayName: null,
+          createdAt: null,
+          canChangeUsername: true,
+          usernameChangeAvailableAt: null,
+        }),
+      };
+    }
+
+    const userStats = stats[0];
+
+    // Calculate username change availability
+    let canChangeUsername = true;
+    let usernameChangeAvailableAt: string | null = null;
+
+    if (userStats.username_last_changed_at) {
+      const lastChanged = new Date(userStats.username_last_changed_at);
+      const cooldownEnd = new Date(lastChanged.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+      const now = new Date();
+
+      if (now < cooldownEnd) {
+        canChangeUsername = false;
+        usernameChangeAvailableAt = cooldownEnd.toISOString();
+      }
+    }
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        streak: userStats.streak,
-        bestScore: userStats.best_score,
-        totalQuizzes: userStats.total_quizzes,
-        averageScore: userStats.accuracy_pct,
+        streak: userStats.streak || 0,
+        bestScore: userStats.best_score || 0,
+        totalQuizzes: userStats.total_quizzes || 0,
+        accuracy: userStats.accuracy_pct || 0,
+        challengeWins: userStats.challenge_wins || 0,
+        challengeLosses: userStats.challenge_losses || 0,
+        challengeDraws: userStats.challenge_draws || 0,
+        username: userStats.username,
+        displayName: userStats.display_name,
+        createdAt: userStats.created_at,
+        canChangeUsername,
+        usernameChangeAvailableAt,
       }),
     };
   } catch (error) {

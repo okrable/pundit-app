@@ -28,6 +28,7 @@ export const handler: Handler = async (event) => {
     const leaderboard = await query<{
       user_id: string;
       display_name: string | null;
+      username: string | null;
       score: number;
       streak: number;
       rank: number;
@@ -35,6 +36,7 @@ export const handler: Handler = async (event) => {
       `SELECT
         r.user_id,
         u.display_name,
+        u.username,
         r.score,
         u.streak,
         RANK() OVER (ORDER BY r.score DESC) as rank
@@ -50,6 +52,7 @@ export const handler: Handler = async (event) => {
     const response = leaderboard.map((entry) => ({
       userId: entry.user_id,
       displayName: entry.display_name || 'Anonymous',
+      username: entry.username,
       score: entry.score,
       streak: entry.streak,
       rank: Number(entry.rank),

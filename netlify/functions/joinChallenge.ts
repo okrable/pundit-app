@@ -5,6 +5,7 @@ interface JoinChallengeRequest {
   code: string;
   userId: string;
   displayName?: string;
+  username?: string;
 }
 
 interface DbChallenge {
@@ -40,7 +41,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const body: JoinChallengeRequest = JSON.parse(event.body || '{}');
-    const { code, userId, displayName } = body;
+    const { code, userId, displayName, username } = body;
 
     if (!code || !userId) {
       return {
@@ -63,14 +64,14 @@ export const handler: Handler = async (event) => {
     // This prevents race conditions when multiple users try to join simultaneously
     const updateResult = await query<DbChallenge>(
       `UPDATE challenges
-       SET opponent_id = $1, opponent_display_name = $2, status = 'active'
-       WHERE code = $3
+       SET opponent_id = $1, opponent_display_name = $2, opponent_username = $3, status = 'active'
+       WHERE code = $4
        AND opponent_id IS NULL
        AND status = 'pending'
        AND expires_at > NOW()
        AND creator_id != $1
        RETURNING *`,
-      [userId, displayName || null, code.toUpperCase()]
+      [userId, displayName || null, username || null, code.toUpperCase()]
     );
 
     let challenge: DbChallenge;

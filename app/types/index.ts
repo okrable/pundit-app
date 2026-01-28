@@ -51,6 +51,7 @@ export interface QuizResult {
 export interface LeaderboardEntry {
   userId: string;
   displayName: string | null;
+  username: string | null;
   score: number;
   streak: number;
   rank: number;
@@ -60,7 +61,15 @@ export interface UserStats {
   streak: number;
   bestScore: number;
   totalQuizzes: number;
-  averageScore: number;
+  accuracy: number;
+  challengeWins: number;
+  challengeLosses: number;
+  challengeDraws: number;
+  username: string | null;
+  displayName: string | null;
+  createdAt: string | null;
+  canChangeUsername: boolean;
+  usernameChangeAvailableAt: string | null;
 }
 
 export interface UserProfile {
@@ -69,10 +78,32 @@ export interface UserProfile {
   avatarUrl?: string;
 }
 
+// Username API types
+export interface CheckUsernameResponse {
+  available: boolean;
+  error?: string;
+}
+
+export interface SetUsernameResponse {
+  success: boolean;
+  username?: string;
+  error?: string;
+}
+
+export interface UpdateProfileResponse {
+  success: boolean;
+  profile?: {
+    displayName: string | null;
+    username: string | null;
+  };
+  error?: string;
+}
+
 // Challenge Mode Types
 export interface ChallengeHistoryItem {
   challengeId: string;
   opponentDisplayName: string | null;
+  opponentUsername: string | null;
   yourScore: number;
   opponentScore: number;
   result: 'win' | 'loss' | 'draw';
@@ -90,7 +121,9 @@ export interface ActiveChallenge {
   code: string;
   status: 'pending' | 'active';
   creatorDisplayName: string | null;
+  creatorUsername: string | null;
   opponentDisplayName: string | null;
+  opponentUsername: string | null;
   isCreator: boolean;
   createdAt: string;
   expiresAt: string;
