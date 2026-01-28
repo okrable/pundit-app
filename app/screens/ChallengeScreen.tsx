@@ -231,6 +231,13 @@ export default function ChallengeScreen() {
                 <Ionicons name="flash" size={24} color={theme.colors.accent} />
                 <Text style={styles.activeTitle}>Active Challenge</Text>
               </View>
+              <Text style={styles.roleIndicator}>
+                {activeChallenge.isCreator
+                  ? activeChallenge.opponentDisplayName
+                    ? `You challenged ${activeChallenge.opponentDisplayName}`
+                    : 'Waiting for a challenger...'
+                  : `vs ${activeChallenge.creatorDisplayName || 'Anonymous'}`}
+              </Text>
               <View style={styles.codeDisplay}>
                 <Text style={styles.codeLabel}>Challenge Code</Text>
                 <Text style={styles.codeValue}>{activeChallenge.code}</Text>
@@ -246,50 +253,42 @@ export default function ChallengeScreen() {
                   ? 'Waiting for opponent to play...'
                   : 'Your turn to play!'}
               </Text>
+              {/* Play Status - Button or Indicator */}
+              {(activeChallenge.isCreator
+                ? activeChallenge.hasCreatorPlayed
+                : activeChallenge.hasOpponentPlayed) ? (
+                <View style={styles.playStatusRow}>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.correct} />
+                  <Text style={[styles.playStatusText, styles.playStatusTextPlayed]}>
+                    You've played
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.playStatusButton}
+                  onPress={handlePlayActiveChallenge}
+                >
+                  <Ionicons name="play-circle" size={20} color={theme.colors.white} />
+                  <Text style={styles.playStatusButtonText}>Play</Text>
+                </TouchableOpacity>
+              )}
               <View style={styles.activeButtons}>
-                {activeChallenge.status === 'pending' ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.shareButton}
-                      onPress={() => {
-                        setCreatedCode(activeChallenge.code);
-                        setShowShareModal(true);
-                      }}
-                    >
-                      <Ionicons name="share-outline" size={18} color={theme.colors.white} />
-                      <Text style={styles.shareButtonText}>Share</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.cancelButton}
-                      onPress={handleRevokeChallenge}
-                    >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.playButton,
-                      (activeChallenge.isCreator
-                        ? activeChallenge.hasCreatorPlayed
-                        : activeChallenge.hasOpponentPlayed) && styles.playButtonDisabled,
-                    ]}
-                    onPress={handlePlayActiveChallenge}
-                    disabled={
-                      activeChallenge.isCreator
-                        ? activeChallenge.hasCreatorPlayed
-                        : activeChallenge.hasOpponentPlayed
-                    }
-                  >
-                    <Text style={styles.playButtonText}>
-                      {(activeChallenge.isCreator
-                        ? activeChallenge.hasCreatorPlayed
-                        : activeChallenge.hasOpponentPlayed)
-                        ? 'Already Played'
-                        : 'Play Now'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={styles.shareButton}
+                  onPress={() => {
+                    setCreatedCode(activeChallenge.code);
+                    setShowShareModal(true);
+                  }}
+                >
+                  <Ionicons name="share-outline" size={18} color={theme.colors.white} />
+                  <Text style={styles.shareButtonText}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={handleRevokeChallenge}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
               </View>
             </View>
           ) : (
@@ -519,6 +518,13 @@ const styles = StyleSheet.create({
     color: theme.colors.textDark,
     marginLeft: theme.spacing.sm,
   },
+  roleIndicator: {
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
   codeDisplay: {
     backgroundColor: theme.colors.background,
     borderRadius: theme.borderRadius.md,
@@ -544,6 +550,41 @@ const styles = StyleSheet.create({
     color: theme.colors.mediumGray,
     textAlign: 'center',
     marginBottom: theme.spacing.md,
+  },
+  playStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.background,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.md,
+  },
+  playStatusText: {
+    fontFamily: theme.fonts.gothamMedium,
+    fontSize: 14,
+    color: theme.colors.accent,
+    marginLeft: theme.spacing.sm,
+  },
+  playStatusTextPlayed: {
+    color: theme.colors.correct,
+  },
+  playStatusButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.accent,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.md,
+  },
+  playStatusButtonText: {
+    fontFamily: theme.fonts.gothamMedium,
+    fontSize: 14,
+    color: theme.colors.white,
+    marginLeft: theme.spacing.sm,
   },
   activeButtons: {
     flexDirection: 'row',

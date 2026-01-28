@@ -59,65 +59,81 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Fetch challenge by code
-    const challenges = await query<DbChallenge>(
-      `SELECT * FROM challenges WHERE code = $1`,
-      [code.toUpperCase()]
+    // Atomic update: only succeeds if challenge exists, has no opponent, is pending, not expired, and user isn't creator
+    // This prevents race conditions when multiple users try to join simultaneously
+    const updateResult = await query<DbChallenge>(
+      `UPDATE challenges
+       SET opponent_id = $1, opponent_display_name = $2, status = 'active'
+       WHERE code = $3
+       AND opponent_id IS NULL
+       AND status = 'pending'
+       AND expires_at > NOW()
+       AND creator_id != $1
+       RETURNING *`,
+      [userId, displayName || null, code.toUpperCase()]
     );
 
-    if (challenges.length === 0) {
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: 'Challenge not found' }),
-      };
-    }
+    let challenge: DbChallenge;
 
-    const challenge = challenges[0];
+    if (updateResult.length === 0) {
+      // Update failed - determine specific error by checking the challenge
+      const challenges = await query<DbChallenge>(
+        `SELECT * FROM challenges WHERE code = $1`,
+        [code.toUpperCase()]
+      );
 
-    // Check if expired
-    const now = new Date();
-    const expiresAt = new Date(challenge.expires_at);
-    if (now > expiresAt) {
-      return {
-        statusCode: 410,
-        headers,
-        body: JSON.stringify({ error: 'Challenge has expired' }),
-      };
-    }
+      if (challenges.length === 0) {
+        return {
+          statusCode: 404,
+          headers,
+          body: JSON.stringify({ error: 'Challenge not found' }),
+        };
+      }
 
-    // Check if already has an opponent
-    if (challenge.opponent_id !== null) {
-      return {
-        statusCode: 409,
-        headers,
-        body: JSON.stringify({ error: 'Challenge already has an opponent' }),
-      };
-    }
+      const existingChallenge = challenges[0];
 
-    // Check if trying to join own challenge
-    if (challenge.creator_id === userId) {
+      if (existingChallenge.opponent_id !== null) {
+        return {
+          statusCode: 409,
+          headers,
+          body: JSON.stringify({ error: 'Challenge already has an opponent' }),
+        };
+      }
+
+      if (existingChallenge.creator_id === userId) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Cannot join your own challenge' }),
+        };
+      }
+
+      if (new Date(existingChallenge.expires_at) < new Date()) {
+        return {
+          statusCode: 410,
+          headers,
+          body: JSON.stringify({ error: 'Challenge has expired' }),
+        };
+      }
+
+      if (existingChallenge.status !== 'pending') {
+        return {
+          statusCode: 410,
+          headers,
+          body: JSON.stringify({ error: `Challenge is ${existingChallenge.status}` }),
+        };
+      }
+
+      // Fallback error
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Cannot join your own challenge' }),
+        body: JSON.stringify({ error: 'Challenge is not available' }),
       };
     }
 
-    // Check if challenge is in valid state
-    if (challenge.status === 'revoked' || challenge.status === 'expired' || challenge.status === 'completed') {
-      return {
-        statusCode: 410,
-        headers,
-        body: JSON.stringify({ error: `Challenge is ${challenge.status}` }),
-      };
-    }
-
-    // Update challenge with opponent
-    await query(
-      `UPDATE challenges SET opponent_id = $1, opponent_display_name = $2 WHERE id = $3`,
-      [userId, displayName || null, challenge.id]
-    );
+    // Success - we atomically claimed the opponent spot
+    challenge = updateResult[0];
 
     // Fetch quiz questions
     const questions = await query<{
