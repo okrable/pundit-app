@@ -4,3 +4,9 @@
 
 [functions]
   node_bundler = "esbuild"
+
+# Friend invite link redirects
+[[redirects]]
+  from = "/f/*"
+  to = "/.netlify/functions/f/:splat"
+  status = 200

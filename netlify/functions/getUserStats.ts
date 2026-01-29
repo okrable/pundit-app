@@ -42,7 +42,6 @@ export const handler: Handler = async (event) => {
           streak: 0,
           bestScore: 0,
           totalQuizzes: 0,
-          accuracy: 0,
           challengeWins: 0,
           challengeLosses: 0,
           challengeDraws: 0,
@@ -60,8 +59,6 @@ export const handler: Handler = async (event) => {
       streak: number;
       best_score: number;
       total_quizzes: number;
-      total_correct: number;
-      accuracy_pct: number;
       challenge_wins: number;
       challenge_losses: number;
       challenge_draws: number;
@@ -74,11 +71,6 @@ export const handler: Handler = async (event) => {
         streak,
         best_score,
         total_quizzes,
-        total_correct,
-        CASE WHEN total_quizzes > 0
-          THEN ROUND(total_correct::DECIMAL / (total_quizzes * 5) * 100, 1)
-          ELSE 0
-        END as accuracy_pct,
         COALESCE(challenge_wins, 0) as challenge_wins,
         COALESCE(challenge_losses, 0) as challenge_losses,
         COALESCE(challenge_draws, 0) as challenge_draws,
@@ -100,7 +92,6 @@ export const handler: Handler = async (event) => {
           streak: 0,
           bestScore: 0,
           totalQuizzes: 0,
-          accuracy: 0,
           challengeWins: 0,
           challengeLosses: 0,
           challengeDraws: 0,
@@ -137,7 +128,6 @@ export const handler: Handler = async (event) => {
         streak: userStats.streak || 0,
         bestScore: userStats.best_score || 0,
         totalQuizzes: userStats.total_quizzes || 0,
-        accuracy: userStats.accuracy_pct || 0,
         challengeWins: userStats.challenge_wins || 0,
         challengeLosses: userStats.challenge_losses || 0,
         challengeDraws: userStats.challenge_draws || 0,

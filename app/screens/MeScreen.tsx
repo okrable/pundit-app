@@ -149,7 +149,7 @@ export default function MeScreen() {
         }
       );
 
-      const { accessToken } = tokenResponse;
+      const { accessToken, refreshToken } = tokenResponse;
 
       // Fetch user info
       const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
@@ -160,8 +160,8 @@ export default function MeScreen() {
 
       const userInfo = await userInfoResponse.json();
 
-      // Update auth store
-      setAuthResult(accessToken, userInfo);
+      // Update auth store with access token and refresh token
+      setAuthResult(accessToken, userInfo, refreshToken);
       setIsLoading(false);
     } catch (error) {
       console.error('Token exchange error:', error);
@@ -348,19 +348,6 @@ export default function MeScreen() {
               <Text style={styles.statLabel}>High Score</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>🎯</Text>
-              {loadingStats ? (
-                <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
-              ) : (
-                <Text style={styles.statValue}>{localStats?.accuracy ?? 0}%</Text>
-              )}
-              <Text style={styles.statLabel}>Accuracy</Text>
-            </View>
-          </View>
-
-          {/* Second row of stats */}
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
               <Text style={styles.statEmoji}>📊</Text>
               {loadingStats ? (
                 <ActivityIndicator size="small" color={theme.colors.primary} style={styles.statLoader} />
@@ -369,6 +356,10 @@ export default function MeScreen() {
               )}
               <Text style={styles.statLabel}>Quizzes</Text>
             </View>
+          </View>
+
+          {/* Second row of stats */}
+          <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statEmoji}>🏆</Text>
               {loadingStats ? (

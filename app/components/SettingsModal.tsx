@@ -30,7 +30,7 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    logout();
+    await logout();
     setIsLoggingOut(false);
     onClose();
   };

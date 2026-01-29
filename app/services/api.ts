@@ -9,6 +9,11 @@ import {
   CheckUsernameResponse,
   SetUsernameResponse,
   UpdateProfileResponse,
+  CreateFriendLinkResponse,
+  AcceptFriendLinkResponse,
+  GetFriendsResponse,
+  RemoveFriendResponse,
+  FriendsLeaderboardResponse,
 } from '../types';
 import { useAuthStore } from '../state/useAuthStore';
 
@@ -120,4 +125,45 @@ export async function updateProfile(
     method: 'POST',
     body: JSON.stringify({ userId, displayName }),
   });
+}
+
+// Friends API functions
+
+export async function createFriendLink(userId: string): Promise<CreateFriendLinkResponse> {
+  return fetchApi<CreateFriendLinkResponse>('/createFriendLink', {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function acceptFriendLink(
+  code: string,
+  userId: string
+): Promise<AcceptFriendLinkResponse> {
+  return fetchApi<AcceptFriendLinkResponse>('/acceptFriendLink', {
+    method: 'POST',
+    body: JSON.stringify({ code, userId }),
+  });
+}
+
+export async function getFriends(userId: string): Promise<GetFriendsResponse> {
+  return fetchApi<GetFriendsResponse>(`/getFriends?userId=${userId}`);
+}
+
+export async function removeFriend(
+  userId: string,
+  friendId: string
+): Promise<RemoveFriendResponse> {
+  return fetchApi<RemoveFriendResponse>('/removeFriend', {
+    method: 'POST',
+    body: JSON.stringify({ userId, friendId }),
+  });
+}
+
+export async function getFriendsLeaderboard(
+  userId: string
+): Promise<FriendsLeaderboardResponse> {
+  return fetchApi<FriendsLeaderboardResponse>(
+    `/getFriendsLeaderboard?userId=${userId}`
+  );
 }

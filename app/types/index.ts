@@ -61,7 +61,6 @@ export interface UserStats {
   streak: number;
   bestScore: number;
   totalQuizzes: number;
-  accuracy: number;
   challengeWins: number;
   challengeLosses: number;
   challengeDraws: number;
@@ -183,4 +182,53 @@ export interface GetChallengeResponse {
   } | null;
   canJoin: boolean;
   expiresAt: string;
+}
+
+// Friends & Personal Leaderboard Types
+export interface Friend {
+  id: string;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  streak: number;
+  friendSince: string;
+}
+
+export interface FriendsLeaderboardEntry {
+  userId: string;
+  displayName: string | null;
+  username: string | null;
+  score: number;
+  streak: number;
+  rank: number | null;
+  hasPlayedToday: boolean;
+}
+
+export interface FriendsLeaderboardResponse {
+  leaderboard: FriendsLeaderboardEntry[];
+  totalFriends: number;
+  friendsPlayedToday: number;
+}
+
+export interface CreateFriendLinkResponse {
+  code: string;
+  shareUrl: string;
+  expiresAt: string;
+}
+
+export interface AcceptFriendLinkResponse {
+  success: boolean;
+  friendId?: string;
+  friendDisplayName?: string | null;
+  friendUsername?: string | null;
+  error?: string;
+}
+
+export interface GetFriendsResponse {
+  friends: Friend[];
+}
+
+export interface RemoveFriendResponse {
+  success: boolean;
+  error?: string;
 }

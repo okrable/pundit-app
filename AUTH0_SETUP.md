@@ -11,6 +11,7 @@ Auth0 integration is **fully implemented** and ready to use:
 - Automatic token injection for API calls
 - Graceful fallback to guest mode when Auth0 is not configured
 - Settings screen with login/logout functionality
+- **Offline access tokens** for persistent login sessions (users stay logged in)
 
 ## Implementation Details
 
@@ -18,11 +19,14 @@ Auth0 integration is **fully implemented** and ready to use:
 - `expo-auth-session` - OAuth authentication flow
 - `expo-crypto` - Cryptographic operations for PKCE
 - `expo-web-browser` - Browser-based authentication
+- `expo-secure-store` - Secure storage for refresh tokens (iOS Keychain / Android Keystore)
 
 ### Key Files
-- [app/services/auth0.ts](app/services/auth0.ts) - Auth0 configuration and hooks
-- [app/state/useAuthStore.ts](app/state/useAuthStore.ts) - Authentication state management
-- [app/screens/SettingsScreen.tsx](app/screens/SettingsScreen.tsx) - Login/logout UI
+- [app/services/auth0.ts](app/services/auth0.ts) - Auth0 configuration, hooks, and token refresh
+- [app/state/useAuthStore.ts](app/state/useAuthStore.ts) - Authentication state management with session restoration
+- [app/storage/authStorage.ts](app/storage/authStorage.ts) - Secure token storage (SecureStore/AsyncStorage)
+- [app/hooks/useAuthInit.ts](app/hooks/useAuthInit.ts) - Auth initialization hook for app startup
+- [app/screens/MeScreen.tsx](app/screens/MeScreen.tsx) - Login/logout UI
 - [app/services/api.ts](app/services/api.ts) - Automatic token injection for API calls
 
 ## Setup Instructions
@@ -54,7 +58,50 @@ pundit-app://*, exp://localhost:8081/--/*
 pundit-app://*, exp://localhost:8081
 ```
 
-### 3. Set Up Environment Variables
+### 3. Enable Refresh Tokens (Offline Access)
+
+**IMPORTANT:** To keep users logged in between app sessions, you must enable refresh tokens in Auth0.
+
+#### Step 3a: Enable Refresh Token Rotation (Recommended)
+
+1. Go to your Auth0 Dashboard
+2. Navigate to **Applications > APIs**
+3. Select your API (or the default "Auth0 Management API" if using first-party apps)
+4. Go to the **Settings** tab
+5. Under **Access Settings**, ensure **Allow Offline Access** is enabled
+
+#### Step 3b: Configure Your Application for Refresh Tokens
+
+1. Go to **Applications > Applications**
+2. Select your Native application
+3. Go to the **Settings** tab
+4. Scroll down to **Refresh Token Rotation**
+5. Enable **Rotation** (recommended for security)
+6. Set **Reuse Interval** to something reasonable (e.g., 60 seconds)
+7. Under **Refresh Token Expiration**:
+   - Set **Absolute Lifetime** (e.g., 2592000 seconds = 30 days)
+   - Set **Inactivity Lifetime** (e.g., 1296000 seconds = 15 days)
+
+#### Step 3c: Grant Types
+
+1. Still in your application settings
+2. Scroll to **Advanced Settings > Grant Types**
+3. Ensure these are enabled:
+   - **Authorization Code**
+   - **Refresh Token**
+
+#### Summary of Auth0 Dashboard Settings for Offline Access
+
+| Setting | Location | Value |
+|---------|----------|-------|
+| Allow Offline Access | APIs > Your API > Settings | Enabled |
+| Refresh Token Rotation | Applications > Your App > Settings | Enabled |
+| Reuse Interval | Applications > Your App > Settings | 60 seconds |
+| Absolute Lifetime | Applications > Your App > Settings | 2592000 (30 days) |
+| Inactivity Lifetime | Applications > Your App > Settings | 1296000 (15 days) |
+| Grant Types | Applications > Your App > Advanced Settings | Authorization Code, Refresh Token |
+
+### 4. Set Up Environment Variables
 
 Create a `.env` file from `.env.example`:
 
@@ -99,9 +146,18 @@ Press `r` to reload or restart the app completely.
 2. Opens browser for Auth0 Universal Login
 3. User authenticates with Auth0
 4. App receives authorization code via redirect
-5. Exchanges code for access token using PKCE
+5. Exchanges code for access token AND refresh token using PKCE
 6. Fetches user profile from Auth0
-7. All API requests automatically include Bearer token
+7. Stores refresh token securely (iOS Keychain / Android Keystore)
+8. All API requests automatically include Bearer token
+
+### Persistent Login (Session Restoration)
+When the app launches:
+1. App checks for stored refresh token
+2. If found, exchanges refresh token for new access token
+3. Fetches fresh user profile
+4. User is automatically logged in (no need to re-authenticate)
+5. If refresh token is expired/invalid, user is logged out and must re-authenticate
 
 ### Automatic Token Injection
 
@@ -246,6 +302,18 @@ Check the console for errors during token exchange. Common issues:
 
 ### Token Not Being Sent to Backend
 Check the Network tab in debugging tools. The `Authorization: Bearer <token>` header should appear in requests to your API when authenticated.
+
+### User Not Staying Logged In (Session Not Persisting)
+1. **Check Auth0 Configuration**: Ensure you've enabled refresh tokens in your Auth0 dashboard (see Step 3 above)
+2. **Verify Grant Types**: Make sure "Refresh Token" grant type is enabled for your application
+3. **Check Token Response**: After login, verify the token response includes a `refresh_token` field
+4. **Storage Issues**: On web, tokens are stored in AsyncStorage (less secure). For production web apps, consider server-side session management.
+
+### Refresh Token Expired
+If users are being logged out after a period of time:
+1. Check your Auth0 **Refresh Token Expiration** settings
+2. Increase **Absolute Lifetime** for longer sessions
+3. Increase **Inactivity Lifetime** if users are being logged out due to inactivity
 
 ## Production Deployment
 

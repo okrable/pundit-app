@@ -1,26 +1,65 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  TouchableOpacity,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AuthSession from 'expo-auth-session';
-import { LeaderboardEntry } from '../types';
-import { getLeaderboard } from '../services/api';
+import { Ionicons } from '@expo/vector-icons';
+import { LeaderboardEntry, FriendsLeaderboardEntry } from '../types';
+import { getLeaderboard, getFriendsLeaderboard } from '../services/api';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAuthRequest, auth0Config } from '../services/auth0';
 import { theme } from '../theme/theme';
 import Avatar from '../components/Avatar';
+import ManageFriendsModal from '../components/ManageFriendsModal';
+
+type ViewMode = 'friends' | 'global';
 
 export default function LeaderboardScreen() {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('friends');
+  const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [friendsLeaderboard, setFriendsLeaderboard] = useState<FriendsLeaderboardEntry[]>([]);
+  const [totalFriends, setTotalFriends] = useState(0);
+  const [friendsPlayedToday, setFriendsPlayedToday] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [showManageFriends, setShowManageFriends] = useState(false);
 
-  const { isAuthenticated, isAuth0Available, setAuthResult, clearError } = useAuthStore();
+  const { user, isAuthenticated, isAuth0Available, setAuthResult, clearError } = useAuthStore();
   const [request, response, promptAsync] = useAuthRequest();
 
+  const loadData = useCallback(async () => {
+    setError(null);
+    try {
+      if (viewMode === 'friends' && isAuthenticated && user?.sub) {
+        const data = await getFriendsLeaderboard(user.sub);
+        setFriendsLeaderboard(data.leaderboard);
+        setTotalFriends(data.totalFriends);
+        setFriendsPlayedToday(data.friendsPlayedToday);
+      } else {
+        const data = await getLeaderboard();
+        setGlobalLeaderboard(data);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load leaderboard');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [viewMode, isAuthenticated, user?.sub]);
+
   useEffect(() => {
-    loadLeaderboard();
-  }, []);
+    setLoading(true);
+    loadData();
+  }, [loadData]);
 
   // Handle Auth0 response
   useEffect(() => {
@@ -37,40 +76,26 @@ export default function LeaderboardScreen() {
 
   const exchangeCodeForToken = async (code: string) => {
     try {
-      const redirectUri = AuthSession.makeRedirectUri({
-        scheme: 'pundit-app',
-      });
-
+      const redirectUri = AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
       const tokenResponse = await AuthSession.exchangeCodeAsync(
         {
           code,
           clientId: auth0Config.clientId || '',
           redirectUri,
-          extraParams: {
-            code_verifier: request?.codeVerifier || '',
-          },
+          extraParams: { code_verifier: request?.codeVerifier || '' },
         },
-        {
-          tokenEndpoint: auth0Config.tokenEndpoint,
-        }
+        { tokenEndpoint: auth0Config.tokenEndpoint }
       );
 
       const { accessToken } = tokenResponse;
-
-      // Fetch user info
       const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
-
       const userInfo = await userInfoResponse.json();
-
-      // Update auth store
       setAuthResult(accessToken, userInfo);
       setIsAuthLoading(false);
-    } catch (error) {
-      console.error('Token exchange error:', error);
+    } catch (err) {
+      console.error('Token exchange error:', err);
       setIsAuthLoading(false);
     }
   };
@@ -81,20 +106,82 @@ export default function LeaderboardScreen() {
     await promptAsync();
   };
 
-  const loadLeaderboard = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getLeaderboard();
-      setLeaderboard(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load leaderboard');
-    } finally {
-      setLoading(false);
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  const handleFriendsChanged = () => {
+    if (viewMode === 'friends') {
+      loadData();
     }
   };
 
-  const renderItem = ({ item, index }: { item: LeaderboardEntry; index: number }) => (
+  const renderSegmentedControl = () => {
+    if (!isAuthenticated) return null;
+
+    return (
+      <View style={styles.segmentedControl}>
+        <TouchableOpacity
+          style={[styles.segment, viewMode === 'friends' && styles.segmentActive]}
+          onPress={() => setViewMode('friends')}
+        >
+          <Text style={[styles.segmentText, viewMode === 'friends' && styles.segmentTextActive]}>
+            Friends
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.segment, viewMode === 'global' && styles.segmentActive]}
+          onPress={() => setViewMode('global')}
+        >
+          <Text style={[styles.segmentText, viewMode === 'global' && styles.segmentTextActive]}>
+            Global
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderFriendsItem = ({ item }: { item: FriendsLeaderboardEntry }) => {
+    const isCurrentUser = item.userId === user?.sub;
+
+    return (
+      <View style={[styles.leaderboardItem, isCurrentUser && styles.currentUserItem]}>
+        {item.hasPlayedToday && item.rank ? (
+          <View style={styles.rankContainer}>
+            <Text style={styles.rank}>#{item.rank}</Text>
+          </View>
+        ) : (
+          <View style={[styles.rankContainer, styles.rankContainerEmpty]}>
+            <Ionicons name="time-outline" size={16} color={theme.colors.mediumGray} />
+          </View>
+        )}
+        <Avatar
+          userId={item.userId}
+          displayName={item.displayName}
+          username={item.username}
+          size="md"
+        />
+        <View style={styles.playerInfo}>
+          <View style={styles.nameRow}>
+            <Text style={styles.playerName}>
+              {item.username ? `@${item.username}` : item.displayName || 'Anonymous'}
+            </Text>
+            {isCurrentUser && <Text style={styles.youBadge}>You</Text>}
+          </View>
+          {item.hasPlayedToday ? (
+            <Text style={styles.playerStats}>
+              {item.score} pts • Streak: {item.streak}
+            </Text>
+          ) : (
+            <Text style={styles.notPlayedText}>Not yet played</Text>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const renderGlobalItem = ({ item, index }: { item: LeaderboardEntry; index: number }) => (
     <View style={styles.leaderboardItem}>
       <View style={styles.rankContainer}>
         <Text style={styles.rank}>#{item.rank || index + 1}</Text>
@@ -140,6 +227,29 @@ export default function LeaderboardScreen() {
     );
   };
 
+  const renderFriendsEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="people-outline" size={48} color={theme.colors.mediumGray} />
+      <Text style={styles.emptyText}>No friends yet</Text>
+      <Text style={styles.emptySubtext}>
+        Add friends to see your personal leaderboard
+      </Text>
+      <TouchableOpacity
+        style={styles.inviteFriendsButton}
+        onPress={() => setShowManageFriends(true)}
+      >
+        <Text style={styles.inviteFriendsButtonText}>Invite Friends</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderGlobalEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>No leaderboard data yet</Text>
+      <Text style={styles.emptySubtext}>Be the first to complete today's quiz!</Text>
+    </View>
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -156,29 +266,77 @@ export default function LeaderboardScreen() {
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <View style={styles.centerContainer}>
           <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
+  const isFriendsView = viewMode === 'friends' && isAuthenticated;
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       {renderGuestBanner()}
+
       <View style={styles.header}>
-        <Text style={styles.title}>Leaderboard</Text>
-        <Text style={styles.subtitle}>Today's top players</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>Leaderboard</Text>
+          {isAuthenticated && (
+            <TouchableOpacity
+              style={styles.manageFriendsButton}
+              onPress={() => setShowManageFriends(true)}
+            >
+              <Ionicons name="people" size={22} color={theme.colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {renderSegmentedControl()}
+        {isFriendsView && totalFriends > 0 && (
+          <Text style={styles.subtitle}>
+            {friendsPlayedToday} of {totalFriends} friends played today
+          </Text>
+        )}
+        {!isFriendsView && <Text style={styles.subtitle}>Today's top players</Text>}
       </View>
-      <FlatList
-        data={leaderboard}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.userId}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No leaderboard data yet</Text>
-            <Text style={styles.emptySubtext}>Be the first to complete today's quiz!</Text>
-          </View>
-        }
+
+      {isFriendsView ? (
+        <FlatList
+          data={friendsLeaderboard}
+          renderItem={renderFriendsItem}
+          keyExtractor={(item) => item.userId}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={renderFriendsEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
+        />
+      ) : (
+        <FlatList
+          data={globalLeaderboard}
+          renderItem={renderGlobalItem}
+          keyExtractor={(item) => item.userId}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={renderGlobalEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
+        />
+      )}
+
+      <ManageFriendsModal
+        visible={showManageFriends}
+        onClose={() => setShowManageFriends(false)}
+        onFriendsChanged={handleFriendsChanged}
       />
     </SafeAreaView>
   );
@@ -206,16 +364,58 @@ const styles = StyleSheet.create({
     color: theme.colors.incorrect,
     textAlign: 'center',
     fontFamily: theme.fonts.gothamBook,
+    marginBottom: theme.spacing.md,
+  },
+  retryButton: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.gothamMedium,
   },
   header: {
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.sm,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
   title: {
     fontSize: 24,
     fontFamily: theme.fonts.gothamBlack,
     color: theme.colors.textDark,
-    marginBottom: theme.spacing.xs,
+  },
+  manageFriendsButton: {
+    padding: theme.spacing.xs,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: 4,
+    marginBottom: theme.spacing.sm,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.sm,
+  },
+  segmentActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.mediumGray,
+  },
+  segmentTextActive: {
+    color: theme.colors.white,
   },
   subtitle: {
     fontSize: 13,
@@ -263,6 +463,7 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: theme.spacing.lg,
     paddingTop: theme.spacing.sm,
+    flexGrow: 1,
   },
   leaderboardItem: {
     flexDirection: 'row',
@@ -277,6 +478,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  currentUserItem: {
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+  },
   rankContainer: {
     width: 36,
     height: 36,
@@ -285,6 +490,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: theme.spacing.md,
+  },
+  rankContainerEmpty: {
+    backgroundColor: theme.colors.lightGray,
   },
   rank: {
     color: theme.colors.white,
@@ -295,30 +503,68 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: theme.spacing.md,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
   playerName: {
     fontSize: 15,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.textDark,
-    marginBottom: theme.spacing.xs,
+  },
+  youBadge: {
+    marginLeft: theme.spacing.sm,
+    fontSize: 11,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.primary,
+    backgroundColor: theme.colors.primaryLight,
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+    overflow: 'hidden',
   },
   playerStats: {
     fontSize: 12,
     color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
   },
+  notPlayedText: {
+    fontSize: 12,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
+    fontStyle: 'italic',
+  },
   emptyContainer: {
-    padding: theme.spacing.xxl,
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.xxl,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
     color: theme.colors.textDark,
-    fontFamily: theme.fonts.gothamMedium,
+    fontFamily: theme.fonts.gothamBold,
+    marginTop: theme.spacing.md,
     marginBottom: theme.spacing.xs,
   },
   emptySubtext: {
-    fontSize: 13,
+    fontSize: 14,
     color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
+    textAlign: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  inviteFriendsButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.md,
+  },
+  inviteFriendsButtonText: {
+    color: theme.colors.white,
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamMedium,
   },
 });
