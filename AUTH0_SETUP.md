@@ -193,89 +193,18 @@ The app uses `pundit-app://` as its URL scheme for Auth0 redirects. This is conf
 - [app/services/auth0.ts:39](app/services/auth0.ts#L39)
 - Auth0 application settings (Allowed Callback/Logout URLs)
 
-## Backend Verification (Optional)
+## Backend Verification (Implemented)
 
-If you want your Netlify Functions to verify Auth0 tokens:
+Netlify Functions now verify Auth0 access tokens for authenticated endpoints and enforce ownership (`token.sub === userId`).
 
-1. Install dependencies:
-```bash
-npm install jsonwebtoken jwks-rsa
-```
+Required server environment variable:
 
-2. Set server-side environment variables in Netlify:
-   - `AUTH0_DOMAIN`
-   - `AUTH0_CLIENT_SECRET` (optional for JWT verification)
-   - `AUTH0_AUDIENCE`
+- `AUTH0_DOMAIN` (e.g., `your-tenant.auth0.com`)
 
-3. Create verification utility:
-
-```typescript
-// netlify/functions/lib/auth.ts
-import jwt from 'jsonwebtoken';
-import jwksClient from 'jwks-rsa';
-
-const client = jwksClient({
-  jwksUri: `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`,
-});
-
-function getKey(header: any, callback: any) {
-  client.getSigningKey(header.kid, (err, key) => {
-    if (err) {
-      callback(err);
-      return;
-    }
-    const signingKey = key?.getPublicKey();
-    callback(null, signingKey);
-  });
-}
-
-export function verifyToken(token: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    jwt.verify(
-      token,
-      getKey,
-      {
-        audience: process.env.AUTH0_AUDIENCE,
-        issuer: `https://${process.env.AUTH0_DOMAIN}/`,
-        algorithms: ['RS256'],
-      },
-      (err, decoded) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(decoded);
-        }
-      }
-    );
-  });
-}
-```
-
-4. Use in your functions:
-
-```typescript
-import { verifyToken } from './lib/auth';
-
-export const handler = async (event) => {
-  const token = event.headers.authorization?.replace('Bearer ', '');
-
-  if (token) {
-    try {
-      const decoded = await verifyToken(token);
-      // User is authenticated, decoded contains user info
-      const userId = decoded.sub;
-    } catch (error) {
-      // Invalid token
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ error: 'Invalid token' }),
-      };
-    }
-  }
-
-  // Continue with function logic
-};
-```
+Implementation detail:
+- Shared helper: `netlify/functions/lib/auth.ts`
+- Verification flow: validates bearer token by calling Auth0 `/userinfo` and compares returned `sub` to request `userId`.
+- Endpoints that permit guest usage explicitly bypass token verification for `guest_*` IDs; all other user-scoped endpoints require a valid bearer token.
 
 ## Troubleshooting
 
@@ -352,5 +281,5 @@ The app supports both modes simultaneously:
 1. ✅ Auth0 integration is complete
 2. Create `.env` file with your Auth0 credentials (see step 3 above)
 3. Test authentication flow
-4. Optionally implement backend token verification
+4. Configure `AUTH0_DOMAIN` in Netlify so backend token verification succeeds
 5. Deploy to production with production credentials

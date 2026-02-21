@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 interface RemoveFriendRequest {
   userId: string;
@@ -44,6 +45,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ error: 'Please sign in to manage friends' }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Sort user IDs to match the database constraint (user_a < user_b)

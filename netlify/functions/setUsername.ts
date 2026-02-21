@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 // Username validation rules (same as checkUsername)
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$/;
@@ -44,6 +45,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ success: false, error: 'Sign in to set a username' }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Normalize for validation and storage

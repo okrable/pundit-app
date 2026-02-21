@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 interface RevokeChallengeRequest {
   challengeId: string;
@@ -42,6 +43,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ error: 'Missing challengeId or userId' }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Fetch challenge

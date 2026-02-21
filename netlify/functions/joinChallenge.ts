@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 interface JoinChallengeRequest {
   code: string;
@@ -58,6 +59,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ error: 'Please sign in to join challenges' }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Atomic update: only succeeds if challenge exists, has no opponent, is pending, not expired, and user isn't creator

@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -38,6 +39,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ friends: [] }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Get all friends for this user
