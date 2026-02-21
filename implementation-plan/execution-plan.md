@@ -91,7 +91,7 @@
 ## Phase 7: Cleanup and Production Readiness 🚧 PARTIAL
 - [x] Error handling for API failures
 - [x] Loading states throughout
-- [ ] Harden edge cases
+- [x] Harden edge cases (submit validation + stats fix + secure code generation + log cleanup)
 - [ ] Remove debug UI (if any)
 - [ ] **Validation**: app meets scope and constraints
 
@@ -100,7 +100,7 @@
 - Custom ApiError class with status codes
 - Theme system with consistent styling
 - **TODO**: Add error boundaries
-- **TODO**: Test edge cases (network failures, malformed data)
+- Added input validation in submitQuiz for malformed payloads and duplicate answers
 
 ---
 
@@ -144,12 +144,12 @@
 
 ### Medium Priority
 1. London timezone for quiz resets
-2. Error boundaries in React
-3. Display name editing UI
+2. Server-side Auth0 token validation and user ownership checks ✅ COMPLETE
+3. Fair-play API contract: stop returning correct answers in daily quiz payload
 
 ### Low Priority
-4. Offline answer queue
-5. Server-side Auth0 token validation
+4. Error boundaries in React
+5. Offline answer queue
 6. Analytics/telemetry
 
 ---
@@ -172,3 +172,10 @@
 }
 ```
 
+
+## Hardening PR Breakdown
+
+- **PR A (this branch)**: Low-risk backend hardening (submit validation, total_correct accounting fix, secure friend-code RNG, and daily quiz debug log cleanup).
+- **PR B**: ✅ Implemented auth enforcement on protected endpoints (`Authorization` required + `token.sub` ownership checks).
+- **PR C**: Timezone consistency for daily quiz/streak/leaderboard calculations.
+- **PR D**: Fair-play payload change to remove daily quiz answer leakage.

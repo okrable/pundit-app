@@ -1,5 +1,7 @@
 import { Handler } from '@netlify/functions';
+import { randomInt } from 'node:crypto';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 interface CreateFriendLinkRequest {
   userId: string;
@@ -10,7 +12,7 @@ function generateFriendCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No 0/O, 1/I/L
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(randomInt(chars.length));
   }
   return code;
 }
@@ -53,6 +55,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ error: 'Please sign in to invite friends' }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Generate unique code (retry if collision)

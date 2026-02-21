@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 interface MigrateGuestResultRequest {
   userId: string; // Auth0 user ID
@@ -93,6 +94,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ error: 'Cannot migrate to a guest user' }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     const quizDate = quizId.replace('quiz-', '');
