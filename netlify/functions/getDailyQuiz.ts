@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { getQuizDate } from './lib/quizDate';
 
 interface QuizQuestion {
   date: string | null;
@@ -36,8 +37,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const { date, language = 'uk' } = event.queryStringParameters || {};
-    // Uses UTC date; mismatch with local-date data can return no rows.
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || getQuizDate();
     console.log('Quiz query params', { targetDate, language });
 
     const questions = await query<QuizQuestion>(

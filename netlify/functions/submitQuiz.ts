@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
+import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 
 interface SubmitQuizRequest {
   quizId: string;
@@ -59,8 +60,7 @@ async function calculateStreak(userId: string): Promise<number> {
 
   if (results.length === 0) return 0;
 
-  // Get today's date in UTC
-  const today = new Date().toISOString().split('T')[0];
+  const today = getQuizDate();
 
   // Check if most recent play is today
   if (results[0].quiz_date !== today) {
@@ -69,13 +69,12 @@ async function calculateStreak(userId: string): Promise<number> {
 
   // Count consecutive days from today backwards
   let streak = 1;
-  let expectedDate = new Date(today);
+  let expectedDate = today;
 
   for (let i = 1; i < results.length; i++) {
-    expectedDate.setDate(expectedDate.getDate() - 1);
-    const expectedDateStr = expectedDate.toISOString().split('T')[0];
+    expectedDate = getPreviousQuizDate(expectedDate);
 
-    if (results[i].quiz_date === expectedDateStr) {
+    if (results[i].quiz_date === expectedDate) {
       streak++;
     } else {
       break; // Gap found, streak ends

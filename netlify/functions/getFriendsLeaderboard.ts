@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
+import { getQuizDate } from './lib/quizDate';
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -50,8 +51,7 @@ export const handler: Handler = async (event) => {
       return authError;
     }
 
-    // Get today's date in UTC
-    const today = new Date().toISOString().split('T')[0];
+    const today = getQuizDate();
 
     // Get friends leaderboard including the current user
     // Uses a CTE to get all friend IDs plus the current user,

@@ -143,7 +143,7 @@
 ## Remaining Work
 
 ### Medium Priority
-1. London timezone for quiz resets
+1. London timezone for quiz resets ✅ COMPLETE (via configurable `QUIZ_TIMEZONE`)
 2. Server-side Auth0 token validation and user ownership checks ✅ COMPLETE
 3. Fair-play API contract: stop returning correct answers in daily quiz payload
 
@@ -177,5 +177,5 @@
 
 - **PR A (this branch)**: Low-risk backend hardening (submit validation, total_correct accounting fix, secure friend-code RNG, and daily quiz debug log cleanup).
 - **PR B**: ✅ Implemented auth enforcement on protected endpoints (`Authorization` required + `token.sub` ownership checks).
-- **PR C**: Timezone consistency for daily quiz/streak/leaderboard calculations.
+- **PR C**: ✅ Implemented timezone consistency for daily quiz, streak, leaderboard, and client cache date logic.
 - **PR D**: Fair-play payload change to remove daily quiz answer leakage.

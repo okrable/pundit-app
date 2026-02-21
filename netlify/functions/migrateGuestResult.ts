@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
+import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 
 interface MigrateGuestResultRequest {
   userId: string; // Auth0 user ID
@@ -32,20 +33,19 @@ async function calculateStreak(userId: string): Promise<number> {
 
   if (results.length === 0) return 0;
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getQuizDate();
 
   if (results[0].quiz_date !== today) {
     return 0;
   }
 
   let streak = 1;
-  let expectedDate = new Date(today);
+  let expectedDate = today;
 
   for (let i = 1; i < results.length; i++) {
-    expectedDate.setDate(expectedDate.getDate() - 1);
-    const expectedDateStr = expectedDate.toISOString().split('T')[0];
+    expectedDate = getPreviousQuizDate(expectedDate);
 
-    if (results[i].quiz_date === expectedDateStr) {
+    if (results[i].quiz_date === expectedDate) {
       streak++;
     } else {
       break;

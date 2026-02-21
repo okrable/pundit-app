@@ -56,6 +56,8 @@ cp .env.example .env
 - `DATABASE_URL`: Your CockroachDB connection string
 - `AUTH0_*`: Auth0 credentials (required for server-side token validation on authenticated endpoints)
 - `API_BASE_URL`: Your Netlify Functions URL
+- `QUIZ_TIMEZONE`: Server-side quiz day timezone (default: `Europe/London`)
+- `EXPO_PUBLIC_QUIZ_TIMEZONE`: Client-side quiz day timezone (should match `QUIZ_TIMEZONE`)
 
 ### Development
 
@@ -256,7 +258,7 @@ To minimize risk, improvements are split into small PRs:
 
 - **PR A (low-risk bundled fixes)**: stricter `submitQuiz` validation, correct `total_correct` stat accounting, secure friend-link code generation, and removal of verbose DB metadata logging.
 - **PR B (security hardening)**: ✅ implemented — authenticated endpoints now verify Auth0 access tokens and enforce `token.sub === userId`.
-- **PR C (daily consistency)**: centralize quiz-day timezone policy and apply it to quiz fetch, streak, and leaderboard logic.
+- **PR C (daily consistency)**: ✅ implemented — centralized quiz-day timezone policy across quiz fetch, streaks, leaderboards, and client date-based caching.
 - **PR D (fair-play contract update)**: stop returning quiz correct answers in the daily quiz payload; return correctness only after submission.
 
 ## Future Enhancements

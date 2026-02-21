@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
+import { getQuizDate } from './lib/quizDate';
 
 interface DbResult {
   quiz_date: string;
@@ -59,8 +60,7 @@ export const handler: Handler = async (event) => {
       return authError;
     }
 
-    // Get today's date in UTC
-    const today = new Date().toISOString().split('T')[0];
+    const today = getQuizDate();
 
     // Check for existing result for today
     const results = await query<DbResult>(

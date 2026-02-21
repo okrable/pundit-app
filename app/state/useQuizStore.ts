@@ -3,6 +3,7 @@ import { Quiz, QuizResultImmediate, UserStats, UserProfile, AnswerWithTiming } f
 import { getDailyQuiz, submitQuiz, getUserStats } from '../services/api';
 import { getCachedQuiz, setCachedQuiz } from '../storage/quizCache';
 import { useAuthStore } from './useAuthStore';
+import { getQuizDate } from '../utils/quizDate';
 
 interface QuizState {
   quiz: Quiz | null;
@@ -31,7 +32,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   setUserId: (userId: string) => set({ userId }),
 
   fetchQuiz: async (date?: string) => {
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || getQuizDate();
     set({ loading: true, error: null });
 
     try {
