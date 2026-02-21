@@ -115,6 +115,58 @@ export const handler: Handler = async (event) => {
       };
     }
 
+
+    if (!Array.isArray(answers)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'answers must be an array' }),
+      };
+    }
+
+    if (answers.length > 5) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Too many answers submitted' }),
+      };
+    }
+
+    const seenQuestionIds = new Set<string>();
+    for (const answer of answers) {
+      if (!answer?.questionId || typeof answer.selectedOptionIndex !== 'number') {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Each answer must include questionId and selectedOptionIndex' }),
+        };
+      }
+
+      if (!Number.isInteger(answer.selectedOptionIndex) || answer.selectedOptionIndex < 0 || answer.selectedOptionIndex > 3) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'selectedOptionIndex must be an integer between 0 and 3' }),
+        };
+      }
+
+      if (answer.timeRemainingMs !== undefined && (!Number.isFinite(answer.timeRemainingMs) || answer.timeRemainingMs < 0 || answer.timeRemainingMs > 20_000)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'timeRemainingMs must be between 0 and 20000' }),
+        };
+      }
+
+      if (seenQuestionIds.has(answer.questionId)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Duplicate questionId in answers' }),
+        };
+      }
+      seenQuestionIds.add(answer.questionId);
+    }
     // Fetch correct answers from database
     const questionIds = answers.map((a) => a.questionId);
     const correctAnswers = await query<{
@@ -157,6 +209,14 @@ export const handler: Handler = async (event) => {
       }
 
       const options = [correct.player_0, correct.player_1, correct.player_2, correct.player_3].filter(Boolean);
+      if (userAnswer.selectedOptionIndex >= options.length) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: `selectedOptionIndex out of bounds for question ${userAnswer.questionId}` }),
+        };
+      }
+
       const correctIndex = options.findIndex((opt) => opt === correct.player_name);
       const isCorrect = userAnswer.selectedOptionIndex === correctIndex;
 
@@ -245,6 +305,8 @@ export const handler: Handler = async (event) => {
     // Calculate streak (after inserting today's result)
     const newStreak = await calculateStreak(userId);
 
+    const correctCount = answersCorrect.filter(Boolean).length;
+
     // Update user stats
     await query(
       `UPDATE users SET
@@ -254,7 +316,7 @@ export const handler: Handler = async (event) => {
         total_correct = total_correct + $4,
         last_played = $5
        WHERE id = $1`,
-      [userId, newStreak, score, score, quizDate]
+      [userId, newStreak, score, correctCount, quizDate]
     );
 
     // Get updated best_score
