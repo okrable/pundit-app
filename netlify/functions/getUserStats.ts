@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 const COOLDOWN_DAYS = 30;
 
@@ -52,6 +53,11 @@ export const handler: Handler = async (event) => {
           usernameChangeAvailableAt: null,
         }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: true });
+    if (authError) {
+      return authError;
     }
 
     // Auth0 users: query real stats from database

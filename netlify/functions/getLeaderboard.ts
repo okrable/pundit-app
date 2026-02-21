@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { getQuizDate } from './lib/quizDate';
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -21,8 +22,7 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // Get today's date in UTC
-    const today = new Date().toISOString().split('T')[0];
+    const today = getQuizDate();
 
     // Query daily leaderboard (Auth0 users only - guests have no results in DB)
     const leaderboard = await query<{

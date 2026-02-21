@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 interface AcceptFriendLinkRequest {
   code: string;
@@ -44,6 +45,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ error: 'Please sign in to add friends' }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Look up the friend link

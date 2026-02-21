@@ -54,8 +54,10 @@ cp .env.example .env
 
 4. Configure environment variables:
 - `DATABASE_URL`: Your CockroachDB connection string
-- `AUTH0_*`: Auth0 credentials (optional, for future use)
+- `AUTH0_*`: Auth0 credentials (required for server-side token validation on authenticated endpoints)
 - `API_BASE_URL`: Your Netlify Functions URL
+- `QUIZ_TIMEZONE`: Server-side quiz day timezone (default: `Europe/London`)
+- `EXPO_PUBLIC_QUIZ_TIMEZONE`: Client-side quiz day timezone (should match `QUIZ_TIMEZONE`)
 
 ### Development
 
@@ -148,15 +150,23 @@ Response:
     {
       "id": "q1",
       "prompt": "Question text?",
-      "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-      "correctOptionIndex": 0
+      "options": ["Option 1", "Option 2", "Option 3", "Option 4"]
     }
   ]
 }
 ```
 
+> Note: Correct answers are intentionally omitted from `getDailyQuiz` responses and returned only after `submitQuiz` to prevent client-side answer leakage.
+
 ### `POST /.netlify/functions/submitQuiz`
 Submit quiz answers and get results.
+
+Validation rules:
+- `answers` must be an array and include at least one answer
+- Maximum of 5 answers per submission
+- No duplicate `questionId` values
+- `selectedOptionIndex` must be an integer between 0 and 3 and within option bounds for each question
+- `timeRemainingMs` is optional but, when present, must be between 0 and 20000
 
 Request Body:
 ```json
@@ -242,6 +252,15 @@ netlify deploy --prod
 ## Environment Variables
 
 See `.env.example` for required environment variables.
+
+## Hardening rollout plan
+
+To minimize risk, improvements are split into small PRs:
+
+- **PR A (low-risk bundled fixes)**: stricter `submitQuiz` validation, correct `total_correct` stat accounting, secure friend-link code generation, and removal of verbose DB metadata logging.
+- **PR B (security hardening)**: ✅ implemented — authenticated endpoints now verify Auth0 access tokens and enforce `token.sub === userId`.
+- **PR C (daily consistency)**: ✅ implemented — centralized quiz-day timezone policy across quiz fetch, streaks, leaderboards, and client date-based caching.
+- **PR D (fair-play contract update)**: ✅ implemented — daily quiz payloads no longer include correct answers; correctness is only returned after submission.
 
 ## Future Enhancements
 

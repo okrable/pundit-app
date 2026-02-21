@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QuizResult, QuizResultImmediate } from '../types';
+import { getQuizDate } from '../utils/quizDate';
 
 // Cache keys are now user-specific to keep guest and auth0 results separate
 const GUEST_RESULT_KEY = '@pundit_daily_quiz_result_guest';
@@ -36,8 +37,7 @@ function toCompactResult(result: QuizResultImmediate | QuizResult): QuizResult {
  * Get today's date in YYYY-MM-DD format for comparison
  */
 function getTodayDateString(): string {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
+  return getQuizDate();
 }
 
 /**

@@ -1,5 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
+import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 
 interface SubmitQuizRequest {
   quizId: string;
@@ -58,8 +60,7 @@ async function calculateStreak(userId: string): Promise<number> {
 
   if (results.length === 0) return 0;
 
-  // Get today's date in UTC
-  const today = new Date().toISOString().split('T')[0];
+  const today = getQuizDate();
 
   // Check if most recent play is today
   if (results[0].quiz_date !== today) {
@@ -68,13 +69,12 @@ async function calculateStreak(userId: string): Promise<number> {
 
   // Count consecutive days from today backwards
   let streak = 1;
-  let expectedDate = new Date(today);
+  let expectedDate = today;
 
   for (let i = 1; i < results.length; i++) {
-    expectedDate.setDate(expectedDate.getDate() - 1);
-    const expectedDateStr = expectedDate.toISOString().split('T')[0];
+    expectedDate = getPreviousQuizDate(expectedDate);
 
-    if (results[i].quiz_date === expectedDateStr) {
+    if (results[i].quiz_date === expectedDate) {
       streak++;
     } else {
       break; // Gap found, streak ends
@@ -115,6 +115,58 @@ export const handler: Handler = async (event) => {
       };
     }
 
+
+    if (!Array.isArray(answers)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'answers must be an array' }),
+      };
+    }
+
+    if (answers.length > 5) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Too many answers submitted' }),
+      };
+    }
+
+    const seenQuestionIds = new Set<string>();
+    for (const answer of answers) {
+      if (!answer?.questionId || typeof answer.selectedOptionIndex !== 'number') {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Each answer must include questionId and selectedOptionIndex' }),
+        };
+      }
+
+      if (!Number.isInteger(answer.selectedOptionIndex) || answer.selectedOptionIndex < 0 || answer.selectedOptionIndex > 3) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'selectedOptionIndex must be an integer between 0 and 3' }),
+        };
+      }
+
+      if (answer.timeRemainingMs !== undefined && (!Number.isFinite(answer.timeRemainingMs) || answer.timeRemainingMs < 0 || answer.timeRemainingMs > 20_000)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'timeRemainingMs must be between 0 and 20000' }),
+        };
+      }
+
+      if (seenQuestionIds.has(answer.questionId)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Duplicate questionId in answers' }),
+        };
+      }
+      seenQuestionIds.add(answer.questionId);
+    }
     // Fetch correct answers from database
     const questionIds = answers.map((a) => a.questionId);
     const correctAnswers = await query<{
@@ -157,6 +209,14 @@ export const handler: Handler = async (event) => {
       }
 
       const options = [correct.player_0, correct.player_1, correct.player_2, correct.player_3].filter(Boolean);
+      if (userAnswer.selectedOptionIndex >= options.length) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: `selectedOptionIndex out of bounds for question ${userAnswer.questionId}` }),
+        };
+      }
+
       const correctIndex = options.findIndex((opt) => opt === correct.player_name);
       const isCorrect = userAnswer.selectedOptionIndex === correctIndex;
 
@@ -176,6 +236,11 @@ export const handler: Handler = async (event) => {
     }
 
     const quizDate = quizId.replace('quiz-', '');
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: true });
+    if (authError) {
+      return authError;
+    }
 
     // Guest users: no database interaction, return placeholder response
     if (userId.startsWith('guest_')) {
@@ -245,6 +310,8 @@ export const handler: Handler = async (event) => {
     // Calculate streak (after inserting today's result)
     const newStreak = await calculateStreak(userId);
 
+    const correctCount = answersCorrect.filter(Boolean).length;
+
     // Update user stats
     await query(
       `UPDATE users SET
@@ -254,7 +321,7 @@ export const handler: Handler = async (event) => {
         total_correct = total_correct + $4,
         last_played = $5
        WHERE id = $1`,
-      [userId, newStreak, score, score, quizDate]
+      [userId, newStreak, score, correctCount, quizDate]
     );
 
     // Get updated best_score

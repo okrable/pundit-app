@@ -1,5 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
+import { getQuizDate } from './lib/quizDate';
 
 interface CreateChallengeRequest {
   userId: string;
@@ -57,6 +59,11 @@ export const handler: Handler = async (event) => {
       };
     }
 
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
+    }
+
     // Check if user already has an active challenge (pending or active, not expired)
     const existingChallenge = await query<{ id: string; status: string; expires_at: string }>(
       `SELECT id, status, expires_at FROM challenges
@@ -77,8 +84,8 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Get today's quiz
-    const today = new Date().toISOString().split('T')[0];
+    // Get today's quiz in configured quiz timezone
+    const today = getQuizDate();
     const questions = await query<{
       question_id: string;
       question: string;

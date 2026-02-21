@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
 
@@ -40,6 +41,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ success: false, error: 'Sign in to update profile' }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Validate display name if provided
