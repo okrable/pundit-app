@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 interface DbChallenge {
   id: string;
@@ -67,6 +68,11 @@ export const handler: Handler = async (event) => {
           stats: { wins: 0, losses: 0, draws: 0 },
         }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Find active challenge (pending or active, not expired)

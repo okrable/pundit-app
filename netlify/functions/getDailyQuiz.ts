@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { getQuizDate } from './lib/quizDate';
 
 interface QuizQuestion {
   date: string | null;
@@ -35,19 +36,8 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const dbInfo = await query<{ current_database: string; current_schema: string }>(
-      'SELECT current_database() AS current_database, current_schema() AS current_schema'
-    );
-    console.log('DB info', dbInfo[0]);
-
-    const tables = await query<{ table_schema: string; table_name: string }>(
-      "SELECT table_schema, table_name FROM information_schema.tables WHERE table_name = 'pu_player_ques'"
-    );
-    console.log('Tables', tables);
-
     const { date, language = 'uk' } = event.queryStringParameters || {};
-    // Uses UTC date; mismatch with local-date data can return no rows.
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || getQuizDate();
     console.log('Quiz query params', { targetDate, language });
 
     const questions = await query<QuizQuestion>(
