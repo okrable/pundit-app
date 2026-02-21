@@ -1,4 +1,5 @@
 import { Handler } from '@netlify/functions';
+import { randomInt } from 'node:crypto';
 import { query } from './lib/db';
 
 interface CreateFriendLinkRequest {
@@ -10,7 +11,7 @@ function generateFriendCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No 0/O, 1/I/L
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(randomInt(chars.length));
   }
   return code;
 }
