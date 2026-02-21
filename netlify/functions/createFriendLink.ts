@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { randomInt } from 'node:crypto';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 interface CreateFriendLinkRequest {
   userId: string;
@@ -54,6 +55,11 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ error: 'Please sign in to invite friends' }),
       };
+    }
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
+    if (authError) {
+      return authError;
     }
 
     // Generate unique code (retry if collision)

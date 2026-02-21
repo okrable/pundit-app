@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { assertAuthorizedUser } from './lib/auth';
 
 interface SubmitQuizRequest {
   quizId: string;
@@ -236,6 +237,11 @@ export const handler: Handler = async (event) => {
     }
 
     const quizDate = quizId.replace('quiz-', '');
+
+    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: true });
+    if (authError) {
+      return authError;
+    }
 
     // Guest users: no database interaction, return placeholder response
     if (userId.startsWith('guest_')) {

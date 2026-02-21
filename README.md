@@ -54,7 +54,7 @@ cp .env.example .env
 
 4. Configure environment variables:
 - `DATABASE_URL`: Your CockroachDB connection string
-- `AUTH0_*`: Auth0 credentials (optional, for future use)
+- `AUTH0_*`: Auth0 credentials (required for server-side token validation on authenticated endpoints)
 - `API_BASE_URL`: Your Netlify Functions URL
 
 ### Development
@@ -255,7 +255,7 @@ See `.env.example` for required environment variables.
 To minimize risk, improvements are split into small PRs:
 
 - **PR A (low-risk bundled fixes)**: stricter `submitQuiz` validation, correct `total_correct` stat accounting, secure friend-link code generation, and removal of verbose DB metadata logging.
-- **PR B (security hardening)**: enforce Auth0 token verification and user ownership checks on all authenticated endpoints.
+- **PR B (security hardening)**: ✅ implemented — authenticated endpoints now verify Auth0 access tokens and enforce `token.sub === userId`.
 - **PR C (daily consistency)**: centralize quiz-day timezone policy and apply it to quiz fetch, streak, and leaderboard logic.
 - **PR D (fair-play contract update)**: stop returning quiz correct answers in the daily quiz payload; return correctness only after submission.
 
