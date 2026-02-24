@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { getQuizDate } from './lib/quizDate';
+import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 
 interface QuizQuestion {
   date: string | null;
@@ -35,8 +36,13 @@ export const handler: Handler = async (event) => {
     };
   }
 
+  const requestStartedAt = Date.now();
+  const requestId = createRequestId();
+
   try {
     const { date, language = 'uk' } = event.queryStringParameters || {};
+
+    logRequestStart({ endpoint: 'getDailyQuiz', requestId });
     const targetDate = date || getQuizDate();
     console.log('Quiz query params', { targetDate, language });
 
@@ -76,12 +82,14 @@ export const handler: Handler = async (event) => {
       }),
     };
 
+    logRequestEnd({ endpoint: 'getDailyQuiz', requestId }, Date.now() - requestStartedAt, 200);
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify(formattedQuiz),
     };
   } catch (error) {
+    logRequestError({ endpoint: 'getDailyQuiz', requestId }, Date.now() - requestStartedAt, error);
     console.error('Error fetching quiz:', error);
     return {
       statusCode: 500,

@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
+import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 
 interface SubmitChallengeRequest {
   challengeId: string;
@@ -60,9 +61,14 @@ export const handler: Handler = async (event) => {
     };
   }
 
+  const requestStartedAt = Date.now();
+  const requestId = createRequestId();
+
   try {
     const body: SubmitChallengeRequest = JSON.parse(event.body || '{}');
     const { challengeId, userId, answers } = body;
+
+    logRequestStart({ endpoint: 'submitChallengeAnswers', requestId, userId });
 
     if (!challengeId || !userId || !answers || answers.length === 0) {
       return {
@@ -262,6 +268,7 @@ export const handler: Handler = async (event) => {
       const theirDisplayName = isCreator ? updatedChallenge.opponent_display_name : updatedChallenge.creator_display_name;
       const theirAnswers = isCreator ? updatedChallenge.opponent_answers : updatedChallenge.creator_answers;
 
+      logRequestEnd({ endpoint: 'submitChallengeAnswers', requestId, userId }, Date.now() - requestStartedAt, 200);
       return {
         statusCode: 200,
         headers,
@@ -278,6 +285,7 @@ export const handler: Handler = async (event) => {
     }
 
     // Challenge not complete yet - waiting for other player
+    logRequestEnd({ endpoint: 'submitChallengeAnswers', requestId, userId }, Date.now() - requestStartedAt, 200);
     return {
       statusCode: 200,
       headers,
@@ -288,6 +296,7 @@ export const handler: Handler = async (event) => {
       }),
     };
   } catch (error) {
+    logRequestError({ endpoint: 'submitChallengeAnswers', requestId }, Date.now() - requestStartedAt, error);
     console.error('Error submitting challenge answers:', error);
     return {
       statusCode: 500,
