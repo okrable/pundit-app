@@ -262,16 +262,18 @@ To minimize risk, improvements are split into small PRs:
 
 ## Future Enhancements
 
-- Auth0 authentication (see [AUTH0_SETUP.md](AUTH0_SETUP.md))
-- Results and leaderboard database tables
+- React error boundaries and crash-recovery UX
+- Offline answer queue with retry-on-reconnect
+- Endpoint-level rate limiting / abuse protection for quiz and challenge submits
+- API observability (structured logs + alerting for failures and latency)
 - Push notifications for daily quiz reminders
-- Social sharing features
 - Multiple quiz categories
 - Historical quiz access
+- Product analytics/telemetry
 
 ## Contributing
 
-1. Follow the implementation plan in `implementation-plan/`
+1. Follow the implementation plan in `implementation-plan/` (this is the canonical status source).
 2. Use TypeScript for all new code
 3. Follow existing code style and patterns
 4. Test on both iOS and Android before submitting

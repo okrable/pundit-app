@@ -2,6 +2,7 @@ import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
+import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 
 interface SubmitQuizRequest {
   quizId: string;
@@ -103,9 +104,14 @@ export const handler: Handler = async (event) => {
     };
   }
 
+  const requestStartedAt = Date.now();
+  const requestId = createRequestId();
+
   try {
     const body: SubmitQuizRequest = JSON.parse(event.body || '{}');
     const { quizId, userId, answers, userProfile } = body;
+
+    logRequestStart({ endpoint: 'submitQuiz', requestId, userId });
 
     if (!quizId || !userId || !answers || answers.length === 0) {
       return {
@@ -254,6 +260,7 @@ export const handler: Handler = async (event) => {
         bestScore: score,
       };
 
+      logRequestEnd({ endpoint: 'submitQuiz', requestId, userId }, Date.now() - requestStartedAt, 200);
       return {
         statusCode: 200,
         headers,
@@ -346,6 +353,7 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify(result),
     };
   } catch (error) {
+    logRequestError({ endpoint: 'submitQuiz', requestId }, Date.now() - requestStartedAt, error);
     console.error('Error submitting quiz:', error);
     return {
       statusCode: 500,

@@ -2,6 +2,7 @@ import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { getQuizDate } from './lib/quizDate';
+import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 
 interface CreateChallengeRequest {
   userId: string;
@@ -38,9 +39,14 @@ export const handler: Handler = async (event) => {
     };
   }
 
+  const requestStartedAt = Date.now();
+  const requestId = createRequestId();
+
   try {
     const body: CreateChallengeRequest = JSON.parse(event.body || '{}');
     const { userId, displayName, username } = body;
+
+    logRequestStart({ endpoint: 'createChallenge', requestId, userId });
 
     if (!userId) {
       return {
@@ -157,6 +163,7 @@ export const handler: Handler = async (event) => {
       };
     });
 
+    logRequestEnd({ endpoint: 'createChallenge', requestId, userId }, Date.now() - requestStartedAt, 201);
     return {
       statusCode: 201,
       headers,
@@ -170,6 +177,7 @@ export const handler: Handler = async (event) => {
       }),
     };
   } catch (error) {
+    logRequestError({ endpoint: 'createChallenge', requestId }, Date.now() - requestStartedAt, error);
     console.error('Error creating challenge:', error);
     return {
       statusCode: 500,
