@@ -70,6 +70,24 @@ export async function submitQuiz(
   });
 }
 
+export interface FinalizeQuizStatsResponse {
+  finalized: boolean;
+  skipped?: boolean;
+  streak?: number;
+  bestScore?: number;
+}
+
+export async function finalizeQuizStats(
+  quizId: string,
+  userId: string,
+  userProfile?: UserProfile
+): Promise<FinalizeQuizStatsResponse> {
+  return fetchApi<FinalizeQuizStatsResponse>('/submitQuizFinalizeStats', {
+    method: 'POST',
+    body: JSON.stringify({ quizId, userId, userProfile }),
+  });
+}
+
 export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   return fetchApi<LeaderboardEntry[]>('/getLeaderboard');
 }

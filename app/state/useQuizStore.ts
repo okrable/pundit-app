@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Quiz, QuizResultImmediate, UserStats, UserProfile, AnswerWithTiming } from '../types';
-import { getDailyQuiz, submitQuiz, getUserStats } from '../services/api';
+import { finalizeQuizStats, getDailyQuiz, submitQuiz, getUserStats } from '../services/api';
 import { getCachedQuiz, setCachedQuiz } from '../storage/quizCache';
 import { useAuthStore } from './useAuthStore';
 import { getQuizDate } from '../utils/quizDate';
@@ -76,8 +76,44 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         };
       }
 
-      const result = await submitQuiz(quiz.id, userId, answers, userProfile);
+      const submittedQuizId = quiz.id;
+      const result = await submitQuiz(submittedQuizId, userId, answers, userProfile);
       set({ result, loading: false });
+
+      if (result.statsPending && !userId.startsWith('guest_')) {
+        const refreshDelay = result.statsRefreshAfterMs ?? 800;
+        setTimeout(async () => {
+          let finalizeSucceeded = false;
+          try {
+            const finalizeResult = await finalizeQuizStats(submittedQuizId, userId, userProfile);
+            finalizeSucceeded = Boolean(finalizeResult.finalized || finalizeResult.skipped);
+          } catch (finalizeError) {
+            console.error('Failed to finalize quiz stats:', finalizeError);
+          }
+
+          if (!finalizeSucceeded) {
+            return;
+          }
+
+          try {
+            const latestStats = await getUserStats(userId);
+            set((state) => {
+              const nextState: Partial<QuizState> = { userStats: latestStats };
+              if (state.result && state.result.quizId === submittedQuizId) {
+                nextState.result = {
+                  ...state.result,
+                  streak: latestStats.streak,
+                  bestScore: latestStats.bestScore,
+                  statsPending: false,
+                };
+              }
+              return nextState;
+            });
+          } catch (statsError) {
+            console.error('Failed to refresh user stats after quiz submit:', statsError);
+          }
+        }, refreshDelay);
+      }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to submit quiz',

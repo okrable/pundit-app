@@ -181,7 +181,12 @@ export default function QuestionCard({
                 onPress={() => onSelectOption(index)}
                 disabled={disabled || showResult}
               >
-                <Text style={getOptionTextStyle(index)}>
+                <Text
+                  style={getOptionTextStyle(index)}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                >
                   {option}
                 </Text>
               </TouchableOpacity>
@@ -252,12 +257,12 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     backgroundColor: theme.colors.background,
-    paddingVertical: theme.spacing.md,
+    height: 56,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.lightGray,
-    minHeight: 44,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   optionButtonSelected: {
@@ -277,6 +282,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textDark,
     fontFamily: theme.fonts.gothamBook,
     textAlign: 'center',
+    lineHeight: 18,
   },
   optionTextSelected: {
     color: theme.colors.white,

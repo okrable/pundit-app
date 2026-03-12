@@ -35,6 +35,8 @@ export interface QuizResultImmediate {
   streak: number;
   bestScore: number;
   answers: QuizAnswerDetail[];
+  statsPending?: boolean;
+  statsRefreshAfterMs?: number;
 }
 
 // Result stored in DB/cache (compact boolean array)
