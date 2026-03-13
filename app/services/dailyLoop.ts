@@ -4,6 +4,8 @@ import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { useProfileStore } from '../state/useProfileStore';
 import { useQuizStore } from '../state/useQuizStore';
 
+let inflightPrefetch: Promise<void> | null = null;
+
 export async function resolveEffectiveUserId(): Promise<string> {
   const authState = useAuthStore.getState();
   if (authState.isAuthenticated && authState.user?.sub) {
@@ -23,14 +25,23 @@ export async function hydrateDailyLoopFromCache(userId: string): Promise<void> {
 }
 
 export async function prefetchDailyLoop(userId?: string): Promise<void> {
+  if (inflightPrefetch) {
+    return inflightPrefetch;
+  }
+
   const effectiveUserId = userId ?? (await resolveEffectiveUserId());
   const isAuthenticated =
     useAuthStore.getState().isAuthenticated && !effectiveUserId.startsWith('guest_');
 
-  await Promise.all([
+  inflightPrefetch = Promise.all([
     useQuizStore.getState().fetchQuiz(),
     useProfileStore.getState().revalidate(effectiveUserId),
     useLeaderboardStore.getState().prefetchDailyLoop(effectiveUserId, isAuthenticated),
     useQuizStore.getState().retryPendingSubmission(),
-  ]);
+  ]).then(() => undefined)
+    .finally(() => {
+      inflightPrefetch = null;
+    });
+
+  return inflightPrefetch;
 }

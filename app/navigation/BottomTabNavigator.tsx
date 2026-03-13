@@ -13,6 +13,7 @@ export default function BottomTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
+        lazy: true,
         headerShown: true,
         headerStyle: {
           backgroundColor: theme.colors.accent,

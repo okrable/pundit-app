@@ -20,11 +20,16 @@ const Stack = createNativeStackNavigator();
 function AppContent() {
   // Handle deep links for friend invites
   useDeepLinkHandler();
+  const hasSeenActiveState = React.useRef(false);
 
   React.useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      if (nextState === 'active') {
+      if (nextState === 'active' && hasSeenActiveState.current) {
         void prefetchDailyLoop();
+      }
+
+      if (nextState === 'active') {
+        hasSeenActiveState.current = true;
       }
     });
 
@@ -84,11 +89,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer
-        onReady={() => {
-          void prefetchDailyLoop();
-        }}
-      >
+      <NavigationContainer>
         <AppContent />
       </NavigationContainer>
     </SafeAreaProvider>
