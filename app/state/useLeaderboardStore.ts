@@ -130,11 +130,9 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   },
 
   prefetchDailyLoop: async (userId: string, isAuthenticated: boolean) => {
-    const tasks: Array<Promise<void>> = [get().revalidateGlobal()];
-    if (isAuthenticated && !userId.startsWith('guest_')) {
-      tasks.push(get().revalidateFriends(userId));
-    }
-    await Promise.all(tasks);
+    logInfo('leaderboard.prefetch.start', { userId, isAuthenticated });
+    await get().revalidateGlobal();
+    logInfo('leaderboard.prefetch.global_only', { userId, isAuthenticated });
   },
 
   invalidateFriends: async (userId: string) => {

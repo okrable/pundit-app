@@ -16,9 +16,11 @@ import {
   FriendsLeaderboardResponse,
 } from '../types';
 import { useAuthStore } from '../state/useAuthStore';
+import { logError, logInfo, logWarn } from './debugLog';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
 const inflightRequests = new Map<string, Promise<unknown>>();
+const API_TIMEOUT_MS = 8000;
 
 export class ApiError extends Error {
   constructor(public statusCode: number, message: string) {
@@ -48,17 +50,81 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
       : `${method}:${endpoint}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
   const runRequest = async () => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
+    const startedAt = Date.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, API_TIMEOUT_MS);
+
+    logInfo('api.request.start', {
+      endpoint,
+      method,
+      hasToken: Boolean(token),
+    });
+
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      clearTimeout(timeout);
+      if (error instanceof Error && error.name === 'AbortError') {
+        logWarn('api.request.timeout', {
+          endpoint,
+          method,
+          durationMs: Date.now() - startedAt,
+        });
+        throw new ApiError(408, `Request timed out: ${endpoint}`);
+      }
+
+      logError('api.request.fetch_error', {
+        endpoint,
+        method,
+        durationMs: Date.now() - startedAt,
+        error,
+      });
+      throw error;
+    }
+
+    clearTimeout(timeout);
+    logInfo('api.request.response', {
+      endpoint,
+      method,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
     });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      logWarn('api.request.not_ok', {
+        endpoint,
+        method,
+        status: response.status,
+        error: error.error || error.message || 'Request failed',
+      });
       throw new ApiError(response.status, error.error || error.message || 'Request failed');
     }
 
-    return response.json() as Promise<T>;
+    try {
+      const data = await response.json();
+      logInfo('api.request.success', {
+        endpoint,
+        method,
+        durationMs: Date.now() - startedAt,
+      });
+      return data as T;
+    } catch (error) {
+      logError('api.request.parse_error', {
+        endpoint,
+        method,
+        durationMs: Date.now() - startedAt,
+        error,
+      });
+      throw error;
+    }
   };
 
   if (method === 'GET') {
