@@ -23,9 +23,15 @@ export async function hydrateDailyLoopFromCache(userId: string): Promise<void> {
   logInfo('dailyLoop.cache.hydrate.start', { userId });
   useQuizStore.getState().setUserId(userId);
   await Promise.all([
-    useQuizStore.getState().hydrateFromCache(userId),
-    useProfileStore.getState().hydrateFromCache(userId),
-    useLeaderboardStore.getState().hydrateFromCache(userId),
+    useQuizStore.getState().hydrateFromCache(userId).then(() => {
+      logInfo('dailyLoop.cache.hydrate.quiz.success', { userId });
+    }),
+    useProfileStore.getState().hydrateFromCache(userId).then(() => {
+      logInfo('dailyLoop.cache.hydrate.profile.success', { userId });
+    }),
+    useLeaderboardStore.getState().hydrateFromCache(userId).then(() => {
+      logInfo('dailyLoop.cache.hydrate.leaderboard.success', { userId });
+    }),
   ]);
   logInfo('dailyLoop.cache.hydrate.success', { userId });
 }

@@ -63,10 +63,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   bootstrapFromStorage: async () => {
     try {
       logInfo('auth.store.bootstrap.start');
+      logInfo('auth.store.bootstrap.read_refresh_token.start');
+      const refreshTokenPromise = getRefreshToken().then((value) => {
+        logInfo('auth.store.bootstrap.read_refresh_token.success', { hasRefreshToken: Boolean(value) });
+        return value;
+      });
+      logInfo('auth.store.bootstrap.read_user_info.start');
+      const userInfoPromise = getUserInfo().then((value) => {
+        logInfo('auth.store.bootstrap.read_user_info.success', { hasUserInfo: Boolean(value) });
+        return value;
+      });
+      logInfo('auth.store.bootstrap.read_force_interactive.start');
+      const forceInteractivePromise = getForceInteractiveAuth().then((value) => {
+        logInfo('auth.store.bootstrap.read_force_interactive.success', { forceInteractiveAuth: value });
+        return value;
+      });
+
       const [storedRefreshToken, storedUserInfo, forceInteractiveAuth] = await Promise.all([
-        getRefreshToken(),
-        getUserInfo(),
-        getForceInteractiveAuth(),
+        refreshTokenPromise,
+        userInfoPromise,
+        forceInteractivePromise,
       ]);
 
       if (storedRefreshToken && storedUserInfo) {
@@ -235,7 +251,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isRestoring: true });
 
     try {
+      logInfo('auth.store.restore.read_refresh_token.start');
       const storedRefreshToken = await getRefreshToken();
+      logInfo('auth.store.restore.read_refresh_token.success', { hasRefreshToken: Boolean(storedRefreshToken) });
 
       if (!storedRefreshToken) {
         logInfo('auth.store.restore.no_refresh_token');
@@ -252,6 +270,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       // Attempt to refresh the access token
+      logInfo('auth.store.restore.refresh_access_token.start');
       const tokenResult = await refreshAccessToken(storedRefreshToken);
       if (get().authStateVersion !== authStateVersion) {
         logWarn('auth.store.restore.version_changed_after_refresh');
@@ -280,6 +299,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       // Fetch fresh user info
+      logInfo('auth.store.restore.fetch_user_info.start');
       const userInfo = await fetchUserInfo(tokenResult.accessToken);
       if (get().authStateVersion !== authStateVersion) {
         logWarn('auth.store.restore.version_changed_after_userinfo');
@@ -302,7 +322,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       // Get stored user info to preserve username
+      logInfo('auth.store.restore.read_cached_user_info.start');
       const storedUserInfo = await getUserInfo();
+      logInfo('auth.store.restore.read_cached_user_info.success', { hasUserInfo: Boolean(storedUserInfo) });
       await clearForceInteractiveAuth();
       logInfo('auth.store.restore.success', { userId: userInfo.sub });
 

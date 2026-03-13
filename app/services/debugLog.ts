@@ -14,6 +14,8 @@ let sessionId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2
 let memoryLog: DebugLogEntry[] = [];
 let isLoaded = false;
 let writeQueue = Promise.resolve();
+let latestEntry: DebugLogEntry | null = null;
+const listeners = new Set<(entry: DebugLogEntry) => void>();
 
 function normalizeDetails(details?: unknown): string | undefined {
   if (details === undefined || details === null) {
@@ -79,6 +81,8 @@ export async function appendDebugLog(
   };
 
   memoryLog = [...memoryLog, entry].slice(-MAX_LOG_ENTRIES);
+  latestEntry = entry;
+  listeners.forEach((listener) => listener(entry));
   const consoleMethod = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
   consoleMethod(`[debug:${sessionId}] ${event}`, entry.details ?? '');
   enqueuePersist();
@@ -113,6 +117,24 @@ export async function getDebugLogText(): Promise<string> {
 
 export async function clearDebugLogs(): Promise<void> {
   memoryLog = [];
+  latestEntry = null;
   isLoaded = true;
   await AsyncStorage.removeItem(DEBUG_LOG_KEY);
+}
+
+export function getLatestDebugEntry(): DebugLogEntry | null {
+  return latestEntry;
+}
+
+export function subscribeToLatestDebugEntry(
+  listener: (entry: DebugLogEntry) => void
+): () => void {
+  listeners.add(listener);
+  if (latestEntry) {
+    listener(latestEntry);
+  }
+
+  return () => {
+    listeners.delete(listener);
+  };
 }
