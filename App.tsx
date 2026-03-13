@@ -2,13 +2,16 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import BottomTabNavigator from './app/navigation/BottomTabNavigator';
 import ChallengeQuizScreen from './app/screens/ChallengeQuizScreen';
 import ChallengeResultsScreen from './app/screens/ChallengeResultsScreen';
 import useFonts from './app/hooks/useFonts';
 import useAuthInit from './app/hooks/useAuthInit';
 import useDeepLinkHandler from './app/hooks/useDeepLinkHandler';
+import useAppBootstrap from './app/hooks/useAppBootstrap';
+import BootstrapScreen from './app/components/BootstrapScreen';
+import { prefetchDailyLoop } from './app/services/dailyLoop';
 import { theme } from './app/theme/theme';
 
 const Stack = createNativeStackNavigator();
@@ -17,6 +20,18 @@ const Stack = createNativeStackNavigator();
 function AppContent() {
   // Handle deep links for friend invites
   useDeepLinkHandler();
+
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        void prefetchDailyLoop();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   return (
     <Stack.Navigator
@@ -61,29 +76,21 @@ function AppContent() {
 export default function App() {
   const fontsLoaded = useFonts();
   const authReady = useAuthInit();
+  const appReady = useAppBootstrap(authReady);
 
-  if (!fontsLoaded || !authReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
+  if (!fontsLoaded || !authReady || !appReady) {
+    return <BootstrapScreen />;
   }
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer
+        onReady={() => {
+          void prefetchDailyLoop();
+        }}
+      >
         <AppContent />
       </NavigationContainer>
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background,
-  },
-});

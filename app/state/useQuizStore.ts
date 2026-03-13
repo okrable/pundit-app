@@ -1,91 +1,282 @@
 import { create } from 'zustand';
-import { Quiz, QuizResultImmediate, UserStats, UserProfile, AnswerWithTiming } from '../types';
-import { finalizeQuizStats, getDailyQuiz, submitQuiz, getUserStats } from '../services/api';
-import { getCachedQuiz, setCachedQuiz } from '../storage/quizCache';
+import {
+  finalizeQuizStats,
+  getDailyQuiz,
+  getUserStats,
+  submitQuiz,
+} from '../services/api';
 import { useAuthStore } from './useAuthStore';
 import { getQuizDate } from '../utils/quizDate';
+import { getCachedQuizEntry, isQuizCacheStale, setCachedQuiz } from '../storage/quizCache';
+import {
+  clearPendingQuizSubmission,
+  getPendingQuizSubmission,
+  setPendingQuizSubmission,
+} from '../storage/pendingSubmission';
+import {
+  CachedQuizResult,
+  getTodayQuizResult,
+  saveDailyQuizResult,
+} from '../storage/quizStorage';
+import {
+  AnswerWithTiming,
+  CacheEnvelope,
+  PendingQuizSubmission,
+  Quiz,
+  QuizResultImmediate,
+  UserProfile,
+} from '../types';
+import { useProfileStore } from './useProfileStore';
+import { useLeaderboardStore } from './useLeaderboardStore';
 
 interface QuizState {
   quiz: Quiz | null;
-  loading: boolean;
-  error: string | null;
+  quizCache: CacheEnvelope<Quiz> | null;
+  cachedResult: CachedQuizResult | null;
   result: QuizResultImmediate | null;
-  userStats: UserStats | null;
   userId: string | null;
-
-  // Actions
+  quizError: string | null;
+  submitError: string | null;
+  isQuizLoading: boolean;
+  isSubmitting: boolean;
   setUserId: (userId: string) => void;
-  fetchQuiz: (date?: string) => Promise<void>;
-  submitQuizAnswers: (answers: AnswerWithTiming[]) => Promise<void>;
-  fetchUserStats: () => Promise<void>;
+  hydrateFromCache: (userId: string, date?: string) => Promise<void>;
+  fetchQuiz: (date?: string, options?: { force?: boolean }) => Promise<Quiz | null>;
+  setCachedResult: (result: CachedQuizResult | null) => void;
+  createLocalResult: (answers: AnswerWithTiming[]) => Promise<QuizResultImmediate | null>;
+  submitQuizAnswers: (answers: AnswerWithTiming[], userProfile?: UserProfile) => Promise<void>;
+  retryPendingSubmission: () => Promise<void>;
   resetQuiz: () => void;
+}
+
+function calculatePoints(timeRemainingMs: number | undefined): number {
+  if (timeRemainingMs === undefined) return 60;
+  const seconds = timeRemainingMs / 1000;
+  if (seconds >= 16) return 100;
+  if (seconds >= 12) return 80;
+  if (seconds >= 8) return 60;
+  if (seconds >= 4) return 40;
+  return 20;
+}
+
+function buildUserProfile(): UserProfile | undefined {
+  const authState = useAuthStore.getState();
+  if (!authState.isAuthenticated || !authState.user) {
+    return undefined;
+  }
+
+  return {
+    displayName: authState.user.name,
+    email: authState.user.email,
+    avatarUrl: authState.user.picture,
+  };
 }
 
 export const useQuizStore = create<QuizState>((set, get) => ({
   quiz: null,
-  loading: false,
-  error: null,
+  quizCache: null,
+  cachedResult: null,
   result: null,
-  userStats: null,
   userId: null,
+  quizError: null,
+  submitError: null,
+  isQuizLoading: false,
+  isSubmitting: false,
 
   setUserId: (userId: string) => set({ userId }),
 
-  fetchQuiz: async (date?: string) => {
+  hydrateFromCache: async (userId: string, date?: string) => {
     const targetDate = date || getQuizDate();
-    set({ loading: true, error: null });
+    const [quizCache, cachedResult] = await Promise.all([
+      getCachedQuizEntry(targetDate),
+      getTodayQuizResult(userId),
+    ]);
+
+    set({
+      userId,
+      quiz: quizCache?.data ?? null,
+      quizCache,
+      cachedResult,
+      quizError: null,
+    });
+  },
+
+  fetchQuiz: async (date?: string, options?: { force?: boolean }) => {
+    const targetDate = date || getQuizDate();
+    const cachedQuiz = await getCachedQuizEntry(targetDate);
+
+    if (cachedQuiz && !options?.force && !isQuizCacheStale(cachedQuiz)) {
+      set({
+        quiz: cachedQuiz.data,
+        quizCache: cachedQuiz,
+        quizError: null,
+      });
+      return cachedQuiz.data;
+    }
+
+    if (cachedQuiz?.data) {
+      set({
+        quiz: cachedQuiz.data,
+        quizCache: cachedQuiz,
+        quizError: null,
+      });
+    }
+
+    set({ isQuizLoading: !cachedQuiz?.data, quizError: null });
 
     try {
-      // Try to get from cache first
-      const cachedQuiz = await getCachedQuiz(targetDate);
-      if (cachedQuiz) {
-        set({ quiz: cachedQuiz, loading: false });
-        return;
-      }
-
-      // If not cached, fetch from API
       const quiz = await getDailyQuiz(date);
       await setCachedQuiz(targetDate, quiz);
-      set({ quiz, loading: false });
+      const refreshedCache = await getCachedQuizEntry(targetDate);
+      set({
+        quiz,
+        quizCache: refreshedCache,
+        isQuizLoading: false,
+        quizError: null,
+      });
+      return quiz;
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to fetch quiz',
-        loading: false,
+        isQuizLoading: false,
+        quizError: error instanceof Error ? error.message : 'Failed to fetch quiz',
       });
+      return cachedQuiz?.data ?? null;
     }
   },
 
-  submitQuizAnswers: async (answers) => {
+  setCachedResult: (cachedResult: CachedQuizResult | null) => set({ cachedResult }),
+
+  createLocalResult: async (answers: AnswerWithTiming[]) => {
     const { quiz, userId } = get();
     if (!quiz || !userId) {
-      set({ error: 'Quiz or user ID not available' });
+      set({ submitError: 'Quiz or user ID not available' });
+      return null;
+    }
+
+    const detailedAnswers = answers.map((answer) => {
+      const question = quiz.questions.find((item) => item.id === answer.questionId);
+      const correctOptionIndex = question?.correctOptionIndex ?? 0;
+      return {
+        questionId: answer.questionId,
+        selectedOptionIndex: answer.selectedOptionIndex,
+        correctOptionIndex,
+        isCorrect: answer.selectedOptionIndex === correctOptionIndex,
+      };
+    });
+
+    const score = answers.reduce((total, answer) => {
+      const question = quiz.questions.find((item) => item.id === answer.questionId);
+      if (!question || question.correctOptionIndex !== answer.selectedOptionIndex) {
+        return total;
+      }
+
+      return total + calculatePoints(answer.timeRemainingMs);
+    }, 0);
+
+    const currentStats = useProfileStore.getState().stats;
+    const localResult: QuizResultImmediate = {
+      date: quiz.date,
+      quizId: quiz.id,
+      score,
+      totalQuestions: answers.length,
+      streak: userId.startsWith('guest_') ? 1 : currentStats?.streak ?? 0,
+      bestScore: Math.max(currentStats?.bestScore ?? 0, score),
+      answers: detailedAnswers,
+      statsPending: !userId.startsWith('guest_'),
+      syncState: userId.startsWith('guest_') ? 'synced' : 'pending',
+      isOptimistic: true,
+    };
+
+    const userProfile = buildUserProfile();
+
+    await Promise.all([
+      saveDailyQuizResult(localResult, userId, localResult.syncState),
+      setPendingQuizSubmission({
+        userId,
+        quizId: quiz.id,
+        answers,
+        userProfile,
+        localResult,
+        queuedAt: new Date().toISOString(),
+      }),
+      useProfileStore.getState().markPlayedToday(localResult, userId),
+    ]);
+
+    set({
+      result: localResult,
+      cachedResult: {
+        date: localResult.date,
+        quizId: localResult.quizId,
+        score: localResult.score,
+        totalQuestions: localResult.totalQuestions,
+        streak: localResult.streak,
+        bestScore: localResult.bestScore,
+        answers: localResult.answers.map((answer) => answer.isCorrect),
+        syncState: localResult.syncState,
+        cachedAt: new Date().toISOString(),
+        userId,
+      },
+      submitError: null,
+    });
+
+    return localResult;
+  },
+
+  submitQuizAnswers: async (answers: AnswerWithTiming[], userProfile?: UserProfile) => {
+    const { quiz, userId, result } = get();
+    if (!quiz || !userId) {
+      set({ submitError: 'Quiz or user ID not available' });
       return;
     }
 
-    set({ loading: true, error: null });
-    try {
-      // Get Auth0 user profile if authenticated
-      const authState = useAuthStore.getState();
-      let userProfile: UserProfile | undefined;
+    set({ isSubmitting: true, submitError: null });
 
-      if (authState.isAuthenticated && authState.user) {
-        userProfile = {
-          displayName: authState.user.name,
-          email: authState.user.email,
-          avatarUrl: authState.user.picture,
-        };
+    const profile = userProfile ?? buildUserProfile();
+
+    try {
+      const submittedQuizId = quiz.id;
+      const serverResult = await submitQuiz(submittedQuizId, userId, answers, profile);
+      const mergedResult: QuizResultImmediate = {
+        ...serverResult,
+        syncState: serverResult.statsPending ? 'pending' : 'synced',
+      };
+
+      await saveDailyQuizResult(mergedResult, userId, mergedResult.syncState);
+      await clearPendingQuizSubmission();
+
+      set({
+        result: mergedResult,
+        cachedResult: {
+          date: mergedResult.date,
+          quizId: mergedResult.quizId,
+          score: mergedResult.score,
+          totalQuestions: mergedResult.totalQuestions,
+          streak: mergedResult.streak,
+          bestScore: mergedResult.bestScore,
+          answers: mergedResult.answers.map((answer) => answer.isCorrect),
+          syncState: mergedResult.syncState,
+          cachedAt: new Date().toISOString(),
+          userId,
+        },
+        isSubmitting: false,
+        submitError: null,
+      });
+
+      if (!serverResult.statsPending) {
+        await useProfileStore.getState().markPlayedToday(mergedResult, userId);
+        if (!userId.startsWith('guest_')) {
+          void useLeaderboardStore.getState().prefetchDailyLoop(userId, true);
+        }
+        return;
       }
 
-      const submittedQuizId = quiz.id;
-      const result = await submitQuiz(submittedQuizId, userId, answers, userProfile);
-      set({ result, loading: false });
-
-      if (result.statsPending && !userId.startsWith('guest_')) {
-        const refreshDelay = result.statsRefreshAfterMs ?? 800;
+      if (!userId.startsWith('guest_')) {
+        const refreshDelay = serverResult.statsRefreshAfterMs ?? 800;
         setTimeout(async () => {
           let finalizeSucceeded = false;
+
           try {
-            const finalizeResult = await finalizeQuizStats(submittedQuizId, userId, userProfile);
+            const finalizeResult = await finalizeQuizStats(submittedQuizId, userId, profile);
             finalizeSucceeded = Boolean(finalizeResult.finalized || finalizeResult.skipped);
           } catch (finalizeError) {
             console.error('Failed to finalize quiz stats:', finalizeError);
@@ -97,42 +288,87 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
           try {
             const latestStats = await getUserStats(userId);
-            set((state) => {
-              const nextState: Partial<QuizState> = { userStats: latestStats };
-              if (state.result && state.result.quizId === submittedQuizId) {
-                nextState.result = {
-                  ...state.result,
-                  streak: latestStats.streak,
-                  bestScore: latestStats.bestScore,
-                  statsPending: false,
-                };
-              }
-              return nextState;
-            });
+            await useProfileStore.getState().applyServerStats(latestStats);
+            await saveDailyQuizResult(
+              {
+                ...(get().result ?? result ?? mergedResult),
+                streak: latestStats.streak,
+                bestScore: latestStats.bestScore,
+                statsPending: false,
+                syncState: 'synced',
+              },
+              userId,
+              'synced'
+            );
+            set((state) => ({
+              result: state.result
+                ? {
+                    ...state.result,
+                    streak: latestStats.streak,
+                    bestScore: latestStats.bestScore,
+                    statsPending: false,
+                    syncState: 'synced',
+                  }
+                : state.result,
+              cachedResult: state.cachedResult
+                ? {
+                    ...state.cachedResult,
+                    streak: latestStats.streak,
+                    bestScore: latestStats.bestScore,
+                    syncState: 'synced',
+                    cachedAt: new Date().toISOString(),
+                  }
+                : state.cachedResult,
+            }));
+            void useLeaderboardStore.getState().prefetchDailyLoop(userId, true);
           } catch (statsError) {
             console.error('Failed to refresh user stats after quiz submit:', statsError);
           }
         }, refreshDelay);
       }
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to submit quiz',
-        loading: false,
-      });
+      set((state) => ({
+        isSubmitting: false,
+        submitError: error instanceof Error ? error.message : 'Failed to submit quiz',
+        result: state.result
+          ? { ...state.result, syncState: 'failed', statsPending: true }
+          : state.result,
+        cachedResult: state.cachedResult
+          ? { ...state.cachedResult, syncState: 'failed', cachedAt: new Date().toISOString() }
+          : state.cachedResult,
+      }));
+
+      if (result) {
+        await saveDailyQuizResult(
+          { ...result, syncState: 'failed', statsPending: true },
+          userId,
+          'failed'
+        );
+      }
     }
   },
 
-  fetchUserStats: async () => {
+  retryPendingSubmission: async () => {
+    const pending = await getPendingQuizSubmission();
     const { userId } = get();
-    if (!userId) return;
 
-    try {
-      const userStats = await getUserStats(userId);
-      set({ userStats });
-    } catch (error) {
-      console.error('Failed to fetch user stats:', error);
+    if (!pending || !userId || pending.userId !== userId) {
+      return;
     }
+
+    set({
+      result: pending.localResult,
+      submitError: null,
+    });
+
+    await get().submitQuizAnswers(pending.answers, pending.userProfile);
   },
 
-  resetQuiz: () => set({ quiz: null, result: null, error: null }),
+  resetQuiz: () => set({
+    result: null,
+    quizError: null,
+    submitError: null,
+    isQuizLoading: false,
+    isSubmitting: false,
+  }),
 }));

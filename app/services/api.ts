@@ -18,6 +18,7 @@ import {
 import { useAuthStore } from '../state/useAuthStore';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
+const inflightRequests = new Map<string, Promise<unknown>>();
 
 export class ApiError extends Error {
   constructor(public statusCode: number, message: string) {
@@ -29,6 +30,7 @@ export class ApiError extends Error {
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   // Get Auth0 token if user is authenticated
   const token = useAuthStore.getState().token;
+  const method = options?.method ?? 'GET';
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -40,17 +42,39 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const requestKey =
+    method === 'GET'
+      ? `${method}:${endpoint}:${token ?? 'anonymous'}`
+      : `${method}:${endpoint}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new ApiError(response.status, error.error || error.message || 'Request failed');
+  const runRequest = async () => {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new ApiError(response.status, error.error || error.message || 'Request failed');
+    }
+
+    return response.json() as Promise<T>;
+  };
+
+  if (method === 'GET') {
+    const existing = inflightRequests.get(requestKey);
+    if (existing) {
+      return existing as Promise<T>;
+    }
+
+    const request = runRequest().finally(() => {
+      inflightRequests.delete(requestKey);
+    });
+    inflightRequests.set(requestKey, request);
+    return request;
   }
 
-  return response.json();
+  return runRequest();
 }
 
 export async function getDailyQuiz(date?: string): Promise<Quiz> {

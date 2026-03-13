@@ -12,6 +12,7 @@ app/
 │   └── MeScreen.tsx              # Profile page (logged in/out states)
 ├── components/
 │   ├── QuestionCard.tsx          # Question UI with animations
+│   ├── BootstrapScreen.tsx       # Branded startup loading screen
 │   ├── WelcomeScreen.tsx         # Quiz intro screen
 │   ├── ResultsScreen.tsx         # Full results display
 │   ├── CompletedQuizScreen.tsx   # Already-played state
@@ -19,14 +20,21 @@ app/
 │   └── SettingsModal.tsx         # Settings modal (account, support, about)
 ├── state/
 │   ├── useAuthStore.ts           # Auth0 state (Zustand)
-│   └── useQuizStore.ts           # Quiz state (Zustand)
+│   ├── useQuizStore.ts           # Quiz + result sync state
+│   ├── useProfileStore.ts        # Cached-first profile stats state
+│   └── useLeaderboardStore.ts    # Cached-first leaderboard state
 ├── services/
 │   ├── api.ts                    # API client
-│   └── auth0.ts                  # Auth0 configuration
+│   ├── auth0.ts                  # Auth0 configuration
+│   └── dailyLoop.ts              # Daily-loop bootstrap/prefetch
 ├── storage/
 │   ├── userStorage.ts            # User ID persistence
 │   ├── quizStorage.ts            # Results caching
-│   └── quizCache.ts              # Quiz data caching
+│   ├── quizCache.ts              # Quiz data caching
+│   ├── profileCache.ts           # Profile stats caching
+│   ├── leaderboardCache.ts       # Leaderboard caching
+│   ├── pendingSubmission.ts      # Pending daily quiz submit retry
+│   └── resourceCache.ts          # Generic cache envelope helpers
 ├── theme/
 │   └── theme.ts                  # Colors, fonts, spacing
 ├── types/
@@ -97,19 +105,25 @@ interface AuthState {
 ```typescript
 interface QuizState {
   quiz: Quiz | null;
-  loading: boolean;
-  error: string | null;
-  result: QuizResult | null;
-  userStats: UserStats | null;
+  quizCache: CacheEnvelope<Quiz> | null;
+  cachedResult: CachedQuizResult | null;
+  result: QuizResultImmediate | null;
   userId: string | null;
-  // Actions
+  isQuizLoading: boolean;
+  isSubmitting: boolean;
   setUserId(userId): void;
-  fetchQuiz(date?): Promise<void>;
-  submitQuizAnswers(answers): Promise<QuizResult>;
-  fetchUserStats(): Promise<void>;
+  hydrateFromCache(userId): Promise<void>;
+  fetchQuiz(date?): Promise<Quiz | null>;
+  createLocalResult(answers): Promise<QuizResultImmediate | null>;
+  submitQuizAnswers(answers): Promise<void>;
+  retryPendingSubmission(): Promise<void>;
   resetQuiz(): void;
 }
 ```
+
+**useProfileStore / useLeaderboardStore**
+- Own cached-first warm rendering for Me and League Tables.
+- Revalidate in the background after app bootstrap, focus, auth changes, and quiz completion.
 
 ### Local Component State
 - Current question index
@@ -123,13 +137,13 @@ interface QuizState {
 
 | State | Trigger | UI |
 |-------|---------|-----|
-| Loading | App start / fetch | Loading indicator |
-| Welcome | Quiz loaded, not started | WelcomeScreen |
+| Bootstrap | App start | Branded bootstrap screen |
+| Welcome | Quiz cached or warming, not started | WelcomeScreen |
 | Answering | User started quiz | QuestionCard sequence |
-| Submitting | All questions answered | Loading overlay |
-| Results | Submit success | ResultsScreen |
+| Syncing | All questions answered | ResultsScreen with background sync status |
+| Results | Local result ready | ResultsScreen |
 | Completed | Already played today | CompletedQuizScreen |
-| Error | Network/API failure | Error message + retry |
+| Error | Network/API failure | Inline retry / helper text |
 
 ---
 
@@ -137,6 +151,7 @@ interface QuizState {
 
 ### App.tsx
 - Font loading with expo-font
+- Branded startup bootstrap while local daily-loop state hydrates
 - Navigation container
 - Safe area handling
 
@@ -146,12 +161,11 @@ interface QuizState {
 - Icon assignment (Ionicons)
 - Header styling with accent color
 
-### DailyQuizScreen.tsx (322 lines)
-- Main orchestrator component
-- Checks cached result for same-day replay prevention
-- Manages quiz flow state machine
-- Handles user ID initialization
-- Coordinates between Welcome → Questions → Results
+### DailyQuizScreen.tsx
+- Main daily-loop orchestrator
+- Renders Welcome or Completed immediately from cached state
+- Preloads quiz in the background before kickoff
+- Reveals local result instantly, then syncs submit/final stats in background
 
 ### QuestionCard.tsx (205 lines)
 - Single question display
@@ -178,15 +192,14 @@ interface QuizState {
 - Prevents replaying until next day
 - Uses same score display as ResultsScreen
 
-### LeaderboardScreen.tsx (179 lines)
-- Fetches leaderboard data
-- Displays ranked list of players
-- Shows score and streak per entry
+### LeaderboardScreen.tsx
+- Hydrates cached friends/global leaderboards first
+- Uses placeholder rows instead of centered spinners on empty warm loads
+- Keeps Friends as the primary authenticated comparison view
 
 ### MeScreen.tsx
-- Profile page with logged-in/logged-out states
-- **Logged out**: Account promotion with Create/Login buttons, benefit list
-- **Logged in**: Profile picture, display name, streak/best score cards, streak status
+- Cached-first profile page with logged-in/logged-out states
+- Logged-in stats render from cache immediately and refresh silently on focus
 - Settings cog button opens SettingsModal
 
 ### SettingsModal.tsx
@@ -228,8 +241,11 @@ interface QuizState {
 | Key | Content | Expiry | File |
 |-----|---------|--------|------|
 | `@pundit_user_id` | Guest ID string | Never | userStorage.ts |
-| `@pundit_daily_quiz_result` | QuizResult JSON | Daily (by date check) | quizStorage.ts |
-| `@pundit_quiz_{date}` | Quiz JSON | 24 hours | quizCache.ts |
+| `@pundit_daily_quiz_result_*` | Same-day result JSON | Daily (by date check) | quizStorage.ts |
+| `@pundit_resource_quiz_{date}` | Quiz JSON envelope | stale-first / timed | quizCache.ts |
+| `@pundit_resource_profile_{userId}` | UserStats envelope | stale-first / timed | profileCache.ts |
+| `@pundit_resource_leaderboard_*` | Leaderboard envelope | stale-first / timed | leaderboardCache.ts |
+| `@pundit_pending_daily_submission` | Pending submit payload | until sync success | pendingSubmission.ts |
 
 ---
 

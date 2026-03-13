@@ -11,61 +11,72 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AuthSession from 'expo-auth-session';
 import { Ionicons } from '@expo/vector-icons';
-import { LeaderboardEntry, FriendsLeaderboardEntry } from '../types';
-import { getLeaderboard, getFriendsLeaderboard } from '../services/api';
+import { FriendsLeaderboardEntry, LeaderboardEntry } from '../types';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAuthRequest, auth0Config } from '../services/auth0';
 import { theme } from '../theme/theme';
 import Avatar from '../components/Avatar';
 import ManageFriendsModal from '../components/ManageFriendsModal';
+import { useLeaderboardStore } from '../state/useLeaderboardStore';
 
 type ViewMode = 'friends' | 'global';
 
 export default function LeaderboardScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('friends');
-  const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [friendsLeaderboard, setFriendsLeaderboard] = useState<FriendsLeaderboardEntry[]>([]);
-  const [totalFriends, setTotalFriends] = useState(0);
-  const [friendsPlayedToday, setFriendsPlayedToday] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [showManageFriends, setShowManageFriends] = useState(false);
 
-  const { user, isAuthenticated, isAuth0Available, setAuthResult, clearError } = useAuthStore();
-  const [request, response, promptAsync] = useAuthRequest();
+  const {
+    friendsLeaderboard,
+    totalFriends,
+    friendsPlayedToday,
+    globalLeaderboard,
+    loadingFriends,
+    loadingGlobal,
+    error,
+    revalidateFriends,
+    revalidateGlobal,
+    invalidateFriends,
+  } = useLeaderboardStore();
+  const {
+    user,
+    isAuthenticated,
+    isAuth0Available,
+    forceInteractiveAuth,
+    setAuthResult,
+    clearError,
+  } = useAuthStore();
+  const [request, response, promptAsync] = useAuthRequest({
+    intent: 'signup',
+    forceInteractive: forceInteractiveAuth,
+  });
 
-  const loadData = useCallback(async () => {
-    setError(null);
+  const refreshCurrentView = useCallback(async () => {
     try {
       if (viewMode === 'friends' && isAuthenticated && user?.sub) {
-        const data = await getFriendsLeaderboard(user.sub);
-        setFriendsLeaderboard(data.leaderboard);
-        setTotalFriends(data.totalFriends);
-        setFriendsPlayedToday(data.friendsPlayedToday);
+        await revalidateFriends(user.sub);
       } else {
-        const data = await getLeaderboard();
-        setGlobalLeaderboard(data);
+        await revalidateGlobal();
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load leaderboard');
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
-  }, [viewMode, isAuthenticated, user?.sub]);
+  }, [isAuthenticated, revalidateFriends, revalidateGlobal, user?.sub, viewMode]);
 
   useEffect(() => {
-    setLoading(true);
-    loadData();
-  }, [loadData]);
+    if (viewMode === 'friends' && (!isAuthenticated || !user?.sub)) {
+      setViewMode('global');
+      return;
+    }
 
-  // Handle Auth0 response
+    void refreshCurrentView();
+  }, [isAuthenticated, refreshCurrentView, user?.sub, viewMode]);
+
   useEffect(() => {
     if (response?.type === 'success') {
       const { code } = response.params;
-      exchangeCodeForToken(code);
+      void exchangeCodeForToken(code);
     } else if (response) {
       if (response.type === 'error') {
         console.error('Auth error:', response.error);
@@ -103,18 +114,27 @@ export default function LeaderboardScreen() {
   const handleCreateAccount = async () => {
     setIsAuthLoading(true);
     clearError();
-    await promptAsync();
+    await promptAsync({ preferEphemeralSession: true });
   };
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadData();
+    void refreshCurrentView();
   };
 
   const handleFriendsChanged = () => {
-    if (viewMode === 'friends') {
-      loadData();
+    if (user?.sub) {
+      void invalidateFriends(user.sub);
     }
+  };
+
+  const handleSetViewMode = (nextMode: ViewMode) => {
+    setViewMode(nextMode);
+    if (nextMode === 'friends' && user?.sub) {
+      void revalidateFriends(user.sub);
+      return;
+    }
+    void revalidateGlobal();
   };
 
   const renderSegmentedControl = () => {
@@ -124,7 +144,7 @@ export default function LeaderboardScreen() {
       <View style={styles.segmentedControl}>
         <TouchableOpacity
           style={[styles.segment, viewMode === 'friends' && styles.segmentActive]}
-          onPress={() => setViewMode('friends')}
+          onPress={() => handleSetViewMode('friends')}
         >
           <Text style={[styles.segmentText, viewMode === 'friends' && styles.segmentTextActive]}>
             Friends
@@ -132,7 +152,7 @@ export default function LeaderboardScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.segment, viewMode === 'global' && styles.segmentActive]}
-          onPress={() => setViewMode('global')}
+          onPress={() => handleSetViewMode('global')}
         >
           <Text style={[styles.segmentText, viewMode === 'global' && styles.segmentTextActive]}>
             Global
@@ -250,31 +270,23 @@ export default function LeaderboardScreen() {
     </View>
   );
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading leaderboard...</Text>
+  const renderPlaceholder = () => (
+    <View style={styles.placeholderList}>
+      {[0, 1, 2].map((item) => (
+        <View key={item} style={styles.placeholderCard}>
+          <View style={styles.placeholderRank} />
+          <View style={styles.placeholderBody}>
+            <View style={styles.placeholderLinePrimary} />
+            <View style={styles.placeholderLineSecondary} />
+          </View>
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+      ))}
+    </View>
+  );
 
   const isFriendsView = viewMode === 'friends' && isAuthenticated;
+  const activeLoading = isFriendsView ? loadingFriends : loadingGlobal;
+  const activeData = isFriendsView ? friendsLeaderboard : globalLeaderboard;
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -293,6 +305,7 @@ export default function LeaderboardScreen() {
           )}
         </View>
         {renderSegmentedControl()}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {isFriendsView && totalFriends > 0 && (
           <Text style={styles.subtitle}>
             {friendsPlayedToday} of {totalFriends} friends played today
@@ -301,7 +314,9 @@ export default function LeaderboardScreen() {
         {!isFriendsView && <Text style={styles.subtitle}>Today's top players</Text>}
       </View>
 
-      {isFriendsView ? (
+      {activeData.length === 0 && activeLoading ? (
+        renderPlaceholder()
+      ) : isFriendsView ? (
         <FlatList
           data={friendsLeaderboard}
           renderItem={renderFriendsItem}
@@ -347,33 +362,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
-  },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    fontSize: 14,
-    color: theme.colors.mediumGray,
-    fontFamily: theme.fonts.gothamBook,
-  },
   errorText: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.incorrect,
-    textAlign: 'center',
     fontFamily: theme.fonts.gothamBook,
-    marginBottom: theme.spacing.md,
-  },
-  retryButton: {
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  retryButtonText: {
-    fontSize: 14,
-    color: theme.colors.primary,
-    fontFamily: theme.fonts.gothamMedium,
+    marginBottom: theme.spacing.sm,
   },
   header: {
     padding: theme.spacing.lg,
@@ -518,41 +511,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.primary,
-    backgroundColor: theme.colors.primaryLight,
-    paddingHorizontal: theme.spacing.xs,
-    paddingVertical: 2,
-    borderRadius: theme.borderRadius.sm,
-    overflow: 'hidden',
   },
   playerStats: {
-    fontSize: 12,
-    color: theme.colors.mediumGray,
+    fontSize: 13,
     fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
   },
   notPlayedText: {
-    fontSize: 12,
-    color: theme.colors.mediumGray,
+    fontSize: 13,
     fontFamily: theme.fonts.gothamBook,
-    fontStyle: 'italic',
+    color: theme.colors.mediumGray,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xxl,
+    paddingVertical: theme.spacing.xxl,
   },
   emptyText: {
-    fontSize: 18,
-    color: theme.colors.textDark,
-    fontFamily: theme.fonts.gothamBold,
     marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.xs,
+    fontSize: 18,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
   },
   emptySubtext: {
+    marginTop: theme.spacing.sm,
     fontSize: 14,
-    color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
     textAlign: 'center',
     marginBottom: theme.spacing.lg,
   },
@@ -565,6 +551,42 @@ const styles = StyleSheet.create({
   inviteFriendsButtonText: {
     color: theme.colors.white,
     fontSize: 14,
-    fontFamily: theme.fonts.gothamMedium,
+    fontFamily: theme.fonts.gothamBold,
+  },
+  placeholderList: {
+    padding: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+  },
+  placeholderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.white,
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.sm,
+    opacity: 0.72,
+  },
+  placeholderRank: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.lightGray,
+    marginRight: theme.spacing.md,
+  },
+  placeholderBody: {
+    flex: 1,
+  },
+  placeholderLinePrimary: {
+    height: 14,
+    width: '48%',
+    backgroundColor: theme.colors.lightGray,
+    borderRadius: theme.borderRadius.sm,
+    marginBottom: theme.spacing.sm,
+  },
+  placeholderLineSecondary: {
+    height: 12,
+    width: '62%',
+    backgroundColor: theme.colors.lightGray,
+    borderRadius: theme.borderRadius.sm,
   },
 });

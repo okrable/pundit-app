@@ -25,11 +25,12 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ visible, onClose }: SettingsModalProps) {
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated, error, logout, clearError } = useAuthStore();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
+    clearError();
     await logout();
     setIsLoggingOut(false);
     onClose();
@@ -108,6 +109,7 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
                   <Text style={styles.logoutButtonText}>Sign Out</Text>
                 )}
               </TouchableOpacity>
+              {error ? <Text style={styles.logoutHelper}>{error}</Text> : null}
             </View>
           )}
 
@@ -245,6 +247,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.incorrect,
+  },
+  logoutHelper: {
+    marginTop: theme.spacing.sm,
+    fontSize: 12,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    textAlign: 'center',
   },
   listItem: {
     backgroundColor: theme.colors.white,

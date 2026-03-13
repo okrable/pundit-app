@@ -11,6 +11,17 @@ export interface Quiz {
   questions: Question[];
 }
 
+export interface CacheEnvelope<T> {
+  data: T;
+  cachedAt: string;
+  staleAt: string;
+  expiresAt: string | null;
+  version: number;
+  scopeKey?: string;
+}
+
+export type SyncState = 'pending' | 'synced' | 'failed';
+
 // Answer submitted with timing info
 export interface AnswerWithTiming {
   questionId: string;
@@ -37,6 +48,8 @@ export interface QuizResultImmediate {
   answers: QuizAnswerDetail[];
   statsPending?: boolean;
   statsRefreshAfterMs?: number;
+  syncState?: SyncState;
+  isOptimistic?: boolean;
 }
 
 // Result stored in DB/cache (compact boolean array)
@@ -48,6 +61,7 @@ export interface QuizResult {
   streak: number;
   bestScore: number;
   answers: boolean[];
+  syncState?: SyncState;
 }
 
 export interface LeaderboardEntry {
@@ -233,4 +247,13 @@ export interface GetFriendsResponse {
 export interface RemoveFriendResponse {
   success: boolean;
   error?: string;
+}
+
+export interface PendingQuizSubmission {
+  userId: string;
+  quizId: string;
+  answers: AnswerWithTiming[];
+  userProfile?: UserProfile;
+  localResult: QuizResultImmediate;
+  queuedAt: string;
 }

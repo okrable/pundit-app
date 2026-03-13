@@ -1,4 +1,5 @@
 import * as AuthSession from 'expo-auth-session';
+import { Prompt } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 
 // Enable warm-up for better UX
@@ -20,6 +21,7 @@ export const auth0Config = {
   authorizationEndpoint: auth0Domain ? `https://${auth0Domain}/authorize` : '',
   tokenEndpoint: auth0Domain ? `https://${auth0Domain}/oauth/token` : '',
   revocationEndpoint: auth0Domain ? `https://${auth0Domain}/oauth/revoke` : '',
+  logoutEndpoint: auth0Domain ? `https://${auth0Domain}/v2/logout` : '',
 };
 
 // Helper to check if Auth0 is configured
@@ -27,8 +29,23 @@ export const isAuth0Configured = (): boolean => {
   return !!(auth0Domain && auth0ClientId);
 };
 
+export type AuthIntent = 'signup' | 'login';
+
+interface AuthRequestOptions {
+  intent?: AuthIntent;
+  forceInteractive?: boolean;
+}
+
+function getAuthPrompt(intent: AuthIntent | undefined, forceInteractive: boolean) {
+  if (intent === 'login') {
+    return Prompt.Login;
+  }
+
+  return undefined;
+}
+
 // Create redirect URI for Expo
-export const useAuthRequest = (screenHint?: 'signup' | 'login') => {
+export const useAuthRequest = ({ intent, forceInteractive = false }: AuthRequestOptions = {}) => {
   const discovery = {
     authorizationEndpoint: auth0Config.authorizationEndpoint,
     tokenEndpoint: auth0Config.tokenEndpoint,
@@ -36,17 +53,46 @@ export const useAuthRequest = (screenHint?: 'signup' | 'login') => {
   };
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
+  const prompt = getAuthPrompt(intent, forceInteractive);
+  const extraParams: Record<string, string> = {};
+
+  if (intent) {
+    extraParams.screen_hint = intent;
+  }
+
+  if (forceInteractive || intent === 'login') {
+    extraParams.max_age = '0';
+  }
 
   return AuthSession.useAuthRequest(
     {
       clientId: auth0ClientId || '',
       scopes: ['openid', 'profile', 'email', 'offline_access'],
       redirectUri,
-      extraParams: screenHint ? { screen_hint: screenHint } : undefined,
+      prompt,
+      extraParams: Object.keys(extraParams).length > 0 ? extraParams : undefined,
     },
     discovery
   );
 };
+
+export async function logoutFromAuth0(): Promise<void> {
+  if (!auth0Config.logoutEndpoint || !auth0Config.clientId) {
+    return;
+  }
+
+  const returnTo = AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
+  const logoutUrl =
+    `${auth0Config.logoutEndpoint}?client_id=${encodeURIComponent(auth0Config.clientId)}` +
+    `&returnTo=${encodeURIComponent(returnTo)}`;
+
+  try {
+    await WebBrowser.openAuthSessionAsync(logoutUrl, returnTo);
+  } catch (error) {
+    console.error('Error logging out from Auth0 session:', error);
+    throw error;
+  }
+}
 
 // Refresh access token using refresh token
 export async function refreshAccessToken(refreshToken: string): Promise<{

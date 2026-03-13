@@ -7,8 +7,11 @@ A daily sports trivia quiz app built with React Native (Expo), TypeScript, and N
 - Daily quiz with 5 sports trivia questions
 - Real-time answer submission and scoring
 - Streak tracking and personal best scores
-- Global leaderboard
-- Offline caching for better performance
+- Friends-first and global leaderboards
+- Branded startup bootstrap with stale-first cache hydration
+- Background prefetch for quiz, stats, and leaderboard data
+- Local-first result reveal with background stat reconciliation
+- Offline caching for quiz, results, stats, and leaderboard warm loads
 - Guest user system (no registration required)
 
 ## Tech Stack
@@ -251,6 +254,14 @@ netlify deploy --prod
 ## Environment Variables
 
 See `.env.example` for required environment variables.
+
+## Performance Model
+
+- App launch uses a short branded bootstrap screen while fonts and local daily-loop state hydrate.
+- Auth restoration is stale-first: cached user info renders first and token refresh happens in the background.
+- Explicit sign-out now clears both local tokens and the upstream Auth0 browser session, so logging into a different account requires an interactive auth flow.
+- Games, Me, and League Tables prefer cached same-day data on warm opens, then revalidate silently.
+- Final daily-quiz results render locally as soon as the fifth answer is locked in; server submission and stat finalization continue in the background.
 
 ## Hardening rollout plan
 

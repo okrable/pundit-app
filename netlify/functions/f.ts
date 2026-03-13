@@ -6,6 +6,11 @@ import { Handler } from '@netlify/functions';
 // with a fallback UI if the app isn't installed.
 
 export const handler: Handler = async (event) => {
+  const htmlHeaders: Record<string, string> = {
+    'Content-Type': 'text/html',
+    'Cache-Control': 'no-cache',
+  };
+
   // Extract the code from the path
   // The path will be like /.netlify/functions/f/ABCD1234
   const pathParts = event.path.split('/');
@@ -14,7 +19,7 @@ export const handler: Handler = async (event) => {
   if (!code || code === 'f') {
     return {
       statusCode: 400,
-      headers: { 'Content-Type': 'text/html' },
+      headers: htmlHeaders,
       body: generateErrorPage('Invalid invite link'),
     };
   }
@@ -204,10 +209,7 @@ export const handler: Handler = async (event) => {
 
   return {
     statusCode: 200,
-    headers: {
-      'Content-Type': 'text/html',
-      'Cache-Control': 'no-cache',
-    },
+    headers: htmlHeaders,
     body: html,
   };
 };

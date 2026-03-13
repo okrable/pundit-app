@@ -25,7 +25,11 @@
 ## Cross-Cutting Concerns
 - **Timezone consistency**: backend uses `QUIZ_TIMEZONE` and frontend uses `EXPO_PUBLIC_QUIZ_TIMEZONE`.
 - **Ownership enforcement**: protected endpoints verify bearer token and match `token.sub` to requested `userId`.
-- **Caching**: client caches quiz payloads and same-day results to reduce network dependence.
+- **Bootstrap loading**: app startup now hydrates cached daily-loop state before first navigation render.
+- **Auth session control**: explicit logout clears local credentials and attempts upstream Auth0 session logout; login and signup flows prefer interactive re-auth over silent session reuse.
+- **Caching**: client caches quiz payloads, same-day results, profile stats, and leaderboard data to reduce network dependence.
+- **Stale-first refresh**: Games, Me, and League Tables render cached data first and revalidate silently in the background.
+- **Optimistic daily results**: the fifth answer reveals a local result immediately while submit/finalization continue asynchronously.
 
 ## Known Architectural Gaps
 1. No offline submit queue for disconnected answer capture and delayed sync.

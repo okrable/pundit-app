@@ -43,6 +43,12 @@ export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps
         <View style={styles.scoreBlock}>
           <Text style={styles.scoreText}>{result.score} POINTS</Text>
           <Text style={styles.emojiText}>{emojis}</Text>
+          {result.syncState === 'pending' && (
+            <Text style={styles.statusText}>Stats still syncing in the background.</Text>
+          )}
+          {result.syncState === 'failed' && (
+            <Text style={styles.statusText}>We will retry syncing your result shortly.</Text>
+          )}
         </View>
 
         <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
@@ -93,6 +99,13 @@ const styles = StyleSheet.create({
   emojiText: {
     fontSize: 26,
     letterSpacing: 6,
+    textAlign: 'center',
+  },
+  statusText: {
+    marginTop: theme.spacing.sm,
+    fontSize: 12,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.textDark,
     textAlign: 'center',
   },
   correctText: {

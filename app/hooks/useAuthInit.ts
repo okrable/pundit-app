@@ -3,18 +3,32 @@ import { useAuthStore } from '../state/useAuthStore';
 
 export default function useAuthInit(): boolean {
   const [isReady, setIsReady] = useState(false);
-  const { restoreAuthState, isAuth0Available } = useAuthStore();
+  const { bootstrapFromStorage, restoreAuthState, isAuth0Available } = useAuthStore();
 
   useEffect(() => {
-    const initAuth = async () => {
-      if (isAuth0Available) {
-        await restoreAuthState();
-      }
-      setIsReady(true);
-    };
+    let isMounted = true;
 
-    initAuth();
-  }, []);
+    async function initAuth() {
+      if (isAuth0Available) {
+        await bootstrapFromStorage();
+        if (isMounted) {
+          setIsReady(true);
+        }
+        void restoreAuthState();
+        return;
+      }
+
+      if (isMounted) {
+        setIsReady(true);
+      }
+    }
+
+    void initAuth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [bootstrapFromStorage, isAuth0Available, restoreAuthState]);
 
   return isReady;
 }

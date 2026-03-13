@@ -13,6 +13,9 @@ This folder documents what is **actually shipped**, what is **currently being ha
 - Daily 5-question quiz flow (fetch, play, submit, results)
 - Speed-based scoring (0–500 total)
 - Daily leaderboard + personal stats
+- Branded startup bootstrap with cached-first hydration
+- Stale-first quiz/profile/leaderboard loading for warm opens
+- Local-first result reveal with background sync/finalization
 - Me profile page + settings modal
 - Guest mode + optional Auth0 sign-in
 - Server-side Auth0 ownership checks on protected endpoints (`token.sub === userId`)
@@ -37,8 +40,9 @@ Read in this order:
 2. `execution-plan.md` — phase progress + next milestones
 3. `api-plan.md` — endpoint contracts and auth rules
 4. `data-contracts.md` — payloads and DB-facing shapes
-5. `assumptions-and-todos.md` — active TODOs and known limitations
-6. `features/` — feature-specific implementation notes
+5. `performance-bootstrap.md` — startup bootstrap, stale-first caches, and background refresh
+6. `assumptions-and-todos.md` — active TODOs and known limitations
+7. `features/` — feature-specific implementation notes
 
 ## Maintenance Rules (Strict)
 - Any significant behavior change must update docs in this folder in the same PR.

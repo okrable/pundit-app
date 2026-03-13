@@ -12,15 +12,20 @@
 - [x] Submit + immediate results
 - [x] Replay prevention for same quiz date
 - [x] Speed-based scoring support in submit flows
+- [x] Branded startup bootstrap and stale-first daily-loop hydration
+- [x] Background prefetch for quiz, stats, and leaderboard warm loads
+- [x] Local-first result reveal with background submission retry/finalization
 
 ### Accounts + Data
 - [x] Guest mode and optional Auth0 login
 - [x] User/profile persistence for authenticated users
 - [x] Server-side ownership checks on protected endpoints
 - [x] Timezone-consistent quiz-day calculation
+- [x] Cached-first auth restoration with background token refresh
 
 ### Competition
 - [x] Global leaderboard and Me stats
+- [x] Friends-first cached leaderboard warm loads
 - [x] Challenge mode end-to-end (create/join/play/reveal)
 - [x] Challenge history and W/L/D stat updates
 - [x] Friend links, friend list, and friends leaderboard

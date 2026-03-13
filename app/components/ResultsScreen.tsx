@@ -47,6 +47,12 @@ export default function ResultsScreen({ result, quiz, onPlayAgain }: ResultsScre
             <Text style={styles.scoreValue}>{result.score}</Text>
             <Text style={styles.scoreLabel}>points</Text>
             <Text style={styles.correctCount}>{correctCount}/{result.totalQuestions} correct</Text>
+            {result.syncState === 'pending' && (
+              <Text style={styles.syncText}>Syncing your stats in the background...</Text>
+            )}
+            {result.syncState === 'failed' && (
+              <Text style={styles.syncText}>We will retry your score sync automatically.</Text>
+            )}
           </View>
           <View style={styles.statsColumn}>
             <View style={styles.statItem}>
@@ -162,6 +168,13 @@ const styles = StyleSheet.create({
     color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
     marginTop: theme.spacing.xs,
+  },
+  syncText: {
+    marginTop: theme.spacing.sm,
+    fontSize: 11,
+    color: theme.colors.mediumGray,
+    fontFamily: theme.fonts.gothamBook,
+    textAlign: 'center',
   },
   statsColumn: {
     flex: 1,

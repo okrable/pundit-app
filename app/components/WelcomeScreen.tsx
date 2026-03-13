@@ -7,9 +7,15 @@ const { width, height } = Dimensions.get('window');
 
 interface WelcomeScreenProps {
   onStartQuiz: () => void;
+  isPreparing?: boolean;
+  helperText?: string | null;
 }
 
-export default function WelcomeScreen({ onStartQuiz }: WelcomeScreenProps) {
+export default function WelcomeScreen({
+  onStartQuiz,
+  isPreparing = false,
+  helperText = null,
+}: WelcomeScreenProps) {
   const [showLaws, setShowLaws] = useState(false);
 
   return (
@@ -34,10 +40,15 @@ export default function WelcomeScreen({ onStartQuiz }: WelcomeScreenProps) {
           <TouchableOpacity
             style={styles.kickOffButton}
             onPress={onStartQuiz}
+            disabled={isPreparing}
           >
-            <Text style={styles.kickOffButtonText}>Kick Off</Text>
+            <Text style={styles.kickOffButtonText}>
+              {isPreparing ? 'Warming Up...' : 'Kick Off'}
+            </Text>
           </TouchableOpacity>
         </View>
+
+        {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
       </View>
 
       <LawsOfTheGameModal
@@ -101,5 +112,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.white,
+  },
+  helperText: {
+    marginTop: theme.spacing.md,
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.background,
+    textAlign: 'center',
   },
 });

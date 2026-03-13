@@ -85,7 +85,10 @@ export const handler: Handler = async (event) => {
     logRequestEnd({ endpoint: 'getDailyQuiz', requestId }, Date.now() - requestStartedAt, 200);
     return {
       statusCode: 200,
-      headers,
+      headers: {
+        ...headers,
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=21600',
+      },
       body: JSON.stringify(formattedQuiz),
     };
   } catch (error) {

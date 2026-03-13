@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { QuizResult, QuizResultImmediate } from '../types';
+import { QuizResult, QuizResultImmediate, SyncState } from '../types';
 import { getQuizDate } from '../utils/quizDate';
 
 // Cache keys are now user-specific to keep guest and auth0 results separate
@@ -22,16 +22,17 @@ function toCompactResult(result: QuizResultImmediate | QuizResult): QuizResult {
 
   // Convert detailed answers to boolean array
   const immediateResult = result as QuizResultImmediate;
-  return {
-    date: immediateResult.date,
-    quizId: immediateResult.quizId,
-    score: immediateResult.score,
-    totalQuestions: immediateResult.totalQuestions,
-    streak: immediateResult.streak,
-    bestScore: immediateResult.bestScore,
-    answers: immediateResult.answers.map(a => a.isCorrect),
-  };
-}
+    return {
+      date: immediateResult.date,
+      quizId: immediateResult.quizId,
+      score: immediateResult.score,
+      totalQuestions: immediateResult.totalQuestions,
+      streak: immediateResult.streak,
+      bestScore: immediateResult.bestScore,
+      answers: immediateResult.answers.map(a => a.isCorrect),
+      syncState: immediateResult.syncState,
+    };
+  }
 
 /**
  * Get today's date in YYYY-MM-DD format for comparison
@@ -55,11 +56,16 @@ function getCacheKey(userId: string | null): string {
  * Save a quiz result to local storage for a specific user
  * Accepts both immediate (detailed) and compact (boolean) result formats
  */
-export async function saveDailyQuizResult(result: QuizResult | QuizResultImmediate, userId?: string): Promise<void> {
+export async function saveDailyQuizResult(
+  result: QuizResult | QuizResultImmediate,
+  userId?: string,
+  syncState?: SyncState
+): Promise<void> {
   try {
     const compactResult = toCompactResult(result);
     const cachedResult: CachedQuizResult = {
       ...compactResult,
+      syncState: syncState ?? compactResult.syncState,
       cachedAt: new Date().toISOString(),
       userId,
     };
