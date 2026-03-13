@@ -15,6 +15,7 @@ import {
   getForceInteractiveAuth,
   storeForceInteractiveAuth,
 } from '../storage/authStorage';
+import { logError, logInfo, logWarn } from '../services/debugLog';
 
 interface User {
   sub: string;
@@ -61,6 +62,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   bootstrapFromStorage: async () => {
     try {
+      logInfo('auth.store.bootstrap.start');
       const [storedRefreshToken, storedUserInfo, forceInteractiveAuth] = await Promise.all([
         getRefreshToken(),
         getUserInfo(),
@@ -68,6 +70,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ]);
 
       if (storedRefreshToken && storedUserInfo) {
+        logInfo('auth.store.bootstrap.cached_session_found', {
+          userId: storedUserInfo.sub,
+          forceInteractiveAuth,
+        });
         set({
           user: {
             sub: storedUserInfo.sub,
@@ -88,6 +94,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return storedUserInfo.sub;
       }
 
+      logInfo('auth.store.bootstrap.no_cached_session', { forceInteractiveAuth });
       set({
         user: null,
         token: null,
@@ -102,6 +109,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return null;
     } catch (error) {
       console.error('Error bootstrapping auth state:', error);
+      logError('auth.store.bootstrap.error', error);
       set({
         user: null,
         token: null,
@@ -117,6 +125,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setAuthResult: async (token: string, user: User, refreshToken?: string) => {
+    logInfo('auth.store.setAuthResult', { userId: user.sub, hasRefreshToken: Boolean(refreshToken) });
     set({
       token,
       user,
@@ -187,6 +196,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    logInfo('auth.store.logout.start');
     const nextAuthStateVersion = get().authStateVersion + 1;
     set({
       user: null,
@@ -205,7 +215,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       await logoutFromAuth0();
+      logInfo('auth.store.logout.auth0_success');
     } catch (error) {
+      logError('auth.store.logout.auth0_error', error);
       set({
         error: 'Signed out locally. If account switching still looks sticky, try again.',
       });
@@ -219,12 +231,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // Restore auth state from storage on app start
   restoreAuthState: async () => {
     const authStateVersion = get().authStateVersion;
+    logInfo('auth.store.restore.start', { authStateVersion });
     set({ isRestoring: true });
 
     try {
       const storedRefreshToken = await getRefreshToken();
 
       if (!storedRefreshToken) {
+        logInfo('auth.store.restore.no_refresh_token');
         set({
           user: null,
           token: null,
@@ -240,10 +254,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Attempt to refresh the access token
       const tokenResult = await refreshAccessToken(storedRefreshToken);
       if (get().authStateVersion !== authStateVersion) {
+        logWarn('auth.store.restore.version_changed_after_refresh');
         return false;
       }
 
       if (!tokenResult) {
+        logWarn('auth.store.restore.refresh_failed');
         // Refresh token expired or invalid, clear storage
         await clearAuthStorage();
         set({
@@ -266,10 +282,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Fetch fresh user info
       const userInfo = await fetchUserInfo(tokenResult.accessToken);
       if (get().authStateVersion !== authStateVersion) {
+        logWarn('auth.store.restore.version_changed_after_userinfo');
         return false;
       }
 
       if (!userInfo) {
+        logWarn('auth.store.restore.userinfo_failed');
         await clearAuthStorage();
         set({
           user: null,
@@ -286,6 +304,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Get stored user info to preserve username
       const storedUserInfo = await getUserInfo();
       await clearForceInteractiveAuth();
+      logInfo('auth.store.restore.success', { userId: userInfo.sub });
 
       set({
         token: tokenResult.accessToken,
@@ -307,6 +326,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return true;
     } catch (error) {
       console.error('Error restoring auth state:', error);
+      logError('auth.store.restore.error', error);
       await clearAuthStorage();
       set({
         user: null,
@@ -324,18 +344,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // Refresh the current access token
   refreshToken: async () => {
     const authStateVersion = get().authStateVersion;
+    logInfo('auth.store.refresh.start', { authStateVersion });
     const storedRefreshToken = await getRefreshToken();
 
     if (!storedRefreshToken) {
+      logWarn('auth.store.refresh.no_refresh_token');
       return false;
     }
 
     const tokenResult = await refreshAccessToken(storedRefreshToken);
     if (get().authStateVersion !== authStateVersion) {
+      logWarn('auth.store.refresh.version_changed');
       return false;
     }
 
     if (!tokenResult) {
+      logWarn('auth.store.refresh.failed');
       // Force logout if refresh fails
       get().logout();
       return false;
@@ -347,6 +371,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     await clearForceInteractiveAuth();
+    logInfo('auth.store.refresh.success');
 
     set({
       token: tokenResult.accessToken,

@@ -28,6 +28,7 @@ import {
 } from '../types';
 import { useProfileStore } from './useProfileStore';
 import { useLeaderboardStore } from './useLeaderboardStore';
+import { logError, logInfo, logWarn } from '../services/debugLog';
 
 interface QuizState {
   quiz: Quiz | null;
@@ -87,6 +88,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
   hydrateFromCache: async (userId: string, date?: string) => {
     const targetDate = date || getQuizDate();
+    logInfo('quiz.cache.hydrate.start', { userId, targetDate });
     const [quizCache, cachedResult] = await Promise.all([
       getCachedQuizEntry(targetDate),
       getTodayQuizResult(userId),
@@ -99,13 +101,21 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       cachedResult,
       quizError: null,
     });
+    logInfo('quiz.cache.hydrate.success', {
+      userId,
+      targetDate,
+      hasQuiz: Boolean(quizCache?.data),
+      hasCachedResult: Boolean(cachedResult),
+    });
   },
 
   fetchQuiz: async (date?: string, options?: { force?: boolean }) => {
     const targetDate = date || getQuizDate();
+    logInfo('quiz.fetch.start', { targetDate, force: Boolean(options?.force) });
     const cachedQuiz = await getCachedQuizEntry(targetDate);
 
     if (cachedQuiz && !options?.force && !isQuizCacheStale(cachedQuiz)) {
+      logInfo('quiz.fetch.cache_hit', { targetDate });
       set({
         quiz: cachedQuiz.data,
         quizCache: cachedQuiz,
@@ -134,8 +144,10 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         isQuizLoading: false,
         quizError: null,
       });
+      logInfo('quiz.fetch.success', { targetDate, questionCount: quiz.questions.length });
       return quiz;
     } catch (error) {
+      logError('quiz.fetch.error', error);
       set({
         isQuizLoading: false,
         quizError: error instanceof Error ? error.message : 'Failed to fetch quiz',
@@ -225,10 +237,12 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   submitQuizAnswers: async (answers: AnswerWithTiming[], userProfile?: UserProfile) => {
     const { quiz, userId, result } = get();
     if (!quiz || !userId) {
+      logWarn('quiz.submit.missing_context', { hasQuiz: Boolean(quiz), userId });
       set({ submitError: 'Quiz or user ID not available' });
       return;
     }
 
+    logInfo('quiz.submit.start', { userId, quizId: quiz.id, answerCount: answers.length });
     set({ isSubmitting: true, submitError: null });
 
     const profile = userProfile ?? buildUserProfile();
@@ -263,6 +277,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       });
 
       if (!serverResult.statsPending) {
+        logInfo('quiz.submit.success', { userId, quizId: submittedQuizId, statsPending: false });
         await useProfileStore.getState().markPlayedToday(mergedResult, userId);
         if (!userId.startsWith('guest_')) {
           void useLeaderboardStore.getState().prefetchDailyLoop(userId, true);
@@ -271,6 +286,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       }
 
       if (!userId.startsWith('guest_')) {
+        logInfo('quiz.submit.success', { userId, quizId: submittedQuizId, statsPending: true });
         const refreshDelay = serverResult.statsRefreshAfterMs ?? 800;
         setTimeout(async () => {
           let finalizeSucceeded = false;
@@ -327,6 +343,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         }, refreshDelay);
       }
     } catch (error) {
+      logError('quiz.submit.error', error);
       set((state) => ({
         isSubmitting: false,
         submitError: error instanceof Error ? error.message : 'Failed to submit quiz',
@@ -353,9 +370,11 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     const { userId } = get();
 
     if (!pending || !userId || pending.userId !== userId) {
+      logInfo('quiz.submit.retry.none', { userId, hasPending: Boolean(pending) });
       return;
     }
 
+    logWarn('quiz.submit.retry.start', { userId, quizId: pending.quizId });
     set({
       result: pending.localResult,
       submitError: null,

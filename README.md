@@ -263,6 +263,11 @@ See `.env.example` for required environment variables.
 - Games, Me, and League Tables prefer cached same-day data on warm opens, then revalidate silently.
 - Final daily-quiz results render locally as soon as the fifth answer is locked in; server submission and stat finalization continue in the background.
 
+## Debugging
+
+- The app now keeps a small persistent client-side debug log for startup, auth, bootstrap, and daily-loop events.
+- Open Settings and use `Copy Debug Log` after reproducing a freeze or crash to export the latest trace.
+
 ## Hardening rollout plan
 
 To minimize risk, improvements are split into small PRs:

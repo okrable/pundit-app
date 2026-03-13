@@ -4,6 +4,7 @@ import { CacheEnvelope, QuizResultImmediate, UserStats } from '../types';
 import { getCachedUserStats, setCachedUserStats } from '../storage/profileCache';
 import { getTodayQuizResult } from '../storage/quizStorage';
 import { useAuthStore } from './useAuthStore';
+import { logError, logInfo } from '../services/debugLog';
 
 const GUEST_STATS: UserStats = {
   streak: 0,
@@ -40,6 +41,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   error: null,
 
   hydrateFromCache: async (userId: string) => {
+    logInfo('profile.cache.hydrate.start', { userId });
     const [cachedStats, todayResult] = await Promise.all([
       userId.startsWith('guest_') ? Promise.resolve(null) : getCachedUserStats(userId),
       getTodayQuizResult(userId),
@@ -51,9 +53,15 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       statsCache: cachedStats,
       error: null,
     });
+    logInfo('profile.cache.hydrate.success', {
+      userId,
+      hasCachedStats: Boolean(cachedStats?.data),
+      playedToday: Boolean(todayResult),
+    });
   },
 
   revalidate: async (userId: string) => {
+    logInfo('profile.revalidate.start', { userId });
     set({ loading: true, error: null });
 
     try {
@@ -67,11 +75,13 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
           loading: false,
           error: null,
         });
+        logInfo('profile.revalidate.guest', { userId, playedToday: Boolean(todayResult) });
         return;
       }
 
       const authState = useAuthStore.getState();
       if (!authState.token) {
+        logInfo('profile.revalidate.skipped_no_token', { userId });
         set({
           playedToday: Boolean(todayResult),
           loading: false,
@@ -94,7 +104,9 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         loading: false,
         error: null,
       });
+      logInfo('profile.revalidate.success', { userId, playedToday: Boolean(remoteTodayResult || todayResult) });
     } catch (error) {
+      logError('profile.revalidate.error', error);
       set({
         loading: false,
         error: error instanceof Error ? error.message : 'Failed to refresh profile',

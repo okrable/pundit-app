@@ -12,6 +12,7 @@ import {
   setCachedGlobalLeaderboard,
 } from '../storage/leaderboardCache';
 import { useAuthStore } from './useAuthStore';
+import { logError, logInfo } from '../services/debugLog';
 
 interface LeaderboardState {
   friendsLeaderboard: FriendsLeaderboardEntry[];
@@ -47,6 +48,7 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   error: null,
 
   hydrateFromCache: async (userId: string) => {
+    logInfo('leaderboard.cache.hydrate.start', { userId });
     const [friendsCache, globalCache] = await Promise.all([
       userId.startsWith('guest_') ? Promise.resolve(null) : getCachedFriendsLeaderboard(userId),
       getCachedGlobalLeaderboard(),
@@ -61,13 +63,24 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
       globalCache,
       error: null,
     });
+    logInfo('leaderboard.cache.hydrate.success', {
+      userId,
+      friendsCount: friendsCache?.data.leaderboard.length ?? 0,
+      globalCount: globalCache?.data.length ?? 0,
+    });
   },
 
   revalidateFriends: async (userId: string) => {
     if (userId.startsWith('guest_') || !useAuthStore.getState().token) {
+      logInfo('leaderboard.friends.skip', {
+        userId,
+        isGuest: userId.startsWith('guest_'),
+        hasToken: Boolean(useAuthStore.getState().token),
+      });
       return;
     }
 
+    logInfo('leaderboard.friends.start', { userId });
     set({ loadingFriends: true, error: null });
     try {
       const data = await getFriendsLeaderboard(userId);
@@ -82,7 +95,9 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
         loadingFriends: false,
         error: null,
       });
+      logInfo('leaderboard.friends.success', { userId, count: data.leaderboard.length });
     } catch (error) {
+      logError('leaderboard.friends.error', error);
       set({
         loadingFriends: false,
         error: error instanceof Error ? error.message : 'Failed to load friends leaderboard',
@@ -91,6 +106,7 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   },
 
   revalidateGlobal: async () => {
+    logInfo('leaderboard.global.start');
     set({ loadingGlobal: true, error: null });
     try {
       const data = await getLeaderboard();
@@ -103,7 +119,9 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
         loadingGlobal: false,
         error: null,
       });
+      logInfo('leaderboard.global.success', { count: data.length });
     } catch (error) {
+      logError('leaderboard.global.error', error);
       set({
         loadingGlobal: false,
         error: error instanceof Error ? error.message : 'Failed to load leaderboard',

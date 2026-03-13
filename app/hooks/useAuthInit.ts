@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../state/useAuthStore';
+import { logError, logInfo, logWarn } from '../services/debugLog';
 
 export default function useAuthInit(): boolean {
   const [isReady, setIsReady] = useState(false);
@@ -7,8 +8,10 @@ export default function useAuthInit(): boolean {
 
   useEffect(() => {
     let isMounted = true;
+    logInfo('auth.init.start', { isAuth0Available });
     const bootstrapTimeout = setTimeout(() => {
       if (isMounted) {
+        logWarn('auth.init.timeout');
         setIsReady(true);
       }
     }, 2000);
@@ -17,6 +20,7 @@ export default function useAuthInit(): boolean {
       try {
         if (isAuth0Available) {
           await bootstrapFromStorage();
+          logInfo('auth.init.bootstrap.complete');
           if (isMounted) {
             setIsReady(true);
           }
@@ -25,6 +29,7 @@ export default function useAuthInit(): boolean {
         }
       } catch (error) {
         console.error('Error initializing auth bootstrap:', error);
+        logError('auth.init.error', error);
       } finally {
         if (isMounted) {
           setIsReady(true);

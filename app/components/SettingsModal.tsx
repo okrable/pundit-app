@@ -10,11 +10,13 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../state/useAuthStore';
 import { clearGuestCache } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
+import { clearDebugLogs, getDebugLogText, logInfo } from '../services/debugLog';
 
 const DONATION_URL = process.env.EXPO_PUBLIC_DONATION_URL || 'https://www.buymeacoffee.com';
 const FEEDBACK_URL = process.env.EXPO_PUBLIC_FEEDBACK_URL || 'mailto:feedback@pundit-trivia.com';
@@ -27,6 +29,7 @@ interface SettingsModalProps {
 export default function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const { user, isAuthenticated, error, logout, clearError } = useAuthStore();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+  const [isCopyingLogs, setIsCopyingLogs] = React.useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -42,6 +45,38 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
 
   const handleFeedback = () => {
     Linking.openURL(FEEDBACK_URL);
+  };
+
+  const handleCopyDebugLog = async () => {
+    setIsCopyingLogs(true);
+    try {
+      const logText = await getDebugLogText();
+      await Clipboard.setStringAsync(logText || 'No debug log entries recorded.');
+      logInfo('debugLog.copied');
+      Alert.alert('Debug Log Copied', 'The latest app trace has been copied to your clipboard.');
+    } catch (copyError) {
+      Alert.alert('Unable to Copy Log', 'Please try again after reopening the app.');
+    } finally {
+      setIsCopyingLogs(false);
+    }
+  };
+
+  const handleClearDebugLog = () => {
+    Alert.alert(
+      'Clear Debug Log',
+      'Remove the saved app trace from this device?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            await clearDebugLogs();
+            Alert.alert('Debug Log Cleared', 'Saved diagnostics have been removed.');
+          },
+        },
+      ]
+    );
   };
 
   const handleClearCache = () => {
@@ -127,6 +162,28 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
               <View style={styles.listItemContent}>
                 <Text style={styles.listItemEmoji}>🥧</Text>
                 <Text style={styles.listItemText}>Buy Me a Half Time Pie</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.mediumGray} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.listItem}
+              onPress={handleCopyDebugLog}
+              disabled={isCopyingLogs}
+            >
+              <View style={styles.listItemContent}>
+                <Ionicons name="document-text-outline" size={22} color={theme.colors.textDark} />
+                <Text style={styles.listItemText}>Copy Debug Log</Text>
+              </View>
+              {isCopyingLogs ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+              ) : (
+                <Ionicons name="copy-outline" size={20} color={theme.colors.mediumGray} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.listItem} onPress={handleClearDebugLog}>
+              <View style={styles.listItemContent}>
+                <Ionicons name="trash-outline" size={22} color={theme.colors.textDark} />
+                <Text style={styles.listItemText}>Clear Debug Log</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={theme.colors.mediumGray} />
             </TouchableOpacity>

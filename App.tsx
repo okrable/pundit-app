@@ -13,6 +13,7 @@ import useAppBootstrap from './app/hooks/useAppBootstrap';
 import BootstrapScreen from './app/components/BootstrapScreen';
 import { prefetchDailyLoop } from './app/services/dailyLoop';
 import { theme } from './app/theme/theme';
+import { logError, logInfo, startDebugSession } from './app/services/debugLog';
 
 const Stack = createNativeStackNavigator();
 
@@ -23,7 +24,9 @@ function AppContent() {
   const hasSeenActiveState = React.useRef(false);
 
   React.useEffect(() => {
+    logInfo('app.navigation.mounted');
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      logInfo('app.state.change', { nextState, hasSeenActiveState: hasSeenActiveState.current });
       if (nextState === 'active' && hasSeenActiveState.current) {
         void prefetchDailyLoop();
       }
@@ -82,6 +85,35 @@ export default function App() {
   const fontsLoaded = useFonts();
   const authReady = useAuthInit();
   const appReady = useAppBootstrap(authReady);
+
+  React.useEffect(() => {
+    void startDebugSession('app-launch');
+
+    const globalErrorUtils = (global as unknown as {
+      ErrorUtils?: {
+        getGlobalHandler?: () => (error: Error, isFatal?: boolean) => void;
+        setGlobalHandler?: (handler: (error: Error, isFatal?: boolean) => void) => void;
+      };
+    }).ErrorUtils;
+
+    const previousHandler = globalErrorUtils?.getGlobalHandler?.();
+    globalErrorUtils?.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
+      logError('app.global_error', { isFatal: Boolean(isFatal), message: error.message, stack: error.stack });
+      previousHandler?.(error, isFatal);
+    });
+
+    logInfo('app.render.state', { fontsLoaded, authReady, appReady });
+
+    return () => {
+      if (previousHandler && globalErrorUtils?.setGlobalHandler) {
+        globalErrorUtils.setGlobalHandler(previousHandler);
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    logInfo('app.render.state', { fontsLoaded, authReady, appReady });
+  }, [fontsLoaded, authReady, appReady]);
 
   if (!fontsLoaded || !authReady || !appReady) {
     return <BootstrapScreen />;

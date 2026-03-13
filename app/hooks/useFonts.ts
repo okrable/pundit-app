@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import * as Font from 'expo-font';
+import { logError, logInfo } from '../services/debugLog';
 
 export default function useFonts() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
+    logInfo('fonts.load.start');
 
     async function loadFonts() {
       try {
@@ -18,8 +20,10 @@ export default function useFonts() {
           'UniSans-Heavy': require('../../assets/fonts/uni-sans/Uni Sans Heavy.otf'),
           'UniSans-Thin': require('../../assets/fonts/uni-sans/Uni Sans Thin.otf'),
         });
+        logInfo('fonts.load.success');
       } catch (error) {
         console.error('Error loading fonts:', error);
+        logError('fonts.load.error', error);
       } finally {
         if (isMounted) {
           setFontsLoaded(true);
