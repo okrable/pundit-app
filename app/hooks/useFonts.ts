@@ -5,6 +5,8 @@ export default function useFonts() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadFonts() {
       try {
         await Font.loadAsync({
@@ -16,13 +18,20 @@ export default function useFonts() {
           'UniSans-Heavy': require('../../assets/fonts/uni-sans/Uni Sans Heavy.otf'),
           'UniSans-Thin': require('../../assets/fonts/uni-sans/Uni Sans Thin.otf'),
         });
-        setFontsLoaded(true);
       } catch (error) {
         console.error('Error loading fonts:', error);
+      } finally {
+        if (isMounted) {
+          setFontsLoaded(true);
+        }
       }
     }
 
-    loadFonts();
+    void loadFonts();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return fontsLoaded;

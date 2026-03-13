@@ -8,26 +8,39 @@ export default function useAppBootstrap(isAuthReady: boolean): boolean {
 
   useEffect(() => {
     let isMounted = true;
+    const bootstrapTimeout = setTimeout(() => {
+      if (isMounted) {
+        setIsReady(true);
+      }
+    }, 2500);
 
     async function bootstrap() {
       if (!isAuthReady) {
         return;
       }
 
-      const userId = await resolveEffectiveUserId();
-      await hydrateDailyLoopFromCache(userId);
+      try {
+        const userId = await resolveEffectiveUserId();
+        await hydrateDailyLoopFromCache(userId);
 
-      if (isMounted) {
-        setIsReady(true);
+        if (isMounted) {
+          setIsReady(true);
+        }
+
+        void prefetchDailyLoop(userId);
+      } catch (error) {
+        console.error('Error bootstrapping app state:', error);
+        if (isMounted) {
+          setIsReady(true);
+        }
       }
-
-      void prefetchDailyLoop(userId);
     }
 
     void bootstrap();
 
     return () => {
       isMounted = false;
+      clearTimeout(bootstrapTimeout);
     };
   }, [isAuthReady]);
 
@@ -41,14 +54,20 @@ export default function useAppBootstrap(isAuthReady: boolean): boolean {
       void resolveEffectiveUserId().then((userId) => {
         void hydrateDailyLoopFromCache(userId);
         void prefetchDailyLoop(userId);
+      }).catch((error) => {
+        console.error('Error refreshing guest bootstrap state:', error);
       });
       return;
     }
 
     if (nextUserId) {
-      void hydrateDailyLoopFromCache(nextUserId);
+      void hydrateDailyLoopFromCache(nextUserId).catch((error) => {
+        console.error('Error hydrating authenticated bootstrap state:', error);
+      });
       if (token) {
-        void prefetchDailyLoop(nextUserId);
+        void prefetchDailyLoop(nextUserId).catch((error) => {
+          console.error('Error prefetching authenticated daily loop:', error);
+        });
       }
     }
   }, [isReady, isAuthenticated, token, user?.sub]);

@@ -7,19 +7,28 @@ export default function useAuthInit(): boolean {
 
   useEffect(() => {
     let isMounted = true;
+    const bootstrapTimeout = setTimeout(() => {
+      if (isMounted) {
+        setIsReady(true);
+      }
+    }, 2000);
 
     async function initAuth() {
-      if (isAuth0Available) {
-        await bootstrapFromStorage();
+      try {
+        if (isAuth0Available) {
+          await bootstrapFromStorage();
+          if (isMounted) {
+            setIsReady(true);
+          }
+          void restoreAuthState();
+          return;
+        }
+      } catch (error) {
+        console.error('Error initializing auth bootstrap:', error);
+      } finally {
         if (isMounted) {
           setIsReady(true);
         }
-        void restoreAuthState();
-        return;
-      }
-
-      if (isMounted) {
-        setIsReady(true);
       }
     }
 
@@ -27,6 +36,7 @@ export default function useAuthInit(): boolean {
 
     return () => {
       isMounted = false;
+      clearTimeout(bootstrapTimeout);
     };
   }, [bootstrapFromStorage, isAuth0Available, restoreAuthState]);
 
