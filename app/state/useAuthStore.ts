@@ -3,7 +3,6 @@ import {
   isAuth0Configured,
   refreshAccessToken,
   fetchUserInfo,
-  logoutFromAuth0,
 } from '../services/auth0';
 import {
   storeRefreshToken,
@@ -255,15 +254,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       storeForceInteractiveAuth(true),
     ]);
 
-    try {
-      await logoutFromAuth0();
-      logInfo('auth.store.logout.auth0_success');
-    } catch (error) {
-      logError('auth.store.logout.auth0_error', error);
-      set({
-        error: 'Signed out locally. If account switching still looks sticky, try again.',
-      });
-    }
+    logInfo('auth.store.logout.local_only');
   },
 
   clearError: () => {

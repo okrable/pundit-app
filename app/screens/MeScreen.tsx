@@ -37,7 +37,7 @@ const EMPTY_STATS: UserStats = {
 };
 
 export default function MeScreen() {
-  const { stats, playedToday, revalidate } = useProfileStore();
+  const { stats, statsUserId, playedToday, revalidate, loading: profileLoading } = useProfileStore();
   const {
     user,
     isAuthenticated,
@@ -50,7 +50,7 @@ export default function MeScreen() {
     setUsernameRequired,
     clearError,
   } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(false);
+  const [authLoadingIntent, setAuthLoadingIntent] = useState<'signup' | 'login' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -78,7 +78,7 @@ export default function MeScreen() {
   );
 
   useEffect(() => {
-    if (!isAuthenticated || !user || !token || !stats) {
+    if (!isAuthenticated || !user || !token || !stats || profileLoading || statsUserId !== user.sub) {
       return;
     }
 
@@ -98,8 +98,10 @@ export default function MeScreen() {
     setUsername,
     setUsernameRequired,
     stats,
+    statsUserId,
     token,
     user,
+    profileLoading,
   ]);
 
   useEffect(() => {
@@ -110,7 +112,7 @@ export default function MeScreen() {
       if (signupResponse.type === 'error') {
         console.error('Auth error:', signupResponse.error);
       }
-      setIsLoading(false);
+      setAuthLoadingIntent(null);
     }
   }, [signupRequest?.codeVerifier, signupResponse]);
 
@@ -122,7 +124,7 @@ export default function MeScreen() {
       if (loginResponse.type === 'error') {
         console.error('Auth error:', loginResponse.error);
       }
-      setIsLoading(false);
+      setAuthLoadingIntent(null);
     }
   }, [loginRequest?.codeVerifier, loginResponse]);
 
@@ -155,21 +157,21 @@ export default function MeScreen() {
 
       const userInfo = await userInfoResponse.json();
       setAuthResult(accessToken, userInfo, refreshToken);
-      setIsLoading(false);
+      setAuthLoadingIntent(null);
     } catch (error) {
       console.error('Token exchange error:', error);
-      setIsLoading(false);
+      setAuthLoadingIntent(null);
     }
   };
 
   const handleSignup = async () => {
-    setIsLoading(true);
+    setAuthLoadingIntent('signup');
     clearError();
     await promptSignup({ preferEphemeralSession: true });
   };
 
   const handleLogin = async () => {
-    setIsLoading(true);
+    setAuthLoadingIntent('login');
     clearError();
     await promptLogin({ preferEphemeralSession: true });
   };
@@ -234,9 +236,9 @@ export default function MeScreen() {
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={handleSignup}
-                disabled={isLoading}
+                disabled={authLoadingIntent !== null}
               >
-                {isLoading ? (
+                {authLoadingIntent === 'signup' ? (
                   <ActivityIndicator size="small" color={theme.colors.white} />
                 ) : (
                   <Text style={styles.primaryButtonText}>Create a free account</Text>
@@ -245,10 +247,14 @@ export default function MeScreen() {
 
               <TouchableOpacity
                 onPress={handleLogin}
-                disabled={isLoading}
+                disabled={authLoadingIntent !== null}
                 style={styles.loginLink}
               >
-                <Text style={styles.loginLinkText}>Log In</Text>
+                {authLoadingIntent === 'login' ? (
+                  <ActivityIndicator size="small" color={theme.colors.accent} />
+                ) : (
+                  <Text style={styles.loginLinkText}>Log In</Text>
+                )}
               </TouchableOpacity>
             </>
           )}

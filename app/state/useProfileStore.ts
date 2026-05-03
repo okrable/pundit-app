@@ -21,6 +21,7 @@ const GUEST_STATS: UserStats = {
 };
 
 interface ProfileState {
+  statsUserId: string | null;
   stats: UserStats | null;
   playedToday: boolean;
   statsCache: CacheEnvelope<UserStats> | null;
@@ -34,6 +35,7 @@ interface ProfileState {
 }
 
 export const useProfileStore = create<ProfileState>((set, get) => ({
+  statsUserId: null,
   stats: null,
   playedToday: false,
   statsCache: null,
@@ -48,6 +50,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     ]);
 
     set({
+      statsUserId: userId,
       stats: cachedStats?.data ?? (userId.startsWith('guest_') ? GUEST_STATS : null),
       playedToday: Boolean(todayResult),
       statsCache: cachedStats,
@@ -69,6 +72,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
       if (userId.startsWith('guest_')) {
         set({
+          statsUserId: userId,
           stats: GUEST_STATS,
           statsCache: null,
           playedToday: Boolean(todayResult),
@@ -83,6 +87,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       if (!authState.token) {
         logInfo('profile.revalidate.skipped_no_token', { userId });
         set({
+          statsUserId: userId,
           playedToday: Boolean(todayResult),
           loading: false,
         });
@@ -98,6 +103,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       const refreshedCache = await getCachedUserStats(userId);
 
       set({
+        statsUserId: userId,
         stats,
         statsCache: refreshedCache,
         playedToday: Boolean(remoteTodayResult || todayResult),
@@ -124,6 +130,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     await setCachedUserStats(authUserId, stats);
     const refreshedCache = await getCachedUserStats(authUserId);
     set({
+      statsUserId: authUserId,
       stats,
       statsCache: refreshedCache,
       error: null,
@@ -150,6 +157,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     }
 
     set({
+      statsUserId: userId,
       stats: nextStats,
       playedToday: true,
       error: null,
@@ -157,6 +165,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   },
 
   reset: () => set({
+    statsUserId: null,
     stats: null,
     playedToday: false,
     statsCache: null,
