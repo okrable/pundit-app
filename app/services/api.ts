@@ -21,6 +21,7 @@ import { logError, logInfo, logWarn } from './debugLog';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
 const inflightRequests = new Map<string, Promise<unknown>>();
 const API_TIMEOUT_MS = 8000;
+const LEADERBOARD_TIMEOUT_MS = 15000;
 
 export class ApiError extends Error {
   constructor(public statusCode: number, message: string) {
@@ -29,10 +30,19 @@ export class ApiError extends Error {
   }
 }
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+interface ApiRequestConfig {
+  timeoutMs?: number;
+}
+
+async function fetchApi<T>(
+  endpoint: string,
+  options?: RequestInit,
+  requestConfig?: ApiRequestConfig
+): Promise<T> {
   // Get Auth0 token if user is authenticated
   const token = useAuthStore.getState().token;
   const method = options?.method ?? 'GET';
+  const timeoutMs = requestConfig?.timeoutMs ?? API_TIMEOUT_MS;
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -54,7 +64,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       controller.abort();
-    }, API_TIMEOUT_MS);
+    }, timeoutMs);
 
     logInfo('api.request.start', {
       endpoint,
@@ -179,7 +189,9 @@ export async function finalizeQuizStats(
 }
 
 export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
-  return fetchApi<LeaderboardEntry[]>('/getLeaderboard');
+  return fetchApi<LeaderboardEntry[]>('/getLeaderboard', undefined, {
+    timeoutMs: LEADERBOARD_TIMEOUT_MS,
+  });
 }
 
 export async function getUserStats(userId: string): Promise<UserStats> {

@@ -3,6 +3,7 @@ import { query } from './lib/db';
 import { getQuizDate } from './lib/quizDate';
 
 export const handler: Handler = async (event) => {
+  const startedAt = Date.now();
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -23,6 +24,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const today = getQuizDate();
+    console.log('getLeaderboard.start', { today });
 
     // Query daily leaderboard (Auth0 users only - guests have no results in DB)
     const leaderboard = await query<{
@@ -58,13 +60,22 @@ export const handler: Handler = async (event) => {
       rank: Number(entry.rank),
     }));
 
+    console.log('getLeaderboard.success', {
+      today,
+      count: response.length,
+      durationMs: Date.now() - startedAt,
+    });
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify(response),
     };
   } catch (error) {
-    console.error('Error fetching leaderboard:', error);
+    console.error('Error fetching leaderboard:', {
+      durationMs: Date.now() - startedAt,
+      error,
+    });
     return {
       statusCode: 500,
       headers,
