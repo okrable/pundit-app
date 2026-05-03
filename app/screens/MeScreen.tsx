@@ -82,7 +82,7 @@ export default function MeScreen() {
       return;
     }
 
-    if (stats.username) {
+    if (stats.username && stats.username !== user.username) {
       setUsername(stats.username);
     } else if (!user.username) {
       setUsernameRequired(true);

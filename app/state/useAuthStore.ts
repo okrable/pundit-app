@@ -167,6 +167,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setUsername: (username: string) => {
     set((state) => {
+      if (!state.user) {
+        return { user: null };
+      }
+
+      if (state.user.username === username && state.user.usernameRequired === false) {
+        return state;
+      }
+
       const updatedUser = state.user
         ? { ...state.user, username, usernameRequired: false }
         : null;
@@ -188,6 +196,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setDisplayName: (name: string) => {
     set((state) => {
+      if (!state.user) {
+        return { user: null };
+      }
+
+      if (state.user.name === name) {
+        return state;
+      }
+
       const updatedUser = state.user ? { ...state.user, name } : null;
 
       // Persist updated user info
@@ -206,9 +222,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setUsernameRequired: (required: boolean) => {
-    set((state) => ({
-      user: state.user ? { ...state.user, usernameRequired: required } : null,
-    }));
+    set((state) => {
+      if (!state.user) {
+        return { user: null };
+      }
+
+      if (state.user.usernameRequired === required) {
+        return state;
+      }
+
+      return {
+        user: { ...state.user, usernameRequired: required },
+      };
+    });
   },
 
   logout: async () => {
