@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ export default function LeaderboardScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('friends');
   const [refreshing, setRefreshing] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const handledAuthCodeRef = useRef<string | null>(null);
   const [showManageFriends, setShowManageFriends] = useState(false);
 
   const {
@@ -74,8 +75,16 @@ export default function LeaderboardScreen() {
   }, [isAuthenticated, refreshCurrentView, user?.sub, viewMode]);
 
   useEffect(() => {
+    if (!isAuthLoading) {
+      return;
+    }
+
     if (response?.type === 'success') {
       const { code } = response.params;
+      if (handledAuthCodeRef.current === code) {
+        return;
+      }
+      handledAuthCodeRef.current = code;
       void exchangeCodeForToken(code);
     } else if (response) {
       if (response.type === 'error') {
@@ -83,7 +92,7 @@ export default function LeaderboardScreen() {
       }
       setIsAuthLoading(false);
     }
-  }, [response]);
+  }, [isAuthLoading, response]);
 
   const exchangeCodeForToken = async (code: string) => {
     try {
@@ -107,11 +116,13 @@ export default function LeaderboardScreen() {
       setIsAuthLoading(false);
     } catch (err) {
       console.error('Token exchange error:', err);
+      handledAuthCodeRef.current = null;
       setIsAuthLoading(false);
     }
   };
 
   const handleCreateAccount = async () => {
+    handledAuthCodeRef.current = null;
     setIsAuthLoading(true);
     clearError();
     await promptAsync({ preferEphemeralSession: true });

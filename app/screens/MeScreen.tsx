@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -51,6 +51,7 @@ export default function MeScreen() {
     clearError,
   } = useAuthStore();
   const [authLoadingIntent, setAuthLoadingIntent] = useState<'signup' | 'login' | null>(null);
+  const handledAuthCodeRef = useRef<string | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -105,8 +106,16 @@ export default function MeScreen() {
   ]);
 
   useEffect(() => {
+    if (authLoadingIntent !== 'signup') {
+      return;
+    }
+
     if (signupResponse?.type === 'success') {
       const { code } = signupResponse.params;
+      if (handledAuthCodeRef.current === code) {
+        return;
+      }
+      handledAuthCodeRef.current = code;
       void exchangeCodeForToken(code, signupRequest?.codeVerifier);
     } else if (signupResponse) {
       if (signupResponse.type === 'error') {
@@ -114,11 +123,19 @@ export default function MeScreen() {
       }
       setAuthLoadingIntent(null);
     }
-  }, [signupRequest?.codeVerifier, signupResponse]);
+  }, [authLoadingIntent, signupRequest?.codeVerifier, signupResponse]);
 
   useEffect(() => {
+    if (authLoadingIntent !== 'login') {
+      return;
+    }
+
     if (loginResponse?.type === 'success') {
       const { code } = loginResponse.params;
+      if (handledAuthCodeRef.current === code) {
+        return;
+      }
+      handledAuthCodeRef.current = code;
       void exchangeCodeForToken(code, loginRequest?.codeVerifier);
     } else if (loginResponse) {
       if (loginResponse.type === 'error') {
@@ -126,7 +143,7 @@ export default function MeScreen() {
       }
       setAuthLoadingIntent(null);
     }
-  }, [loginRequest?.codeVerifier, loginResponse]);
+  }, [authLoadingIntent, loginRequest?.codeVerifier, loginResponse]);
 
   const exchangeCodeForToken = async (code: string, codeVerifier?: string) => {
     try {
@@ -160,17 +177,20 @@ export default function MeScreen() {
       setAuthLoadingIntent(null);
     } catch (error) {
       console.error('Token exchange error:', error);
+      handledAuthCodeRef.current = null;
       setAuthLoadingIntent(null);
     }
   };
 
   const handleSignup = async () => {
+    handledAuthCodeRef.current = null;
     setAuthLoadingIntent('signup');
     clearError();
     await promptSignup({ preferEphemeralSession: true });
   };
 
   const handleLogin = async () => {
+    handledAuthCodeRef.current = null;
     setAuthLoadingIntent('login');
     clearError();
     await promptLogin({ preferEphemeralSession: true });
