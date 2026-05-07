@@ -1,307 +1,109 @@
 # Frontend Plan
 
-## File & Folder Structure (Implemented)
+## App Structure
 
-```
+The app uses React Navigation bottom tabs, not Expo Router.
+
+```text
 app/
-├── navigation/
-│   └── BottomTabNavigator.tsx    # Tab navigation config
-├── screens/
-│   ├── DailyQuizScreen.tsx       # Main quiz orchestrator
-│   ├── LeaderboardScreen.tsx     # Leaderboard display
-│   └── MeScreen.tsx              # Profile page (logged in/out states)
-├── components/
-│   ├── QuestionCard.tsx          # Question UI with animations
-│   ├── BootstrapScreen.tsx       # Branded startup loading screen
-│   ├── WelcomeScreen.tsx         # Quiz intro screen
-│   ├── ResultsScreen.tsx         # Full results display
-│   ├── CompletedQuizScreen.tsx   # Already-played state
-│   ├── LawsOfTheGameModal.tsx    # Rules info modal
-│   └── SettingsModal.tsx         # Settings modal (account, support, about)
-├── state/
-│   ├── useAuthStore.ts           # Auth0 state (Zustand)
-│   ├── useQuizStore.ts           # Quiz + result sync state
-│   ├── useProfileStore.ts        # Cached-first profile stats state
-│   └── useLeaderboardStore.ts    # Cached-first leaderboard state
-├── services/
-│   ├── api.ts                    # API client
-│   ├── auth0.ts                  # Auth0 configuration
-│   └── dailyLoop.ts              # Daily-loop bootstrap/prefetch
-├── storage/
-│   ├── userStorage.ts            # User ID persistence
-│   ├── quizStorage.ts            # Results caching
-│   ├── quizCache.ts              # Quiz data caching
-│   ├── profileCache.ts           # Profile stats caching
-│   ├── leaderboardCache.ts       # Leaderboard caching
-│   ├── pendingSubmission.ts      # Pending daily quiz submit retry
-│   └── resourceCache.ts          # Generic cache envelope helpers
-├── theme/
-│   └── theme.ts                  # Colors, fonts, spacing
-├── types/
-│   └── index.ts                  # TypeScript interfaces
-├── hooks/
-│   └── useFonts.ts               # Font loading hook
-├── styles/                       # (empty - using inline styles)
-└── utils/                        # (empty)
-
-assets/
-├── fonts/                        # Gotham, UniSans
-├── images/
-├── logo/
-└── favicon/
+├── components/       # Shared UI: quiz card, results, modals, loading screens
+├── constants/        # App constants such as version
+├── hooks/            # Bootstrap/auth/font hooks
+├── navigation/       # Bottom tab navigator
+├── screens/          # Daily, Challenge, Leaderboard, Me screens
+├── services/         # API, auth flow, Auth0 config, daily prefetch
+├── state/            # Zustand stores
+├── storage/          # AsyncStorage/SecureStore helpers
+├── theme/            # Colors, fonts, spacing
+└── types/            # Shared TypeScript interfaces
 ```
 
-*Note: Not using Expo Router - using @react-navigation*
+## Navigation
 
----
+Bottom tabs:
 
-## Screens and Navigation Flow (Implemented)
+- Games
+- Challenge
+- League Tables
+- Me
 
-### Bottom Tabs
-```
-┌─────────────┬─────────────────┬─────────────┐
-│   Games     │  League Tables  │     Me      │
-│  (football) │    (trophy)     │  (person)   │
-└─────────────┴─────────────────┴─────────────┘
-```
+## Daily Quiz Flow
 
-### Games Tab Flow
-```
+```text
 DailyQuizScreen
-    │
-    ├── [First visit today] → WelcomeScreen → QuestionCard (x5) → ResultsScreen
-    │
-    └── [Already played today] → CompletedQuizScreen (cached result)
+├── AuthSyncScreen                    # login/reconciliation or identity handoff
+├── WelcomeScreen                     # first visit, quiz ready or warming
+├── QuestionCard x5                   # active quiz play
+├── ResultsScreen                     # immediate post-quiz summary
+└── CompletedQuizScreen               # already-played cached state
 ```
 
-### Question Flow Detail
-- Questions shown one at a time (not all 5 visible)
-- Auto-advance after 2-second delay on answer
-- Typewriter effect for question text (30ms per char)
-- Staggered fade-in for answer options
+The immediate summary is shown only after completing a daily quiz in the current session. Returning later uses the completed/cached state.
 
----
+Challenge results use the same compact logo/card/action rhythm as the daily summary, adapted for waiting and head-to-head complete states.
 
-## State Management (Implemented)
+## Shared Gameplay Surface
 
-### Zustand Stores
+`QuestionCard` is shared by daily quiz and challenge mode.
 
-**useAuthStore** (`app/state/useAuthStore.ts`)
-```typescript
-interface AuthState {
-  user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  isAuth0Available: boolean;
-  error: string | null;
-  // Actions
-  setAuthResult(token, user): void;
-  logout(): void;
-  clearError(): void;
-}
-```
+Current behavior:
 
-**useQuizStore** (`app/state/useQuizStore.ts`)
-```typescript
-interface QuizState {
-  quiz: Quiz | null;
-  quizCache: CacheEnvelope<Quiz> | null;
-  cachedResult: CachedQuizResult | null;
-  result: QuizResultImmediate | null;
-  userId: string | null;
-  isQuizLoading: boolean;
-  isSubmitting: boolean;
-  setUserId(userId): void;
-  hydrateFromCache(userId): Promise<void>;
-  fetchQuiz(date?): Promise<Quiz | null>;
-  createLocalResult(answers): Promise<QuizResultImmediate | null>;
-  submitQuizAnswers(answers): Promise<void>;
-  retryPendingSubmission(): Promise<void>;
-  resetQuiz(): void;
-}
-```
+- Persistent compact top bar with logo, score, question count, and progress dots.
+- Question content transitions independently so the top bar does not flicker.
+- Prompt uses the intentional typewriter effect.
+- Answer options fade in one by one after typing completes.
+- Timer starts only once the prompt and options are visible.
+- Timer remains at zero and allows an answer; correct post-zero answers receive minimum score.
+- Answer tap locks options, shows a short suspense beat, then reveals correctness.
+- Locked/correct/incorrect message copy is selected as linked pairs by index.
+- Correct answer reveal uses repeated pulse; wrong answers do not shake.
+- Between questions, the question content zoom-fades out, pauses, then the next question begins.
+- Challenge mode keeps the same full-window card proportions as daily quiz, with only a small neutral challenge context pill above the shared card.
 
-**useProfileStore / useLeaderboardStore**
-- Own cached-first warm rendering for Me and League Tables.
-- Revalidate in the background after app bootstrap, focus, auth changes, and quiz completion.
+## State Management
 
-### Local Component State
-- Current question index
-- User answers array
-- Animation states (typewriter, fade-in)
-- Modal visibility
+### Auth
 
----
+`useAuthStore` owns user/token/session state, refresh-token restore, auth-state versioning, and username/display-name mutations.
 
-## App States (Implemented)
+Login/logout orchestration lives in `app/services/authFlow.ts`:
 
-| State | Trigger | UI |
-|-------|---------|-----|
-| Bootstrap | App start | Branded bootstrap screen |
-| Welcome | Quiz cached or warming, not started | WelcomeScreen |
-| Answering | User started quiz | QuestionCard sequence |
-| Syncing | All questions answered | ResultsScreen with background sync status |
-| Results | Local result ready | ResultsScreen |
-| Completed | Already played today | CompletedQuizScreen |
-| Error | Network/API failure | Inline retry / helper text |
+- prompts Auth0 once;
+- exchanges the authorization code once with PKCE;
+- stores credentials through `useAuthStore`;
+- reconciles guest/auth quiz state;
+- prefetches first daily-loop data before releasing the UI.
 
----
+### Quiz
 
-## Component Responsibilities (Implemented)
+`useQuizStore` owns quiz cache, same-day result cache, immediate result, user identity, pending submission, and identity reconciliation.
 
-### App.tsx
-- Font loading with expo-font
-- Branded startup bootstrap while local daily-loop state hydrates
-- Navigation container
-- Safe area handling
+Important behaviors:
 
-### BottomTabNavigator.tsx
-- Tab bar configuration
-- Screen registration
-- Icon assignment (Ionicons)
-- Header styling with accent color
+- Guest results are local-only during guest play.
+- Authenticated results submit to the server.
+- Guest results can be migrated/adopted after login when no authenticated result already exists.
+- Reconciliation resets transient play UI so stale in-progress questions do not flash.
 
-### DailyQuizScreen.tsx
-- Main daily-loop orchestrator
-- Renders Welcome or Completed immediately from cached state
-- Preloads quiz in the background before kickoff
-- Reveals local result instantly, then syncs submit/final stats in background
+### Profile and Leaderboards
 
-### QuestionCard.tsx (205 lines)
-- Single question display
-- Typewriter animation for prompt text
-- Staggered option button fade-in
-- Correct/incorrect highlighting
-- 2-option row layout (48% width each)
+`useProfileStore` and `useLeaderboardStore` render cached data first and revalidate in the background. Profile revalidation discards stale responses if auth state changes mid-flight.
 
-### WelcomeScreen.tsx (106 lines)
-- Logo display
-- "Kick Off" start button
-- "Laws of the Game" info modal trigger
-- Styled with accent color background
+## Settings
 
-### ResultsScreen.tsx (248 lines)
-- Score display (X/5 and percentage)
-- Streak and best score stats
-- Answer review with ⚽️ (correct) / ❌ (incorrect)
-- Dynamic feedback messages based on score
-- "Play Again" button (resets quiz)
+Settings includes:
 
-### CompletedQuizScreen.tsx
-- Shows cached result for users who already played
-- Prevents replaying until next day
-- Uses same score display as ResultsScreen
+- authenticated account section and sign out;
+- support links;
+- debug-log copy/clear controls;
+- app version from `APP_VERSION`;
+- guest-only quiz cache reset.
 
-### LeaderboardScreen.tsx
-- Hydrates cached friends/global leaderboards first
-- Uses placeholder rows instead of centered spinners on empty warm loads
-- Keeps Friends as the primary authenticated comparison view
+Authenticated users do not see guest options.
 
-### MeScreen.tsx
-- Cached-first profile page with logged-in/logged-out states
-- Logged-in stats render from cache immediately and refresh silently on focus
-- Settings cog button opens SettingsModal
+## Theme and Animation
 
-### SettingsModal.tsx
-- Modal accessed via cog icon in MeScreen header
-- "Done" button to dismiss
-- Account section (name, email, sign out) - only when logged in
-- Support section (feedback link, donation)
-- About section (version info)
-- Guest options (clear quiz) - only when logged out
-
----
-
-## State Transitions (Implemented)
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                                                              │
-│  ┌─────────┐    fetch    ┌─────────────┐                    │
-│  │ Loading │────────────▶│   Welcome   │                    │
-│  └─────────┘             └──────┬──────┘                    │
-│       │                         │                            │
-│       │ cached result           │ "Kick Off"                 │
-│       ▼                         ▼                            │
-│  ┌───────────┐           ┌───────────┐    all answered      │
-│  │ Completed │           │ Answering │─────────────────┐    │
-│  └───────────┘           └───────────┘                 │    │
-│                                                        ▼    │
-│                          ┌───────────┐           ┌─────────┐│
-│                          │  Results  │◀──────────│Submitting│
-│                          └───────────┘           └─────────┘│
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
-
----
-
-## AsyncStorage Keys (Implemented)
-
-| Key | Content | Expiry | File |
-|-----|---------|--------|------|
-| `@pundit_user_id` | Guest ID string | Never | userStorage.ts |
-| `@pundit_daily_quiz_result_*` | Same-day result JSON | Daily (by date check) | quizStorage.ts |
-| `@pundit_resource_quiz_{date}` | Quiz JSON envelope | stale-first / timed | quizCache.ts |
-| `@pundit_resource_profile_{userId}` | UserStats envelope | stale-first / timed | profileCache.ts |
-| `@pundit_resource_leaderboard_*` | Leaderboard envelope | stale-first / timed | leaderboardCache.ts |
-| `@pundit_pending_daily_submission` | Pending submit payload | until sync success | pendingSubmission.ts |
-
----
-
-## Offline / Guest Mode (Implemented)
-
-### Guest Mode
-- Default mode - no login required
-- Auto-generated ID: `guest_{timestamp}_{random}`
-- ID persisted in AsyncStorage
-
-### Auth0 Mode (Optional)
-- Configured via EXPO_PUBLIC_AUTH0_* env vars
-- Graceful degradation if not configured
-- Auth0 user ID used when authenticated
-
-### Offline Handling
-- Quiz data cached for 24 hours
-- Results cached locally after submission
-- Same-day replay prevented via cached result date check
-- **Not implemented**: Offline answer storage for later submission
-
----
-
-## Theme System (Implemented)
-
-**File**: `app/theme/theme.ts`
-
-```typescript
-colors: {
-  background: '#F9F6ED',    // Beige
-  primary: '#34855b',       // Green
-  accent: '#d07158',        // Orange/coral
-  correct: '#4CAF50',       // Green
-  incorrect: '#F44336',     // Red
-  textDark: '#2f2926',
-  white: '#FFFFFF',
-  lightGray: '#F5F5F5',
-  mediumGray: '#9E9E9E'
-}
-
-fonts: {
-  gothamBlack, gothamBold, gothamMedium, gothamBook, gothamLight,
-  uniSansHeavy, uniSansThin
-}
-
-spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 }
-borderRadius: { sm: 8, md: 12, lg: 16, xl: 24 }
-```
-
----
-
-## Animations (Implemented)
-
-| Animation | Location | Timing |
-|-----------|----------|--------|
-| Typewriter text | QuestionCard | 30ms per character |
-| Option fade-in | QuestionCard | Staggered 100ms delay |
-| Auto-advance | DailyQuizScreen | 2000ms after answer |
-| Correct/incorrect highlight | QuestionCard | Immediate on selection |
+- Theme values live in `app/theme/theme.ts`.
+- Gameplay animation uses React Native Reanimated and Worklets.
+- The timer preserves the circular countdown concept with smoother progress and urgency styling.
+- Avoid parent-level remount keys around `QuestionCard`; only the question content should remount for per-question animation.

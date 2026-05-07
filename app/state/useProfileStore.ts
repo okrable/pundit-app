@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { getTodayResult, getUserStats } from '../services/api';
-import { CacheEnvelope, QuizResultImmediate, UserStats } from '../types';
+import { CacheEnvelope, QuizResult, QuizResultImmediate, UserStats } from '../types';
 import { getCachedUserStats, setCachedUserStats } from '../storage/profileCache';
 import { getTodayQuizResult } from '../storage/quizStorage';
 import { useAuthStore } from './useAuthStore';
@@ -30,7 +30,7 @@ interface ProfileState {
   hydrateFromCache: (userId: string) => Promise<void>;
   revalidate: (userId: string) => Promise<void>;
   applyServerStats: (stats: UserStats) => Promise<void>;
-  markPlayedToday: (result: QuizResultImmediate, userId: string) => Promise<void>;
+  markPlayedToday: (result: QuizResultImmediate | QuizResult, userId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -64,7 +64,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   },
 
   revalidate: async (userId: string) => {
-    logInfo('profile.revalidate.start', { userId });
+    const startedAuthState = useAuthStore.getState();
+    const startedAuthVersion = startedAuthState.authStateVersion;
+
+    logInfo('profile.revalidate.start', { userId, authStateVersion: startedAuthVersion });
     set({ loading: true, error: null });
 
     try {
@@ -84,8 +87,12 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       }
 
       const authState = useAuthStore.getState();
-      if (!authState.token) {
-        logInfo('profile.revalidate.skipped_no_token', { userId });
+      if (!authState.token || authState.user?.sub !== userId) {
+        logInfo('profile.revalidate.skipped_no_matching_auth', {
+          userId,
+          authUserId: authState.user?.sub,
+          hasToken: Boolean(authState.token),
+        });
         set({
           statsUserId: userId,
           playedToday: Boolean(todayResult),
@@ -101,6 +108,19 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
       await setCachedUserStats(userId, stats);
       const refreshedCache = await getCachedUserStats(userId);
+      const latestAuthState = useAuthStore.getState();
+      if (
+        latestAuthState.authStateVersion !== startedAuthVersion ||
+        latestAuthState.user?.sub !== userId
+      ) {
+        logInfo('profile.revalidate.discarded_stale_success', {
+          userId,
+          startedAuthVersion,
+          latestAuthVersion: latestAuthState.authStateVersion,
+        });
+        set({ loading: false });
+        return;
+      }
 
       set({
         statsUserId: userId,
@@ -112,6 +132,20 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       });
       logInfo('profile.revalidate.success', { userId, playedToday: Boolean(remoteTodayResult || todayResult) });
     } catch (error) {
+      const latestAuthState = useAuthStore.getState();
+      if (
+        latestAuthState.authStateVersion !== startedAuthVersion ||
+        latestAuthState.user?.sub !== userId
+      ) {
+        logInfo('profile.revalidate.discarded_stale_error', {
+          userId,
+          startedAuthVersion,
+          latestAuthVersion: latestAuthState.authStateVersion,
+        });
+        set({ loading: false });
+        return;
+      }
+
       logError('profile.revalidate.error', error);
       set({
         loading: false,
@@ -137,19 +171,36 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     });
   },
 
-  markPlayedToday: async (result: QuizResultImmediate, userId: string) => {
+  markPlayedToday: async (result: QuizResultImmediate | QuizResult, userId: string) => {
     const currentStats = get().stats ?? (userId.startsWith('guest_') ? GUEST_STATS : null);
     if (!currentStats) {
-      set({ playedToday: true });
+      const nextStats: UserStats = {
+        ...GUEST_STATS,
+        streak: result.streak,
+        bestScore: Math.max(result.bestScore, result.score),
+        totalQuizzes: 1,
+      };
+
+      if (!userId.startsWith('guest_')) {
+        await setCachedUserStats(userId, nextStats);
+      }
+
+      set({
+        statsUserId: userId,
+        stats: nextStats,
+        playedToday: true,
+        error: null,
+      });
       return;
     }
 
     const nextStats: UserStats = {
       ...currentStats,
-      bestScore: Math.max(currentStats.bestScore, result.score),
+      streak: Math.max(currentStats.streak, result.streak),
+      bestScore: Math.max(currentStats.bestScore, result.bestScore, result.score),
       totalQuizzes: userId.startsWith('guest_')
         ? Math.max(currentStats.totalQuizzes, 1)
-        : currentStats.totalQuizzes,
+        : Math.max(currentStats.totalQuizzes, 1),
     };
 
     if (!userId.startsWith('guest_')) {

@@ -1,5 +1,13 @@
-# Deprecated: Challenge Mode Discussion Points
+# Challenge Mode Discussion Points
 
-This file is retained only for historical context.
+Current challenge mode is shipped. Future discussion should focus on hardening and product depth rather than initial implementation.
 
-Use `implementation-plan/features/challenge-mode/README.md` as the current source of truth.
+## Open Topics
+
+- Deep-link reliability and attribution.
+- Challenge expiry/revoke messaging.
+- Abuse controls for challenge creation/join/submit.
+- Better lifecycle telemetry for created, joined, completed, expired, and revoked challenges.
+- Historical challenge summaries and richer profile integration.
+
+For current behavior, use `implementation-plan/features/challenge-mode/README.md`.

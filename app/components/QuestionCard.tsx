@@ -1,28 +1,71 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, TextStyle, Animated, Image } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextStyle,
+  View,
+  ViewStyle,
+} from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { Question } from '../types';
 import { theme } from '../theme/theme';
 import CountdownTimer from './CountdownTimer';
 
-const TYPING_SPEED = 30; // milliseconds per character
-const TYPING_SPEED_FAST = 8; // milliseconds per character when holding
-const OPTION_FADE_DURATION = 200; // milliseconds for each option fade
-const OPTION_STAGGER_DELAY = 100; // milliseconds between each option appearing
+const TYPING_SPEED = 30;
+const TYPING_SPEED_FAST = 8;
+const OPTION_FADE_DURATION = 300;
+const OPTION_STAGGER_DELAY = 220;
+const OPTION_LABELS = ['A', 'B', 'C', 'D'];
+const logoImage = require('../../assets/logo/dark/pundit-black.png');
+
+const REVEAL_PHRASE_SETS = [
+  { locked: 'Shoots...', correct: 'Scores!', incorrect: 'Saved!' },
+  { locked: 'Takes aim...', correct: 'Top bins!', incorrect: 'Off target!' },
+  { locked: 'Chance!', correct: 'GOAL!', incorrect: 'Denied!' },
+  { locked: 'Locked in!', correct: 'In the net!', incorrect: 'Wide!' },
+  { locked: 'Goes for it!', correct: 'What a finish!', incorrect: 'Not this time!' },
+] as const;
+
+const usedRevealPhraseIndexes = new Set<number>();
+
+function pickRevealPhraseSetIndex(): number {
+  if (usedRevealPhraseIndexes.size >= REVEAL_PHRASE_SETS.length) {
+    usedRevealPhraseIndexes.clear();
+  }
+
+  const availableIndexes = REVEAL_PHRASE_SETS
+    .map((_, index) => index)
+    .filter((index) => !usedRevealPhraseIndexes.has(index));
+  const phraseIndex =
+    availableIndexes[Math.floor(Math.random() * availableIndexes.length)] ?? 0;
+  usedRevealPhraseIndexes.add(phraseIndex);
+  return phraseIndex;
+}
 
 interface QuestionCardProps {
   question: Question;
   selectedOption: number | null;
   onSelectOption: (optionIndex: number) => void;
   disabled?: boolean;
+  isExiting?: boolean;
   showResult?: boolean;
   correctOptionIndex?: number;
   isHolding?: boolean;
   onTypingComplete?: () => void;
-  // Header props
   questionNumber: number;
   totalQuestions: number;
   score: number;
-  // Timer props
   timerDuration: number;
   timerActive: boolean;
   timeRemaining: number;
@@ -30,11 +73,117 @@ interface QuestionCardProps {
   onTimeUp: () => void;
 }
 
+interface OptionTileProps {
+  option: string;
+  index: number;
+  isSelected: boolean;
+  isLocked: boolean;
+  showResult: boolean;
+  isCorrectOption: boolean;
+  isWrongSelected: boolean;
+  onPress: () => void;
+}
+
+function OptionTile({
+  option,
+  index,
+  isSelected,
+  isLocked,
+  showResult,
+  isCorrectOption,
+  isWrongSelected,
+  onPress,
+}: OptionTileProps) {
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    if (isSelected && !showResult) {
+      scale.value = withSequence(
+        withTiming(0.96, { duration: 90, easing: Easing.out(Easing.cubic) }),
+        withSpring(1.02, { damping: 12, stiffness: 240 }),
+        withSpring(1, { damping: 14, stiffness: 220 })
+      );
+    }
+  }, [isSelected, scale, showResult]);
+
+  useEffect(() => {
+    if (showResult && isCorrectOption) {
+      scale.value = withSequence(
+        withTiming(1.07, { duration: 230, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, { duration: 210, easing: Easing.in(Easing.cubic) }),
+        withTiming(1.06, { duration: 230, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, { duration: 210, easing: Easing.in(Easing.cubic) }),
+        withTiming(1.05, { duration: 230, easing: Easing.out(Easing.cubic) }),
+        withSpring(1, { damping: 18, stiffness: 130 })
+      );
+    }
+  }, [isCorrectOption, scale, showResult]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const tileStyles: ViewStyle[] = [styles.optionButton];
+  const labelStyles: TextStyle[] = [styles.optionLabel];
+  const textStyles: TextStyle[] = [styles.optionText];
+
+  if (showResult) {
+    if (isCorrectOption) {
+      tileStyles.push(styles.optionButtonCorrect);
+      labelStyles.push(styles.optionLabelStrong);
+      textStyles.push(styles.optionTextStrong);
+    } else if (isWrongSelected) {
+      tileStyles.push(styles.optionButtonIncorrect);
+      labelStyles.push(styles.optionLabelStrong);
+      textStyles.push(styles.optionTextStrong);
+    } else {
+      tileStyles.push(styles.optionButtonDimmed);
+    }
+  } else if (isSelected) {
+    tileStyles.push(styles.optionButtonSelected);
+    labelStyles.push(styles.optionLabelSelected);
+    textStyles.push(styles.optionTextSelected);
+  }
+
+  return (
+    <Animated.View
+      layout={LinearTransition.duration(180)}
+      style={[styles.optionWrapper, animatedStyle]}
+    >
+      <Animated.View
+        entering={FadeIn.duration(OPTION_FADE_DURATION).delay(index * OPTION_STAGGER_DELAY)}
+      >
+        <Pressable
+          style={({ pressed }) => [
+            tileStyles,
+            pressed && !isLocked ? styles.optionButtonPressed : null,
+          ]}
+          onPress={onPress}
+          disabled={isLocked}
+        >
+          <View style={styles.optionLabelBadge}>
+            <Text style={labelStyles}>{OPTION_LABELS[index]}</Text>
+          </View>
+          <Text
+            style={textStyles}
+            numberOfLines={3}
+            adjustsFontSizeToFit
+            minimumFontScale={0.78}
+          >
+            {option}
+          </Text>
+        </Pressable>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
 export default function QuestionCard({
   question,
   selectedOption,
   onSelectOption,
   disabled = false,
+  isExiting = false,
   showResult = false,
   correctOptionIndex,
   isHolding = false,
@@ -50,29 +199,49 @@ export default function QuestionCard({
 }: QuestionCardProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [isTypingComplete, setIsTypingComplete] = useState(false);
+  const [revealPhraseSetIndex, setRevealPhraseSetIndex] = useState<number | null>(null);
   const typingTimer = useRef<NodeJS.Timeout | null>(null);
-  const isHoldingRef = useRef(false); // Use ref to access current value in timeout callback
+  const optionReadyTimer = useRef<NodeJS.Timeout | null>(null);
+  const isHoldingRef = useRef(false);
+  const onTypingCompleteRef = useRef(onTypingComplete);
+  const questionContentOpacity = useSharedValue(1);
+  const questionContentScale = useSharedValue(1);
+
+  useEffect(() => {
+    questionContentOpacity.value = withTiming(isExiting ? 0 : 1, {
+      duration: isExiting ? 950 : 220,
+      easing: Easing.out(Easing.cubic),
+    });
+    questionContentScale.value = withTiming(isExiting ? 0.94 : 1, {
+      duration: isExiting ? 950 : 220,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [isExiting, questionContentOpacity, questionContentScale]);
+
+  const questionContentAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: questionContentOpacity.value,
+    transform: [{ scale: questionContentScale.value }],
+  }));
 
   useEffect(() => {
     isHoldingRef.current = isHolding;
   }, [isHolding]);
 
-  // Create animated values for each option (max 4 options)
-  const optionAnimations = useRef([
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-  ]).current;
-
-  // Typewriter effect for question prompt
   useEffect(() => {
-    // Reset when question changes
+    onTypingCompleteRef.current = onTypingComplete;
+  }, [onTypingComplete]);
+
+  useEffect(() => {
     setDisplayedText('');
     setIsTypingComplete(false);
+    setRevealPhraseSetIndex(null);
 
-    // Reset option animations
-    optionAnimations.forEach(anim => anim.setValue(0));
+    if (typingTimer.current) {
+      clearTimeout(typingTimer.current);
+    }
+    if (optionReadyTimer.current) {
+      clearTimeout(optionReadyTimer.current);
+    }
 
     const fullText = question.prompt;
     let currentIndex = 0;
@@ -80,25 +249,18 @@ export default function QuestionCard({
     const typeNextChar = () => {
       if (currentIndex < fullText.length) {
         setDisplayedText(fullText.slice(0, currentIndex + 1));
-        currentIndex++;
+        currentIndex += 1;
         const speed = isHoldingRef.current ? TYPING_SPEED_FAST : TYPING_SPEED;
         typingTimer.current = setTimeout(typeNextChar, speed);
-      } else {
-        setIsTypingComplete(true);
-        // Start staggered fade-in for options
-        const animations = question.options.map((_, index) =>
-          Animated.timing(optionAnimations[index], {
-            toValue: 1,
-            duration: OPTION_FADE_DURATION,
-            delay: index * OPTION_STAGGER_DELAY,
-            useNativeDriver: true,
-          })
-        );
-        Animated.parallel(animations).start(() => {
-          // Notify parent that typing and option display is complete
-          onTypingComplete?.();
-        });
+        return;
       }
+
+      setIsTypingComplete(true);
+      const optionRevealMs =
+        OPTION_STAGGER_DELAY * Math.max(question.options.length - 1, 0) + OPTION_FADE_DURATION;
+      optionReadyTimer.current = setTimeout(() => {
+        onTypingCompleteRef.current?.();
+      }, optionRevealMs);
     };
 
     typingTimer.current = setTimeout(typeNextChar, TYPING_SPEED);
@@ -107,167 +269,315 @@ export default function QuestionCard({
       if (typingTimer.current) {
         clearTimeout(typingTimer.current);
       }
+      if (optionReadyTimer.current) {
+        clearTimeout(optionReadyTimer.current);
+      }
     };
-  }, [question.id]);
+  }, [question.id, question.options.length, question.prompt]);
 
-  const getOptionStyle = (index: number): ViewStyle[] => {
-    const baseStyles: ViewStyle[] = [styles.optionButton];
-
-    if (showResult && correctOptionIndex !== undefined) {
-      if (index === correctOptionIndex) {
-        baseStyles.push(styles.optionButtonCorrect);
-      } else if (index === selectedOption && index !== correctOptionIndex) {
-        baseStyles.push(styles.optionButtonIncorrect);
-      }
-    } else if (selectedOption === index) {
-      baseStyles.push(styles.optionButtonSelected);
+  useEffect(() => {
+    if (selectedOption === null) {
+      setRevealPhraseSetIndex(null);
+      return;
     }
 
-    return baseStyles;
-  };
+    setRevealPhraseSetIndex((currentIndex) =>
+      currentIndex === null ? pickRevealPhraseSetIndex() : currentIndex
+    );
+  }, [selectedOption]);
 
-  const getOptionTextStyle = (index: number): TextStyle[] => {
-    const baseStyles: TextStyle[] = [styles.optionText];
-
-    if (showResult && correctOptionIndex !== undefined) {
-      if (index === correctOptionIndex) {
-        baseStyles.push(styles.optionTextCorrect);
-      } else if (index === selectedOption && index !== correctOptionIndex) {
-        baseStyles.push(styles.optionTextIncorrect);
-      }
-    } else if (selectedOption === index) {
-      baseStyles.push(styles.optionTextSelected);
-    }
-
-    return baseStyles;
-  };
+  const isLocked = disabled || selectedOption !== null;
+  const revealPhraseSet =
+    revealPhraseSetIndex === null ? null : REVEAL_PHRASE_SETS[revealPhraseSetIndex];
+  const revealTone =
+    showResult && selectedOption !== null
+      ? selectedOption === correctOptionIndex
+        ? 'correct'
+        : 'incorrect'
+      : selectedOption !== null
+        ? 'locked'
+        : null;
+  const revealText =
+    selectedOption === null || !revealPhraseSet
+      ? ''
+      : showResult
+        ? selectedOption === correctOptionIndex
+          ? revealPhraseSet.correct
+          : revealPhraseSet.incorrect
+        : revealPhraseSet.locked;
 
   return (
     <View style={styles.container}>
-      {/* Header: Logo+Question | Timer | Score */}
-      <View style={styles.headerRow}>
-        <View style={styles.logoSection}>
-          <Image
-            source={require('../../assets/logo/dark/pundit-black.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-          <Text style={styles.questionNumber}>Question {questionNumber} of {totalQuestions}</Text>
-        </View>
-        <CountdownTimer
-          duration={timerDuration}
-          isActive={timerActive}
-          onTimeUp={onTimeUp}
-          timeRemaining={timeRemaining}
-          setTimeRemaining={setTimeRemaining}
+      <View style={styles.topBar}>
+        <Image
+          source={logoImage}
+          style={styles.logo}
+          resizeMode="contain"
         />
-        <Text style={styles.scoreText}>SCORE: {score}</Text>
+
+        <View style={styles.progressBlock}>
+          <Text style={styles.questionNumber}>
+            {questionNumber}/{totalQuestions}
+          </Text>
+          <View style={styles.progressDots}>
+            {Array.from({ length: totalQuestions }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.progressDot,
+                  index < questionNumber ? styles.progressDotActive : null,
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.scorePill}>
+          <Text style={styles.scoreLabel}>Score</Text>
+          <Text style={styles.scoreText}>{score}</Text>
+        </View>
       </View>
 
-      {/* Divider */}
-      <View style={styles.divider} />
+      <Animated.View
+        key={question.id}
+        entering={FadeIn.duration(220)}
+        style={[styles.questionContent, questionContentAnimatedStyle]}
+      >
+        <View style={styles.playArea}>
+          <View style={styles.timerRow}>
+            <CountdownTimer
+              duration={timerDuration}
+              isActive={timerActive}
+              onTimeUp={onTimeUp}
+              timeRemaining={timeRemaining}
+              setTimeRemaining={setTimeRemaining}
+            />
+            <View style={styles.timerCopy}>
+              <Text style={styles.timerTitle}>
+                {timerActive ? 'On the clock' : timeRemaining === 0 ? 'Minimum score' : 'Read first'}
+              </Text>
+              <Text style={styles.timerHint}>
+                {timeRemaining === 0
+                  ? 'Answer when ready.'
+                  : timerActive
+                    ? 'Faster correct answers score more.'
+                    : 'Timer starts after the options appear.'}
+              </Text>
+            </View>
+          </View>
 
-      {/* Question Content */}
-      <Text style={styles.prompt}>{displayedText}</Text>
-      {isTypingComplete && (
-        <View style={styles.optionsContainer}>
-          {question.options.map((option, index) => (
-            <Animated.View
-              key={index}
-              style={{ opacity: optionAnimations[index], width: '48%' }}
+          <View style={styles.promptFrame}>
+            <Animated.Text
+              entering={FadeIn.duration(160)}
+              style={styles.prompt}
             >
-              <TouchableOpacity
-                style={getOptionStyle(index)}
-                onPress={() => onSelectOption(index)}
-                disabled={disabled || showResult}
-              >
-                <Text
-                  style={getOptionTextStyle(index)}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.85}
-                >
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
-          ))}
+              {displayedText}
+            </Animated.Text>
+          </View>
         </View>
-      )}
+
+        <View style={styles.revealRow}>
+          <Text
+            style={[
+              styles.revealText,
+              revealTone === 'correct' ? styles.revealTextCorrect : null,
+              revealTone === 'incorrect' ? styles.revealTextIncorrect : null,
+            ]}
+          >
+            {revealText}
+          </Text>
+        </View>
+
+        <View style={styles.optionsStage}>
+          {isTypingComplete && (
+            <View style={styles.optionsContainer}>
+              {question.options.map((option, index) => {
+                const isSelected = selectedOption === index;
+                const isCorrectOption = showResult && correctOptionIndex === index;
+                const isWrongSelected =
+                  showResult && isSelected && correctOptionIndex !== undefined && index !== correctOptionIndex;
+
+                return (
+                  <OptionTile
+                    key={`${question.id}-${index}`}
+                    option={option}
+                    index={index}
+                    isSelected={isSelected}
+                    isLocked={isLocked}
+                    showResult={showResult}
+                    isCorrectOption={isCorrectOption}
+                    isWrongSelected={isWrongSelected}
+                    onPress={() => onSelectOption(index)}
+                  />
+                );
+              })}
+            </View>
+          )}
+        </View>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.white,
-    padding: theme.spacing.lg,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.28,
-    shadowRadius: 6,
-    elevation: 2,
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.lg,
+    gap: theme.spacing.md,
   },
-  headerRow: {
+  topBar: {
+    minHeight: 56,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  logoSection: {
-    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
   },
   logo: {
-    width: 150,
-    height: 54,
-    marginBottom: 12,
+    width: 92,
+    height: 32,
+  },
+  progressBlock: {
+    flex: 1,
+    alignItems: 'center',
+    gap: theme.spacing.xs,
   },
   questionNumber: {
-    fontSize: 16,
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+    fontVariant: ['tabular-nums'],
+  },
+  progressDots: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  progressDot: {
+    width: 18,
+    height: 5,
+    borderRadius: 99,
+    backgroundColor: '#DED8C9',
+  },
+  progressDotActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  scorePill: {
+    minWidth: 74,
+    borderRadius: 999,
+    backgroundColor: theme.colors.white,
+    borderWidth: 1,
+    borderColor: '#E7DFD2',
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  scoreLabel: {
+    fontSize: 10,
     fontFamily: theme.fonts.gothamBook,
     color: theme.colors.mediumGray,
-    marginLeft: 12,
+    textTransform: 'uppercase',
   },
   scoreText: {
+    fontSize: 17,
+    fontFamily: theme.fonts.gothamBlack,
+    color: theme.colors.textDark,
+    fontVariant: ['tabular-nums'],
+  },
+  questionContent: {
+    flex: 1,
+    gap: theme.spacing.md,
+  },
+  playArea: {
+    flex: 1,
+    minHeight: 190,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: '#E7DFD2',
+    padding: theme.spacing.lg,
+    gap: theme.spacing.lg,
+    justifyContent: 'flex-start',
+  },
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  timerCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  timerTitle: {
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+  },
+  timerHint: {
+    fontSize: 12,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    lineHeight: 16,
+  },
+  promptFrame: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'stretch',
+  },
+  prompt: {
+    fontSize: 25,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.textDark,
+    lineHeight: 32,
+  },
+  revealRow: {
+    minHeight: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  revealText: {
     fontSize: 14,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
-    marginRight: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0,
   },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.primary,
-    marginVertical: theme.spacing.md,
-    opacity: 0.3,
+  revealTextCorrect: {
+    color: theme.colors.correct,
   },
-  prompt: {
-    fontSize: 16,
-    fontFamily: theme.fonts.gothamBook,
-    marginBottom: theme.spacing.md,
-    color: theme.colors.textDark,
-    lineHeight: 22,
+  revealTextIncorrect: {
+    color: theme.colors.incorrect,
   },
   optionsContainer: {
-    gap: theme.spacing.sm,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  optionsStage: {
+    minHeight: 164,
+  },
+  optionWrapper: {
+    flexBasis: '48%',
+    flexGrow: 1,
   },
   optionButton: {
-    backgroundColor: theme.colors.background,
-    height: 56,
-    paddingHorizontal: theme.spacing.lg,
+    minHeight: 78,
+    backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
-    borderColor: theme.colors.lightGray,
-    alignItems: 'center',
+    borderColor: '#D9D0C1',
+    padding: theme.spacing.md,
+    gap: theme.spacing.sm,
     justifyContent: 'center',
   },
-  optionButtonSelected: {
-    backgroundColor: theme.colors.primary,
+  optionButtonPressed: {
+    transform: [{ scale: 0.98 }],
     borderColor: theme.colors.primary,
+  },
+  optionButtonSelected: {
+    backgroundColor: theme.colors.textDark,
+    borderColor: theme.colors.textDark,
   },
   optionButtonCorrect: {
     backgroundColor: theme.colors.correct,
@@ -277,23 +587,38 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.incorrect,
     borderColor: theme.colors.incorrect,
   },
+  optionButtonDimmed: {
+    opacity: 0.42,
+  },
+  optionLabelBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionLabel: {
+    fontSize: 12,
+    fontFamily: theme.fonts.gothamBlack,
+    color: theme.colors.textDark,
+  },
+  optionLabelSelected: {
+    color: theme.colors.textDark,
+  },
+  optionLabelStrong: {
+    color: theme.colors.textDark,
+  },
   optionText: {
     fontSize: 15,
     color: theme.colors.textDark,
-    fontFamily: theme.fonts.gothamBook,
-    textAlign: 'center',
-    lineHeight: 18,
+    fontFamily: theme.fonts.gothamMedium,
+    lineHeight: 19,
   },
   optionTextSelected: {
     color: theme.colors.white,
-    fontFamily: theme.fonts.gothamMedium,
   },
-  optionTextCorrect: {
+  optionTextStrong: {
     color: theme.colors.white,
-    fontFamily: theme.fonts.gothamMedium,
-  },
-  optionTextIncorrect: {
-    color: theme.colors.white,
-    fontFamily: theme.fonts.gothamMedium,
   },
 });

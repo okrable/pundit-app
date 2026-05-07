@@ -5,7 +5,25 @@ import { useProfileStore } from '../state/useProfileStore';
 import { useQuizStore } from '../state/useQuizStore';
 import { logError, logInfo, logWarn } from './debugLog';
 
-let inflightPrefetch: Promise<void> | null = null;
+const inflightPrefetches = new Map<string, Promise<void>>();
+const inflightAuthSyncs = new Map<string, Promise<void>>();
+
+type PrefetchMode = 'bootstrap-auth' | 'public-warm' | 'manual';
+
+interface PrefetchOptions {
+  userId?: string;
+  mode?: PrefetchMode;
+}
+
+interface AuthenticatedSessionSyncOptions {
+  userId: string;
+  userProfile?: {
+    displayName?: string;
+    email?: string;
+    avatarUrl?: string;
+  };
+  source: 'login' | 'restore';
+}
 
 export async function resolveEffectiveUserId(): Promise<string> {
   const authState = useAuthStore.getState();
@@ -36,23 +54,45 @@ export async function hydrateDailyLoopFromCache(userId: string): Promise<void> {
   logInfo('dailyLoop.cache.hydrate.success', { userId });
 }
 
-export async function prefetchDailyLoop(userId?: string): Promise<void> {
-  if (inflightPrefetch) {
-    logWarn('dailyLoop.prefetch.skipped_inflight');
-    return inflightPrefetch;
+export async function prefetchDailyLoop(options?: string | PrefetchOptions): Promise<void> {
+  const normalizedOptions =
+    typeof options === 'string'
+      ? { userId: options, mode: 'public-warm' as PrefetchMode }
+      : options ?? { mode: 'public-warm' as PrefetchMode };
+  const mode = normalizedOptions.mode ?? 'public-warm';
+  const effectiveUserId = normalizedOptions.userId ?? (await resolveEffectiveUserId());
+  const existingPrefetch = inflightPrefetches.get(`${effectiveUserId}:${mode}`);
+  if (existingPrefetch) {
+    logWarn('dailyLoop.prefetch.skipped_inflight', { userId: effectiveUserId, mode });
+    return existingPrefetch;
   }
 
-  const effectiveUserId = userId ?? (await resolveEffectiveUserId());
   const isAuthenticated =
-    useAuthStore.getState().isAuthenticated && !effectiveUserId.startsWith('guest_');
+    useAuthStore.getState().isAuthenticated &&
+    useAuthStore.getState().authStatus === 'authenticated' &&
+    Boolean(useAuthStore.getState().token) &&
+    !effectiveUserId.startsWith('guest_');
+  const hasToken = Boolean(useAuthStore.getState().token);
+  const shouldRunProtected = mode === 'bootstrap-auth' && isAuthenticated && hasToken;
 
-  logInfo('dailyLoop.prefetch.start', { userId: effectiveUserId, isAuthenticated });
-  inflightPrefetch = Promise.all([
+  logInfo('dailyLoop.prefetch.start', {
+    userId: effectiveUserId,
+    mode,
+    isAuthenticated,
+    hasToken,
+    shouldRunProtected,
+  });
+  const tasks: Promise<unknown>[] = [
     useQuizStore.getState().fetchQuiz(),
-    useProfileStore.getState().revalidate(effectiveUserId),
-    useLeaderboardStore.getState().prefetchDailyLoop(effectiveUserId, isAuthenticated),
-    useQuizStore.getState().retryPendingSubmission(),
-  ]).then(() => undefined)
+    useLeaderboardStore.getState().prefetchDailyLoop(effectiveUserId, shouldRunProtected),
+  ];
+
+  if (shouldRunProtected) {
+    tasks.push(useQuizStore.getState().retryPendingSubmission());
+    tasks.push(useProfileStore.getState().revalidate(effectiveUserId));
+  }
+
+  const prefetch = Promise.all(tasks).then(() => undefined)
     .then(() => {
       logInfo('dailyLoop.prefetch.success', { userId: effectiveUserId });
     })
@@ -61,8 +101,44 @@ export async function prefetchDailyLoop(userId?: string): Promise<void> {
       throw error;
     })
     .finally(() => {
-      inflightPrefetch = null;
+      inflightPrefetches.delete(`${effectiveUserId}:${mode}`);
     });
 
-  return inflightPrefetch;
+  inflightPrefetches.set(`${effectiveUserId}:${mode}`, prefetch);
+  return prefetch;
+}
+
+export async function syncAuthenticatedSession({
+  userId,
+  userProfile,
+  source,
+}: AuthenticatedSessionSyncOptions): Promise<void> {
+  const syncKey = `${userId}:${source}:${useAuthStore.getState().authStateVersion}`;
+  const existingSync = inflightAuthSyncs.get(syncKey);
+  if (existingSync) {
+    logWarn('dailyLoop.authSync.skipped_inflight', { userId, source });
+    return existingSync;
+  }
+
+  const sync = (async () => {
+    useAuthStore.getState().beginAuthSync(source);
+    logInfo('dailyLoop.authSync.start', { userId, source });
+
+    try {
+      await useQuizStore.getState().reconcileIdentity(userId, userProfile);
+      await prefetchDailyLoop({ userId, mode: 'bootstrap-auth' });
+      useAuthStore.getState().finishAuthSync();
+      logInfo('dailyLoop.authSync.success', { userId, source });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to sync authenticated session';
+      useAuthStore.getState().failAuthSync(message);
+      logError('dailyLoop.authSync.error', { userId, source, message });
+      throw error;
+    }
+  })().finally(() => {
+    inflightAuthSyncs.delete(syncKey);
+  });
+
+  inflightAuthSyncs.set(syncKey, sync);
+  return sync;
 }

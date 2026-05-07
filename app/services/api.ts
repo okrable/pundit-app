@@ -21,6 +21,8 @@ import { logError, logInfo, logWarn } from './debugLog';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
 const inflightRequests = new Map<string, Promise<unknown>>();
 const API_TIMEOUT_MS = 8000;
+const QUIZ_TIMEOUT_MS = 15000;
+const SUBMIT_QUIZ_TIMEOUT_MS = 20000;
 const LEADERBOARD_TIMEOUT_MS = 15000;
 
 export class ApiError extends Error {
@@ -34,25 +36,116 @@ interface ApiRequestConfig {
   timeoutMs?: number;
 }
 
-async function fetchApi<T>(
+async function executeFetch<T>(
   endpoint: string,
-  options?: RequestInit,
-  requestConfig?: ApiRequestConfig
+  options: RequestInit | undefined,
+  timeoutMs: number,
+  token: string | null,
+  attempt: number
 ): Promise<T> {
-  // Get Auth0 token if user is authenticated
-  const token = useAuthStore.getState().token;
   const method = options?.method ?? 'GET';
-  const timeoutMs = requestConfig?.timeoutMs ?? API_TIMEOUT_MS;
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...options?.headers,
   };
 
-  // Add Authorization header if token exists
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
+
+  logInfo('api.request.start', {
+    endpoint,
+    method,
+    hasToken: Boolean(token),
+    attempt,
+  });
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error instanceof Error && error.name === 'AbortError') {
+      logWarn('api.request.timeout', {
+        url: `${API_BASE_URL}${endpoint}`,
+        endpoint,
+        method,
+        durationMs: Date.now() - startedAt,
+        attempt,
+      });
+      throw new ApiError(408, `Request timed out while loading ${endpoint}`);
+    }
+
+    logError('api.request.fetch_error', {
+      endpoint,
+      method,
+      durationMs: Date.now() - startedAt,
+      attempt,
+      error,
+    });
+    throw error;
+  }
+
+  clearTimeout(timeout);
+  logInfo('api.request.response', {
+    endpoint,
+    method,
+    status: response.status,
+    durationMs: Date.now() - startedAt,
+    attempt,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    logWarn('api.request.not_ok', {
+      endpoint,
+      method,
+      status: response.status,
+      attempt,
+      error: error.error || error.message || 'Request failed',
+    });
+    throw new ApiError(response.status, error.error || error.message || 'Request failed');
+  }
+
+  try {
+    const data = await response.json();
+    logInfo('api.request.success', {
+      endpoint,
+      method,
+      durationMs: Date.now() - startedAt,
+      attempt,
+    });
+    return data as T;
+  } catch (error) {
+    logError('api.request.parse_error', {
+      endpoint,
+      method,
+      durationMs: Date.now() - startedAt,
+      attempt,
+      error,
+    });
+    throw error;
+  }
+}
+
+async function fetchApi<T>(
+  endpoint: string,
+  options?: RequestInit,
+  requestConfig?: ApiRequestConfig
+): Promise<T> {
+  const token = useAuthStore.getState().token;
+  const method = options?.method ?? 'GET';
+  const timeoutMs = requestConfig?.timeoutMs ?? API_TIMEOUT_MS;
 
   const requestKey =
     method === 'GET'
@@ -60,79 +153,56 @@ async function fetchApi<T>(
       : `${method}:${endpoint}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
   const runRequest = async () => {
-    const startedAt = Date.now();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => {
-      controller.abort();
-    }, timeoutMs);
-
-    logInfo('api.request.start', {
-      endpoint,
-      method,
-      hasToken: Boolean(token),
-    });
-
-    let response: Response;
     try {
-      response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      });
+      return await executeFetch<T>(endpoint, options, timeoutMs, token, 1);
     } catch (error) {
-      clearTimeout(timeout);
-      if (error instanceof Error && error.name === 'AbortError') {
-        logWarn('api.request.timeout', {
+      if (token && error instanceof ApiError && error.statusCode === 401) {
+        const authState = useAuthStore.getState();
+        const isSameToken = authState.token === token;
+        if (!isSameToken) {
+          logInfo('api.request.retry_with_current_token', {
+            endpoint,
+            method,
+          });
+          try {
+            return await executeFetch<T>(endpoint, options, timeoutMs, authState.token, 2);
+          } catch (retryError) {
+            if (retryError instanceof ApiError && retryError.statusCode === 401) {
+              useAuthStore.getState().requireReauth('Session expired. Sign in again to refresh.');
+              throw new ApiError(401, 'Session needs re-authentication');
+            }
+            throw retryError;
+          }
+        }
+
+        const refreshed = await authState.refreshToken();
+        const refreshedToken = useAuthStore.getState().token;
+        if (refreshed && refreshedToken && refreshedToken !== token) {
+          logInfo('api.request.retry_after_refresh', {
+            endpoint,
+            method,
+          });
+          try {
+            return await executeFetch<T>(endpoint, options, timeoutMs, refreshedToken, 2);
+          } catch (retryError) {
+            if (retryError instanceof ApiError && retryError.statusCode === 401) {
+              useAuthStore.getState().requireReauth('Session expired. Sign in again to refresh.');
+              throw new ApiError(401, 'Session needs re-authentication');
+            }
+            throw retryError;
+          }
+        }
+
+        logWarn('api.request.auth_refresh_failed', {
           endpoint,
           method,
-          durationMs: Date.now() - startedAt,
         });
-        throw new ApiError(408, `Request timed out: ${endpoint}`);
       }
 
-      logError('api.request.fetch_error', {
-        endpoint,
-        method,
-        durationMs: Date.now() - startedAt,
-        error,
-      });
-      throw error;
-    }
+      if (token && error instanceof ApiError && error.statusCode === 401) {
+        throw new ApiError(401, 'Your session expired. Please sign in again.');
+      }
 
-    clearTimeout(timeout);
-    logInfo('api.request.response', {
-      endpoint,
-      method,
-      status: response.status,
-      durationMs: Date.now() - startedAt,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      logWarn('api.request.not_ok', {
-        endpoint,
-        method,
-        status: response.status,
-        error: error.error || error.message || 'Request failed',
-      });
-      throw new ApiError(response.status, error.error || error.message || 'Request failed');
-    }
-
-    try {
-      const data = await response.json();
-      logInfo('api.request.success', {
-        endpoint,
-        method,
-        durationMs: Date.now() - startedAt,
-      });
-      return data as T;
-    } catch (error) {
-      logError('api.request.parse_error', {
-        endpoint,
-        method,
-        durationMs: Date.now() - startedAt,
-        error,
-      });
       throw error;
     }
   };
@@ -155,7 +225,9 @@ async function fetchApi<T>(
 
 export async function getDailyQuiz(date?: string): Promise<Quiz> {
   const params = date ? `?date=${date}` : '';
-  return fetchApi<Quiz>(`/getDailyQuiz${params}`);
+  return fetchApi<Quiz>(`/getDailyQuiz${params}`, undefined, {
+    timeoutMs: QUIZ_TIMEOUT_MS,
+  });
 }
 
 export async function submitQuiz(
@@ -164,10 +236,16 @@ export async function submitQuiz(
   answers: AnswerWithTiming[],
   userProfile?: UserProfile
 ): Promise<QuizResultImmediate> {
-  return fetchApi<QuizResultImmediate>('/submitQuiz', {
-    method: 'POST',
-    body: JSON.stringify({ quizId, userId, answers, userProfile }),
-  });
+  return fetchApi<QuizResultImmediate>(
+    '/submitQuiz',
+    {
+      method: 'POST',
+      body: JSON.stringify({ quizId, userId, answers, userProfile }),
+    },
+    {
+      timeoutMs: SUBMIT_QUIZ_TIMEOUT_MS,
+    }
+  );
 }
 
 export interface FinalizeQuizStatsResponse {

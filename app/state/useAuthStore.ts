@@ -30,7 +30,10 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isAuth0Available: boolean;
-  authStatus: 'anonymous' | 'restoring' | 'authenticated';
+  authStatus: 'anonymous' | 'restoring' | 'authenticated' | 'reauthRequired';
+  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed';
+  authSyncSource: 'login' | 'restore' | null;
+  authSyncError: string | null;
   forceInteractiveAuth: boolean;
   authStateVersion: number;
   isInitialized: boolean;
@@ -41,11 +44,17 @@ interface AuthState {
   setUsername: (username: string) => void;
   setDisplayName: (name: string) => void;
   setUsernameRequired: (required: boolean) => void;
+  beginAuthSync: (source: 'login' | 'restore') => void;
+  finishAuthSync: () => void;
+  failAuthSync: (message: string) => void;
+  requireReauth: (message: string) => void;
   logout: () => Promise<void>;
   clearError: () => void;
   restoreAuthState: () => Promise<boolean>;
   refreshToken: () => Promise<boolean>;
 }
+
+let inflightRefreshToken: Promise<boolean> | null = null;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -53,6 +62,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isAuth0Available: isAuth0Configured(),
   authStatus: 'anonymous',
+  authSyncStatus: 'idle',
+  authSyncSource: null,
+  authSyncError: null,
   forceInteractiveAuth: false,
   authStateVersion: 0,
   isInitialized: false,
@@ -100,6 +112,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           token: null,
           isAuthenticated: true,
           authStatus: 'restoring',
+          authSyncStatus: 'idle',
+          authSyncSource: null,
+          authSyncError: null,
           forceInteractiveAuth,
           isInitialized: true,
           isRestoring: false,
@@ -115,6 +130,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         token: null,
         isAuthenticated: false,
         authStatus: 'anonymous',
+        authSyncStatus: 'idle',
+        authSyncSource: null,
+        authSyncError: null,
         forceInteractiveAuth,
         isInitialized: true,
         isRestoring: false,
@@ -130,6 +148,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         token: null,
         isAuthenticated: false,
         authStatus: 'anonymous',
+        authSyncStatus: 'idle',
+        authSyncSource: null,
+        authSyncError: null,
         forceInteractiveAuth: false,
         isInitialized: true,
         isRestoring: false,
@@ -141,12 +162,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setAuthResult: async (token: string, user: User, refreshToken?: string) => {
     logInfo('auth.store.setAuthResult', { userId: user.sub, hasRefreshToken: Boolean(refreshToken) });
+    const nextAuthStateVersion = get().authStateVersion + 1;
     set({
       token,
       user,
       isAuthenticated: true,
       authStatus: 'authenticated',
+      authSyncStatus: 'idle',
+      authSyncSource: null,
+      authSyncError: null,
       forceInteractiveAuth: false,
+      authStateVersion: nextAuthStateVersion,
       error: null,
     });
 
@@ -236,6 +262,41 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 
+  beginAuthSync: (source: 'login' | 'restore') => {
+    set({
+      authSyncStatus: 'syncing',
+      authSyncSource: source,
+      authSyncError: null,
+    });
+  },
+
+  finishAuthSync: () => {
+    set({
+      authSyncStatus: 'ready',
+      authSyncSource: null,
+      authSyncError: null,
+    });
+  },
+
+  failAuthSync: (message: string) => {
+    set({
+      authSyncStatus: 'failed',
+      authSyncSource: null,
+      authSyncError: message,
+    });
+  },
+
+  requireReauth: (message: string) => {
+    set({
+      token: null,
+      authStatus: 'reauthRequired',
+      authSyncStatus: 'failed',
+      authSyncSource: null,
+      authSyncError: message,
+      error: message,
+    });
+  },
+
   logout: async () => {
     logInfo('auth.store.logout.start');
     const nextAuthStateVersion = get().authStateVersion + 1;
@@ -244,6 +305,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       token: null,
       isAuthenticated: false,
       authStatus: 'anonymous',
+      authSyncStatus: 'idle',
+      authSyncSource: null,
+      authSyncError: null,
       forceInteractiveAuth: true,
       authStateVersion: nextAuthStateVersion,
       error: null,
@@ -279,6 +343,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           token: null,
           isAuthenticated: false,
           authStatus: 'anonymous',
+          authSyncStatus: 'idle',
+          authSyncSource: null,
+          authSyncError: null,
           forceInteractiveAuth: false,
           isInitialized: true,
           isRestoring: false,
@@ -303,6 +370,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           token: null,
           isAuthenticated: false,
           authStatus: 'anonymous',
+          authSyncStatus: 'idle',
+          authSyncSource: null,
+          authSyncError: null,
           forceInteractiveAuth: false,
           isInitialized: true,
           isRestoring: false,
@@ -331,6 +401,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           token: null,
           isAuthenticated: false,
           authStatus: 'anonymous',
+          authSyncStatus: 'idle',
+          authSyncSource: null,
+          authSyncError: null,
           forceInteractiveAuth: false,
           isInitialized: true,
           isRestoring: false,
@@ -356,6 +429,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         },
         isAuthenticated: true,
         authStatus: 'authenticated',
+        authSyncStatus: 'idle',
+        authSyncSource: null,
+        authSyncError: null,
         forceInteractiveAuth: false,
         isInitialized: true,
         isRestoring: false,
@@ -372,6 +448,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         token: null,
         isAuthenticated: false,
         authStatus: 'anonymous',
+        authSyncStatus: 'idle',
+        authSyncSource: null,
+        authSyncError: null,
         forceInteractiveAuth: false,
         isInitialized: true,
         isRestoring: false,
@@ -382,41 +461,63 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // Refresh the current access token
   refreshToken: async () => {
-    const authStateVersion = get().authStateVersion;
-    logInfo('auth.store.refresh.start', { authStateVersion });
-    const storedRefreshToken = await getRefreshToken();
-
-    if (!storedRefreshToken) {
-      logWarn('auth.store.refresh.no_refresh_token');
-      return false;
+    if (inflightRefreshToken) {
+      logWarn('auth.store.refresh.reused_inflight');
+      return inflightRefreshToken;
     }
 
-    const tokenResult = await refreshAccessToken(storedRefreshToken);
-    if (get().authStateVersion !== authStateVersion) {
-      logWarn('auth.store.refresh.version_changed');
-      return false;
-    }
+    inflightRefreshToken = (async () => {
+      const authStateVersion = get().authStateVersion;
+      logInfo('auth.store.refresh.start', { authStateVersion });
+      const storedRefreshToken = await getRefreshToken();
 
-    if (!tokenResult) {
-      logWarn('auth.store.refresh.failed');
-      // Force logout if refresh fails
-      get().logout();
-      return false;
-    }
+      if (!storedRefreshToken) {
+        logWarn('auth.store.refresh.no_refresh_token');
+        return false;
+      }
 
-    // Update stored refresh token if rotated
-    if (tokenResult.refreshToken) {
-      await storeRefreshToken(tokenResult.refreshToken);
-    }
+      const tokenResult = await refreshAccessToken(storedRefreshToken);
+      if (get().authStateVersion !== authStateVersion) {
+        logWarn('auth.store.refresh.version_changed');
+        return false;
+      }
 
-    await clearForceInteractiveAuth();
-    logInfo('auth.store.refresh.success');
+      if (!tokenResult) {
+        logWarn('auth.store.refresh.failed');
+        get().requireReauth('Session expired. Sign in again to refresh.');
+        return false;
+      }
 
-    set({
-      token: tokenResult.accessToken,
-      authStatus: 'authenticated',
-      forceInteractiveAuth: false,
+      // Update stored refresh token if rotated
+      if (tokenResult.refreshToken) {
+        await storeRefreshToken(tokenResult.refreshToken);
+      }
+
+      const userInfo = await fetchUserInfo(tokenResult.accessToken);
+      if (get().authStateVersion !== authStateVersion) {
+        logWarn('auth.store.refresh.version_changed_after_userinfo');
+        return false;
+      }
+
+      if (!userInfo || userInfo.sub !== get().user?.sub) {
+        logWarn('auth.store.refresh.userinfo_failed');
+        get().requireReauth('Session expired. Sign in again to refresh.');
+        return false;
+      }
+
+      await clearForceInteractiveAuth();
+      logInfo('auth.store.refresh.success');
+
+      set({
+        token: tokenResult.accessToken,
+        authStatus: 'authenticated',
+        forceInteractiveAuth: false,
+      });
+      return true;
+    })().finally(() => {
+      inflightRefreshToken = null;
     });
-    return true;
+
+    return inflightRefreshToken;
   },
 }));

@@ -17,6 +17,8 @@ import { useAuthStore } from '../state/useAuthStore';
 import { clearGuestCache } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
 import { clearDebugLogs, getDebugLogText, logInfo } from '../services/debugLog';
+import { logoutWithAuth0 } from '../services/authFlow';
+import { APP_VERSION } from '../constants/version';
 
 const DONATION_URL = process.env.EXPO_PUBLIC_DONATION_URL || 'https://www.buymeacoffee.com';
 const FEEDBACK_URL = process.env.EXPO_PUBLIC_FEEDBACK_URL || 'mailto:feedback@pundit-trivia.com';
@@ -27,14 +29,14 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ visible, onClose }: SettingsModalProps) {
-  const { user, isAuthenticated, error, logout, clearError } = useAuthStore();
+  const { user, isAuthenticated, error, clearError } = useAuthStore();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCopyingLogs, setIsCopyingLogs] = React.useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     clearError();
-    await logout();
+    await logoutWithAuth0();
     setIsLoggingOut(false);
     onClose();
   };
@@ -194,13 +196,13 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
             <Text style={styles.sectionTitle}>ABOUT</Text>
             <View style={styles.aboutCard}>
               <Text style={styles.aboutTitle}>Pundit Trivia</Text>
-              <Text style={styles.aboutVersion}>Version 0.1</Text>
+              <Text style={styles.aboutVersion}>Version {APP_VERSION}</Text>
               <Text style={styles.aboutDescription}>Daily football quiz</Text>
             </View>
           </View>
 
           {/* Guest Options - Only show if not logged in */}
-          {/*!isAuthenticated &&*/( 
+          {!isAuthenticated && ( 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>GUEST OPTIONS</Text>
               <TouchableOpacity style={styles.listItem} onPress={handleClearCache}>

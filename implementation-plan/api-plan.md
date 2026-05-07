@@ -1,33 +1,37 @@
-# API Plan (Current Contracts)
+# API Plan
 
 All APIs are Netlify Functions under `/.netlify/functions/`.
 
 ## Auth Model
-- Guest-compatible endpoints allow unauthenticated requests for `guest_*` IDs where explicitly supported.
+
+- Guest-compatible endpoints allow unauthenticated `guest_*` identities only where explicitly supported.
 - Protected flows require `Authorization: Bearer <access-token>`.
-- Server validates ownership by ensuring Auth0 `sub` matches requested `userId`.
+- Server validates Auth0 tokens through `/userinfo` and enforces `token.sub === userId`.
+- Client API calls include a defensive one-time retry for refreshed or changed tokens.
 
 ## Daily Quiz APIs
-- `GET /getDailyQuiz`
-  - Returns daily quiz payload by date/language.
-  - Payload includes options and `correctOptionIndex` by product decision to optimize in-app result UX.
-- `POST /submitQuiz`
-  - Accepts quiz answers (+ optional timing metadata).
-  - Validates payload shape, duplicate question IDs, and index bounds.
-  - Returns score + detailed answer correctness.
 
-## Profile/Stats APIs
+- `GET /getDailyQuiz` returns the daily quiz payload by date/language.
+- `GET /getTodayResult` checks whether an authenticated user has a persisted same-day result.
+- `POST /submitQuiz` accepts authenticated quiz answers and timing metadata.
+- `POST /migrateGuestResult` adopts a local guest result for an authenticated user when allowed.
+
+Guest daily plays do not call `submitQuiz` immediately; they are local-only until migration/adoption after login.
+
+## Profile APIs
+
 - `GET /getUserStats`
 - `POST /updateProfile`
 - `GET /checkUsername`
 - `POST /setUsername`
-- `POST /migrateGuestResult`
 
 ## Leaderboard APIs
+
 - `GET /getLeaderboard`
 - `GET /getFriendsLeaderboard`
 
 ## Challenge APIs
+
 - `POST /createChallenge`
 - `GET /getChallenge`
 - `POST /joinChallenge`
@@ -36,16 +40,13 @@ All APIs are Netlify Functions under `/.netlify/functions/`.
 - `GET /getUserChallenges`
 
 ## Friends APIs
+
 - `POST /createFriendLink`
 - `POST /acceptFriendLink`
 - `GET /getFriends`
 - `POST /removeFriend`
 
-## Time and Date Policy
-- Quiz day is computed using configured timezone, not hardcoded UTC.
-- Frontend and backend timezone env vars should match.
-
-
 ## Operational Instrumentation
-- Core read/write endpoints emit structured request lifecycle logs (`start`, `end`, `error`) with request IDs.
-- Log payloads include endpoint name, optional user ID, status, and duration for troubleshooting.
+
+- Core endpoints emit structured lifecycle logs with request IDs, endpoint names, status, user context where available, and duration.
+- Client-side debug logs capture API failures, auth transitions, bootstrap, daily-loop prefetch, and reconciliation behavior.

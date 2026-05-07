@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import * as AuthSession from 'expo-auth-session';
 import { useAuthStore } from '../state/useAuthStore';
-import { useAuthRequest, auth0Config } from '../services/auth0';
+import { useAuthRequest } from '../services/auth0';
 import { getUserId } from '../storage/userStorage';
 import { theme } from '../theme/theme';
 import { UserStats } from '../types';
@@ -21,6 +20,8 @@ import Avatar from '../components/Avatar';
 import UsernameModal from '../components/UsernameModal';
 import EditProfileModal from '../components/EditProfileModal';
 import { useProfileStore } from '../state/useProfileStore';
+import AuthSyncScreen from '../components/AuthSyncScreen';
+import { loginWithAuth0 } from '../services/authFlow';
 
 const EMPTY_STATS: UserStats = {
   streak: 0,
@@ -44,39 +45,24 @@ export default function MeScreen() {
     isAuth0Available,
     token,
     forceInteractiveAuth,
-    setAuthResult,
     setUsername,
     setDisplayName,
     setUsernameRequired,
-    clearError,
   } = useAuthStore();
   const [authLoadingIntent, setAuthLoadingIntent] = useState<'signup' | 'login' | null>(null);
-  const handledAuthCodeRef = useRef<string | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [signupRequest, signupResponse, promptSignup] = useAuthRequest({
+  const [signupRequest, , promptSignup] = useAuthRequest({
     intent: 'signup',
     forceInteractive: forceInteractiveAuth,
   });
-  const [loginRequest, loginResponse, promptLogin] = useAuthRequest({
+  const [loginRequest, , promptLogin] = useAuthRequest({
     intent: 'login',
     forceInteractive: true,
   });
-
-  useFocusEffect(
-    useCallback(() => {
-      if (isAuthenticated && user?.sub) {
-        void revalidate(user.sub);
-        return;
-      }
-
-      void getUserId().then((guestUserId) => {
-        void revalidate(guestUserId);
-      });
-    }, [isAuthenticated, revalidate, user?.sub])
-  );
 
   useEffect(() => {
     if (!isAuthenticated || !user || !token || !stats || profileLoading || statsUserId !== user.sub) {
@@ -85,7 +71,7 @@ export default function MeScreen() {
 
     if (stats.username && stats.username !== user.username) {
       setUsername(stats.username);
-    } else if (!user.username) {
+    } else if (user.usernameRequired && !user.username) {
       setUsernameRequired(true);
       setShowUsernameModal(true);
     }
@@ -105,95 +91,49 @@ export default function MeScreen() {
     profileLoading,
   ]);
 
-  useEffect(() => {
-    if (authLoadingIntent !== 'signup') {
-      return;
-    }
-
-    if (signupResponse?.type === 'success') {
-      const { code } = signupResponse.params;
-      if (handledAuthCodeRef.current === code) {
-        return;
-      }
-      handledAuthCodeRef.current = code;
-      void exchangeCodeForToken(code, signupRequest?.codeVerifier);
-    } else if (signupResponse) {
-      if (signupResponse.type === 'error') {
-        console.error('Auth error:', signupResponse.error);
-      }
-      setAuthLoadingIntent(null);
-    }
-  }, [authLoadingIntent, signupRequest?.codeVerifier, signupResponse]);
-
-  useEffect(() => {
-    if (authLoadingIntent !== 'login') {
-      return;
-    }
-
-    if (loginResponse?.type === 'success') {
-      const { code } = loginResponse.params;
-      if (handledAuthCodeRef.current === code) {
-        return;
-      }
-      handledAuthCodeRef.current = code;
-      void exchangeCodeForToken(code, loginRequest?.codeVerifier);
-    } else if (loginResponse) {
-      if (loginResponse.type === 'error') {
-        console.error('Auth error:', loginResponse.error);
-      }
-      setAuthLoadingIntent(null);
-    }
-  }, [authLoadingIntent, loginRequest?.codeVerifier, loginResponse]);
-
-  const exchangeCodeForToken = async (code: string, codeVerifier?: string) => {
+  const handleSignup = async () => {
+    setAuthLoadingIntent('signup');
     try {
-      const redirectUri = AuthSession.makeRedirectUri({
-        scheme: 'pundit-app',
+      await loginWithAuth0({
+        intent: 'signup',
+        request: signupRequest,
+        promptAsync: promptSignup,
       });
-
-      const tokenResponse = await AuthSession.exchangeCodeAsync(
-        {
-          code,
-          clientId: auth0Config.clientId || '',
-          redirectUri,
-          extraParams: {
-            code_verifier: codeVerifier || '',
-          },
-        },
-        {
-          tokenEndpoint: auth0Config.tokenEndpoint,
-        }
-      );
-
-      const { accessToken, refreshToken } = tokenResponse;
-      const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      const userInfo = await userInfoResponse.json();
-      setAuthResult(accessToken, userInfo, refreshToken);
-      setAuthLoadingIntent(null);
     } catch (error) {
       console.error('Token exchange error:', error);
-      handledAuthCodeRef.current = null;
+    } finally {
       setAuthLoadingIntent(null);
     }
-  };
-
-  const handleSignup = async () => {
-    handledAuthCodeRef.current = null;
-    setAuthLoadingIntent('signup');
-    clearError();
-    await promptSignup({ preferEphemeralSession: true });
   };
 
   const handleLogin = async () => {
-    handledAuthCodeRef.current = null;
     setAuthLoadingIntent('login');
-    clearError();
-    await promptLogin({ preferEphemeralSession: true });
+    try {
+      await loginWithAuth0({
+        intent: 'login',
+        request: loginRequest,
+        promptAsync: promptLogin,
+      });
+    } catch (error) {
+      console.error('Token exchange error:', error);
+    } finally {
+      setAuthLoadingIntent(null);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if (isAuthenticated && user?.sub) {
+        await revalidate(user.sub);
+        return;
+      }
+
+      const guestUserId = await getUserId();
+      await revalidate(guestUserId);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleUsernameSuccess = (username: string) => {
@@ -235,6 +175,10 @@ export default function MeScreen() {
 
   const localStats = stats ?? EMPTY_STATS;
 
+  if (authLoadingIntent !== null) {
+    return <AuthSyncScreen />;
+  }
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -256,7 +200,7 @@ export default function MeScreen() {
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={handleSignup}
-                disabled={authLoadingIntent !== null}
+                disabled={authLoadingIntent !== null || !signupRequest}
               >
                 {authLoadingIntent === 'signup' ? (
                   <ActivityIndicator size="small" color={theme.colors.white} />
@@ -267,7 +211,7 @@ export default function MeScreen() {
 
               <TouchableOpacity
                 onPress={handleLogin}
-                disabled={authLoadingIntent !== null}
+                disabled={authLoadingIntent !== null || !loginRequest}
                 style={styles.loginLink}
               >
                 {authLoadingIntent === 'login' ? (
@@ -301,6 +245,13 @@ export default function MeScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
       >
         <View style={styles.profileSection}>
           <Avatar

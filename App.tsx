@@ -28,7 +28,7 @@ function AppContent() {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       logInfo('app.state.change', { nextState, hasSeenActiveState: hasSeenActiveState.current });
       if (nextState === 'active' && hasSeenActiveState.current) {
-        void prefetchDailyLoop();
+        void prefetchDailyLoop({ mode: 'public-warm' });
       }
 
       if (nextState === 'active') {

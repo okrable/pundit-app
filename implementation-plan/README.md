@@ -1,51 +1,54 @@
-# Pundit Trivia — Implementation Plan
+# Pundit Trivia - Implementation Plan
 
-> **Last Updated**: February 2026
-> **Status**: Active product with Daily Quiz + Challenge Mode shipped
-> **Source of Truth**: This folder is authoritative for planning and execution status.
-
-## Purpose
-This folder documents what is **actually shipped**, what is **currently being hardened**, and what is **next**. It is designed so new tasks inherit correct assumptions.
+> Last updated: v1.1.0 documentation refresh
+> Status: Active product with Daily Quiz, Challenge Mode, Friends, Auth0, and refreshed gameplay shipped
+> Source of truth: This folder documents current behavior and near-term hardening.
 
 ## Product Status Snapshot
 
-### ✅ Delivered (Production features)
-- Daily 5-question quiz flow (fetch, play, submit, results)
-- Speed-based scoring (0–500 total)
-- Daily leaderboard + personal stats
-- Branded startup bootstrap with cached-first hydration
-- Stale-first quiz/profile/leaderboard loading for warm opens
-- Local-first result reveal with background sync/finalization
-- Me profile page + settings modal
-- Guest mode + optional Auth0 sign-in
-- Server-side Auth0 ownership checks on protected endpoints (`token.sub === userId`)
-- Configurable quiz-day timezone with London default (`Europe/London`)
-- Challenge mode (create, join, play, reveal), including challenge history + W/L/D stats
-- Friend links, friend list, and friends leaderboard endpoints/UI
+### Delivered
 
-### 🚧 In Progress / Hardening
-- React error boundaries + crash-recovery UX
-- Offline answer queue for retry-on-reconnect
-- Endpoint-level rate limiting / abuse protection
-- API observability (structured logging + alerting)
+- Daily 5-question football quiz with local-first play and same-day replay prevention.
+- Refreshed shared gameplay UI for daily quiz and challenge mode.
+- Typewriter question pacing, delayed option reveal, timer start after full reveal, and content-only question transitions.
+- Smooth circular timer with numeric seconds, urgency styling, and post-zero minimum-score behavior.
+- Suspense-based answer reveal with locked/correct/incorrect message pairs.
+- Immediate daily summary screen with final score, answer recap, and native text sharing.
+- Cached completed screen for already-played daily state.
+- Guest mode with local-only daily results.
+- Auth0 accounts, Me profile, username/display-name support, and settings.
+- Centralized auth flow with post-login quiz reconciliation and first data prefetch behind `AuthSyncScreen`.
+- Guest-to-auth daily result migration/adoption where applicable.
+- Global leaderboard, friends leaderboard, friend links, and async challenge mode.
+- Branded bootstrap, stale-first cache hydration, and debug-log export.
 
-### 📋 Planned (after hardening)
-- Push notifications
-- Quiz archives / historical play
-- Analytics / telemetry
+### Hardening Remaining
+
+- App-level error boundaries and crash-recovery UX.
+- Offline answer queue with retry-on-reconnect.
+- Endpoint-level rate limiting and abuse controls.
+- API observability and alerting.
+- Product analytics.
 
 ## Canonical Docs in This Folder
-Read in this order:
-1. `scope.md` — current boundaries, delivered behavior, non-goals
-2. `execution-plan.md` — phase progress + next milestones
-3. `api-plan.md` — endpoint contracts and auth rules
-4. `data-contracts.md` — payloads and DB-facing shapes
-5. `performance-bootstrap.md` — startup bootstrap, stale-first caches, and background refresh
-6. `assumptions-and-todos.md` — active TODOs and known limitations
-7. `features/` — feature-specific implementation notes
 
-## Maintenance Rules (Strict)
-- Any significant behavior change must update docs in this folder in the same PR.
-- If two docs disagree, update them immediately; do not leave drift.
-- Prefer concise, current-state documentation over historical commentary.
-- Archive or delete docs that only describe superseded plans.
+Read in this order:
+
+1. `scope.md` - product boundaries and non-goals.
+2. `execution-plan.md` - delivered milestones and active hardening.
+3. `architecture.md` - runtime topology and cross-cutting decisions.
+4. `frontend-plan.md` - current screen/component flow.
+5. `api-plan.md` - endpoint groups and auth rules.
+6. `data-contracts.md` - primary payload and persistence shapes.
+7. `performance-bootstrap.md` - bootstrap, cache, auth sync, and daily-loop model.
+8. `assumptions-and-todos.md` - current assumptions, TODOs, and limitations.
+9. `features/` - feature-specific notes.
+
+## Maintenance Rules
+
+- Update these docs in the same change as any meaningful behavior change.
+- Keep `CHANGELOG.md`, `package.json`, `app.json`, and `app/constants/version.ts` aligned for release/version changes.
+- Agents should classify completed work before handoff and increment SemVer only when the work warrants a release checkpoint: patch for fixes, minor for user-visible features/meaningful UX changes, major for breaking product, scoring, storage, auth, or compatibility changes.
+- Settings must display the version from `APP_VERSION`; do not hard-code version text in UI components.
+- Prefer current-state documentation over historical planning notes.
+- Remove or rewrite superseded plans instead of leaving contradictory details.

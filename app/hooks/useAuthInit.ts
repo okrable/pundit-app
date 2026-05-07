@@ -10,10 +10,7 @@ export default function useAuthInit(): boolean {
     let isMounted = true;
     logInfo('auth.init.start', { isAuth0Available });
     const bootstrapTimeout = setTimeout(() => {
-      if (isMounted) {
-        logWarn('auth.init.timeout');
-        setIsReady(true);
-      }
+      logWarn('auth.init.timeout');
     }, 2000);
 
     async function initAuth() {
@@ -21,10 +18,8 @@ export default function useAuthInit(): boolean {
         if (isAuth0Available) {
           await bootstrapFromStorage();
           logInfo('auth.init.bootstrap.complete');
-          if (isMounted) {
-            setIsReady(true);
-          }
-          void restoreAuthState();
+          await restoreAuthState();
+          logInfo('auth.init.restore.complete');
           return;
         }
       } catch (error) {

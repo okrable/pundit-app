@@ -1,24 +1,21 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import QuestionCard from '../components/QuestionCard';
 import ResultsScreen from '../components/ResultsScreen';
 import WelcomeScreen from '../components/WelcomeScreen';
 import CompletedQuizScreen from '../components/CompletedQuizScreen';
+import AuthSyncScreen from '../components/AuthSyncScreen';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
-import {
-  clearGuestCache,
-  getGuestTodayResult,
-  getTodayQuizResult,
-  saveDailyQuizResult,
-} from '../storage/quizStorage';
-import { getTodayResult, migrateGuestResult } from '../services/api';
+import { getTodayQuizResult } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
 
-const AUTO_ADVANCE_DELAY = 2000;
+const REVEAL_SUSPENSE_DELAY = 1000;
+const RESULT_HOLD_DELAY = 1650;
+const QUESTION_EXIT_DELAY = 1700;
 const TIMER_DURATION = 20;
 
 function calculatePoints(timeRemaining: number): number {
@@ -40,7 +37,10 @@ export default function DailyQuizScreen() {
   const [timerActive, setTimerActive] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(TIMER_DURATION);
   const [answerTimings, setAnswerTimings] = useState<Record<string, number>>({});
+  const [isQuestionExiting, setIsQuestionExiting] = useState(false);
+  const revealTimer = useRef<NodeJS.Timeout | null>(null);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
+  const questionExitTimer = useRef<NodeJS.Timeout | null>(null);
 
   const {
     quiz,
@@ -48,14 +48,44 @@ export default function DailyQuizScreen() {
     quizError,
     submitError,
     result,
+    userId: quizUserId,
+    isReconcilingIdentity,
     fetchQuiz,
     submitQuizAnswers,
     createLocalResult,
+    reconcileIdentity,
     setUserId,
     setCachedResult,
     resetQuiz,
   } = useQuizStore();
   const { user, isAuthenticated, token } = useAuthStore();
+
+  const clearQuestionTimers = () => {
+    if (revealTimer.current) {
+      clearTimeout(revealTimer.current);
+      revealTimer.current = null;
+    }
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
+    if (questionExitTimer.current) {
+      clearTimeout(questionExitTimer.current);
+      questionExitTimer.current = null;
+    }
+  };
+
+  const resetPlayState = () => {
+    clearQuestionTimers();
+    setCurrentQuestionIndex(0);
+    setAnswers({});
+    setShowingResult(false);
+    setScore(0);
+    setTimerActive(false);
+    setTimeRemaining(TIMER_DURATION);
+    setAnswerTimings({});
+    setIsQuestionExiting(false);
+  };
 
   useEffect(() => {
     const loadWarmState = async () => {
@@ -76,96 +106,47 @@ export default function DailyQuizScreen() {
 
   useEffect(() => {
     if (quiz) {
-      setCurrentQuestionIndex(0);
-      setAnswers({});
-      setShowingResult(false);
-      setScore(0);
-      setTimerActive(false);
-      setTimeRemaining(TIMER_DURATION);
-      setAnswerTimings({});
+      resetPlayState();
     }
   }, [quiz?.id]);
 
-  useEffect(() => {
-    if (!isAuthenticated || !user || !token) {
+  useLayoutEffect(() => {
+    if (!isAuthenticated || !user) {
       return;
     }
 
-    let isActive = true;
+    resetPlayState();
+    setQuizStarted(false);
 
-    const reconcileAuthenticatedState = async () => {
-      const localResult = await getTodayQuizResult(user.sub);
-      if (localResult) {
-        setCachedResult(localResult);
-        await clearGuestCache();
-        return;
-      }
+    if (!token) {
+      return;
+    }
 
-      try {
-        const dbResult = await getTodayResult(user.sub);
-        if (dbResult && isActive) {
-          await clearGuestCache();
-          await saveDailyQuizResult(dbResult, user.sub, dbResult.syncState);
-          const cachedDbResult = await getTodayQuizResult(user.sub);
-          setCachedResult(cachedDbResult);
-          return;
-        }
-      } catch (error) {
-        console.error('Error fetching today result:', error);
-      }
+    void reconcileIdentity(user.sub, {
+      displayName: user.name,
+      email: user.email,
+      avatarUrl: user.picture,
+    });
+  }, [isAuthenticated, reconcileIdentity, token, user]);
 
-      const guestResult = await getGuestTodayResult();
-      if (!guestResult) {
-        return;
-      }
+  useLayoutEffect(() => {
+    if (!isReconcilingIdentity) {
+      return;
+    }
 
-      try {
-        const migrationResult = await migrateGuestResult(
-          user.sub,
-          guestResult.quizId,
-          guestResult.score,
-          guestResult.totalQuestions,
-          guestResult.answers,
-          {
-            displayName: user.name,
-            email: user.email,
-            avatarUrl: user.picture,
-          }
-        );
-
-        const migratedResult = {
-          ...guestResult,
-          streak: migrationResult.streak,
-          bestScore: migrationResult.bestScore,
-          userId: user.sub,
-        };
-
-        await clearGuestCache();
-        await saveDailyQuizResult(migratedResult, user.sub, migratedResult.syncState);
-        if (isActive) {
-          setCachedResult({
-            ...migratedResult,
-            cachedAt: new Date().toISOString(),
-          });
-        }
-      } catch (migrationError) {
-        console.error('Error migrating guest result:', migrationError);
-        await clearGuestCache();
-      }
-    };
-
-    void reconcileAuthenticatedState();
-
-    return () => {
-      isActive = false;
-    };
-  }, [isAuthenticated, setCachedResult, token, user]);
+    resetPlayState();
+    setQuizStarted(false);
+  }, [isReconcilingIdentity]);
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
       const syncCachedResult = async () => {
+        if (useQuizStore.getState().isReconcilingIdentity) {
+          return;
+        }
+
         const userId = isAuthenticated && user ? user.sub : await getUserId();
         const todayResult = await getTodayQuizResult(userId);
 
@@ -176,9 +157,7 @@ export default function DailyQuizScreen() {
         if (!todayResult && cachedResult) {
           setCachedResult(null);
           setQuizStarted(false);
-          setAnswers({});
-          setScore(0);
-          setCurrentQuestionIndex(0);
+          resetPlayState();
           resetQuiz();
           void fetchQuiz();
         } else if (todayResult && !cachedResult) {
@@ -194,63 +173,92 @@ export default function DailyQuizScreen() {
     }, [cachedResult, fetchQuiz, isAuthenticated, resetQuiz, setCachedResult, user])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        const state = useQuizStore.getState();
+        if (state.result && state.cachedResult) {
+          state.resetQuiz();
+        }
+      };
+    }, [])
+  );
+
   useEffect(() => {
     return () => {
+      if (revealTimer.current) {
+        clearTimeout(revealTimer.current);
+      }
       if (autoAdvanceTimer.current) {
         clearTimeout(autoAdvanceTimer.current);
+      }
+      if (questionExitTimer.current) {
+        clearTimeout(questionExitTimer.current);
       }
     };
   }, []);
 
   const handleSelectOption = (questionId: string, optionIndex: number) => {
-    if (showingResult) return;
+    if (showingResult || answers[questionId] !== undefined) return;
 
     const currentQuestion = quiz?.questions[currentQuestionIndex];
     if (!currentQuestion) return;
 
     setTimerActive(false);
     const capturedTime = timeRemaining;
+    const updatedAnswers = { ...answers, [questionId]: optionIndex };
+    const updatedTimings = { ...answerTimings, [questionId]: capturedTime * 1000 };
 
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: optionIndex,
-    }));
-    setAnswerTimings((prev) => ({
-      ...prev,
-      [questionId]: capturedTime * 1000,
-    }));
+    setAnswers(updatedAnswers);
+    setAnswerTimings(updatedTimings);
 
     const isCorrect = currentQuestion.correctOptionIndex === optionIndex;
-    if (isCorrect) {
-      const points = calculatePoints(capturedTime);
-      setScore((prev) => prev + points);
+    const points = isCorrect ? calculatePoints(capturedTime) : 0;
+
+    if (revealTimer.current) {
+      clearTimeout(revealTimer.current);
+    }
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+    }
+    if (questionExitTimer.current) {
+      clearTimeout(questionExitTimer.current);
     }
 
-    setShowingResult(true);
-
-    autoAdvanceTimer.current = setTimeout(() => {
-      setShowingResult(false);
-
-      const isLastQuestion = currentQuestionIndex === (quiz?.questions.length ?? 0) - 1;
-
-      if (isLastQuestion) {
-        const updatedAnswers = { ...answers, [questionId]: optionIndex };
-        const updatedTimings = { ...answerTimings, [questionId]: capturedTime * 1000 };
-        const formattedAnswers = Object.entries(updatedAnswers).map(
-          ([qId, selectedOptionIndex]) => ({
-            questionId: qId,
-            selectedOptionIndex,
-            timeRemainingMs: updatedTimings[qId] ?? 0,
-          })
-        );
-
-        void createLocalResult(formattedAnswers);
-        void submitQuizAnswers(formattedAnswers);
-      } else {
-        setCurrentQuestionIndex((prev) => prev + 1);
-        setTimeRemaining(TIMER_DURATION);
+    revealTimer.current = setTimeout(() => {
+      if (points > 0) {
+        setScore((prev) => prev + points);
       }
-    }, AUTO_ADVANCE_DELAY);
+
+      setShowingResult(true);
+
+      autoAdvanceTimer.current = setTimeout(() => {
+        setIsQuestionExiting(true);
+
+        questionExitTimer.current = setTimeout(() => {
+          setShowingResult(false);
+          setIsQuestionExiting(false);
+
+          const isLastQuestion = currentQuestionIndex === (quiz?.questions.length ?? 0) - 1;
+
+          if (isLastQuestion) {
+            const formattedAnswers = Object.entries(updatedAnswers).map(
+              ([qId, selectedOptionIndex]) => ({
+                questionId: qId,
+                selectedOptionIndex,
+                timeRemainingMs: updatedTimings[qId] ?? 0,
+              })
+            );
+
+            void createLocalResult(formattedAnswers);
+            void submitQuizAnswers(formattedAnswers);
+          } else {
+            setCurrentQuestionIndex((prev) => prev + 1);
+            setTimeRemaining(TIMER_DURATION);
+          }
+        }, QUESTION_EXIT_DELAY);
+      }, RESULT_HOLD_DELAY);
+    }, REVEAL_SUSPENSE_DELAY);
   };
 
   const handleTimeUp = () => {
@@ -269,12 +277,8 @@ export default function DailyQuizScreen() {
       : null;
 
   const handleCloseResults = async () => {
-    setAnswers({});
-    setScore(0);
+    resetPlayState();
     setQuizStarted(false);
-    setTimerActive(false);
-    setTimeRemaining(TIMER_DURATION);
-    setAnswerTimings({});
     resetQuiz();
 
     const userId = isAuthenticated && user ? user.sub : await getUserId();
@@ -286,6 +290,7 @@ export default function DailyQuizScreen() {
   };
 
   const handleStartQuiz = () => {
+    resetPlayState();
     if (quiz) {
       setQuizStarted(true);
       return;
@@ -303,6 +308,23 @@ export default function DailyQuizScreen() {
         ? 'Today’s questions are warming up.'
         : null;
 
+  const shouldShowReconciliation =
+    isReconcilingIdentity ||
+    Boolean(isAuthenticated && user?.sub && token && quizUserId !== user.sub);
+
+  if (shouldShowReconciliation) {
+    return (
+      <AuthSyncScreen
+        title="Syncing your play..."
+        subtitle="Just getting today’s result ready."
+      />
+    );
+  }
+
+  if (result && quiz) {
+    return <ResultsScreen result={result} quiz={quiz} onPlayAgain={handleCloseResults} />;
+  }
+
   if (cachedResult) {
     return <CompletedQuizScreen result={cachedResult} />;
   }
@@ -315,10 +337,6 @@ export default function DailyQuizScreen() {
         helperText={helperText}
       />
     );
-  }
-
-  if (result && quiz) {
-    return <ResultsScreen result={result} quiz={quiz} onPlayAgain={handleCloseResults} />;
   }
 
   if (!quiz) {
@@ -345,10 +363,10 @@ export default function DailyQuizScreen() {
         >
           {currentQuestion && (
             <QuestionCard
-              key={currentQuestion.id}
               question={currentQuestion}
               selectedOption={currentAnswer}
               onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
+              isExiting={isQuestionExiting}
               showResult={showingResult}
               correctOptionIndex={currentQuestion.correctOptionIndex}
               isHolding={isHolding}

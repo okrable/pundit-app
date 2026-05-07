@@ -14,9 +14,11 @@ import { useChallengeStore } from '../state/useChallengeStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
 import { theme } from '../theme/theme';
-import type { AnswerWithTiming, ChallengeSubmitResult } from '../types';
+import type { AnswerWithTiming } from '../types';
 
-const AUTO_ADVANCE_DELAY = 2000;
+const REVEAL_SUSPENSE_DELAY = 1000;
+const RESULT_HOLD_DELAY = 1650;
+const QUESTION_EXIT_DELAY = 1700;
 const TIMER_DURATION = 20;
 
 function calculatePoints(timeRemaining: number): number {
@@ -42,8 +44,11 @@ export default function ChallengeQuizScreen() {
   const [timeRemaining, setTimeRemaining] = useState(TIMER_DURATION);
   const [answerTimings, setAnswerTimings] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [isQuestionExiting, setIsQuestionExiting] = useState(false);
 
+  const revealTimer = useRef<NodeJS.Timeout | null>(null);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
+  const questionExitTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const loadUserId = async () => {
@@ -55,8 +60,14 @@ export default function ChallengeQuizScreen() {
 
   useEffect(() => {
     return () => {
+      if (revealTimer.current) {
+        clearTimeout(revealTimer.current);
+      }
       if (autoAdvanceTimer.current) {
         clearTimeout(autoAdvanceTimer.current);
+      }
+      if (questionExitTimer.current) {
+        clearTimeout(questionExitTimer.current);
       }
     };
   }, []);
@@ -71,66 +82,83 @@ export default function ChallengeQuizScreen() {
       setTimerActive(false);
       setTimeRemaining(TIMER_DURATION);
       setAnswerTimings({});
+      setIsQuestionExiting(false);
     }
   }, [currentChallenge?.challengeId]);
 
   const handleSelectOption = async (questionId: string, optionIndex: number) => {
-    if (showingResult || !currentChallenge || !userId) return;
+    if (showingResult || answers[questionId] !== undefined || !currentChallenge || !userId) return;
 
     const currentQuestion = currentChallenge.questions[currentQuestionIndex];
     if (!currentQuestion) return;
 
     setTimerActive(false);
     const capturedTime = timeRemaining;
+    const updatedAnswers = { ...answers, [questionId]: optionIndex };
+    const updatedTimings = { ...answerTimings, [questionId]: capturedTime * 1000 };
 
-    setAnswers((prev) => ({ ...prev, [questionId]: optionIndex }));
-    setAnswerTimings((prev) => ({ ...prev, [questionId]: capturedTime * 1000 }));
+    setAnswers(updatedAnswers);
+    setAnswerTimings(updatedTimings);
 
     const isCorrect = currentQuestion.correctOptionIndex === optionIndex;
-    if (isCorrect) {
-      const points = calculatePoints(capturedTime);
-      setScore((prev) => prev + points);
+    const points = isCorrect ? calculatePoints(capturedTime) : 0;
+
+    if (revealTimer.current) {
+      clearTimeout(revealTimer.current);
+    }
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+    }
+    if (questionExitTimer.current) {
+      clearTimeout(questionExitTimer.current);
     }
 
-    setShowingResult(true);
-
-    autoAdvanceTimer.current = setTimeout(async () => {
-      setShowingResult(false);
-
-      const isLastQuestion = currentQuestionIndex === currentChallenge.questions.length - 1;
-
-      if (isLastQuestion) {
-        // Submit answers
-        setSubmitting(true);
-        const updatedAnswers = { ...answers, [questionId]: optionIndex };
-        const updatedTimings = { ...answerTimings, [questionId]: capturedTime * 1000 };
-
-        const formattedAnswers: AnswerWithTiming[] = Object.entries(updatedAnswers).map(
-          ([qId, selectedOptionIndex]) => ({
-            questionId: qId,
-            selectedOptionIndex,
-            timeRemainingMs: updatedTimings[qId] ?? 0,
-          })
-        );
-
-        try {
-          const result = await submitAnswers(userId, formattedAnswers);
-          // Navigate to results screen with the result
-          navigation.replace('ChallengeResults', {
-            result,
-            code: currentChallenge.code,
-            opponentName: currentChallenge.opponentName,
-            isCreator: currentChallenge.isCreator,
-          });
-        } catch (error) {
-          console.error('Failed to submit answers:', error);
-          setSubmitting(false);
-        }
-      } else {
-        setCurrentQuestionIndex((prev) => prev + 1);
-        setTimeRemaining(TIMER_DURATION);
+    revealTimer.current = setTimeout(() => {
+      if (points > 0) {
+        setScore((prev) => prev + points);
       }
-    }, AUTO_ADVANCE_DELAY);
+
+      setShowingResult(true);
+
+      autoAdvanceTimer.current = setTimeout(async () => {
+        setIsQuestionExiting(true);
+
+        questionExitTimer.current = setTimeout(async () => {
+          setShowingResult(false);
+          setIsQuestionExiting(false);
+
+          const isLastQuestion = currentQuestionIndex === currentChallenge.questions.length - 1;
+
+          if (isLastQuestion) {
+            setSubmitting(true);
+
+            const formattedAnswers: AnswerWithTiming[] = Object.entries(updatedAnswers).map(
+              ([qId, selectedOptionIndex]) => ({
+                questionId: qId,
+                selectedOptionIndex,
+                timeRemainingMs: updatedTimings[qId] ?? 0,
+              })
+            );
+
+            try {
+              const result = await submitAnswers(userId, formattedAnswers);
+              navigation.replace('ChallengeResults', {
+                result,
+                code: currentChallenge.code,
+                opponentName: currentChallenge.opponentName,
+                isCreator: currentChallenge.isCreator,
+              });
+            } catch (error) {
+              console.error('Failed to submit answers:', error);
+              setSubmitting(false);
+            }
+          } else {
+            setCurrentQuestionIndex((prev) => prev + 1);
+            setTimeRemaining(TIMER_DURATION);
+          }
+        }, QUESTION_EXIT_DELAY);
+      }, RESULT_HOLD_DELAY);
+    }, REVEAL_SUSPENSE_DELAY);
   };
 
   const handleTimeUp = () => {
@@ -174,16 +202,6 @@ export default function ChallengeQuizScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      {/* Challenge Header */}
-      <View style={styles.challengeHeader}>
-        <Text style={styles.challengeLabel}>Challenge Mode</Text>
-        {currentChallenge.opponentName && (
-          <Text style={styles.opponentText}>
-            vs {currentChallenge.opponentName}
-          </Text>
-        )}
-      </View>
-
       <Pressable
         style={styles.pressable}
         onPressIn={() => setIsHolding(true)}
@@ -194,12 +212,28 @@ export default function ChallengeQuizScreen() {
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.challengeContext}>
+            <Text style={styles.challengeLabel}>Challenge Mode</Text>
+            {currentChallenge.opponentName ? (
+              <Text
+                style={styles.opponentText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
+              >
+                vs {currentChallenge.opponentName}
+              </Text>
+            ) : (
+              <Text style={styles.opponentText}>Code {currentChallenge.code}</Text>
+            )}
+          </View>
+
           {currentQuestion && (
             <QuestionCard
-              key={currentQuestion.id}
               question={currentQuestion}
               selectedOption={currentAnswer}
               onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
+              isExiting={isQuestionExiting}
               showResult={showingResult}
               correctOptionIndex={currentQuestion.correctOptionIndex}
               isHolding={isHolding}
@@ -248,23 +282,33 @@ const styles = StyleSheet.create({
     color: theme.colors.mediumGray,
     fontFamily: theme.fonts.gothamBook,
   },
-  challengeHeader: {
-    backgroundColor: theme.colors.accent,
-    paddingVertical: theme.spacing.sm,
+  challengeContext: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    minHeight: 28,
     paddingHorizontal: theme.spacing.lg,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderRadius: 999,
+    backgroundColor: '#EFE7D9',
+    borderWidth: 1,
+    borderColor: '#E0D6C7',
   },
   challengeLabel: {
-    fontSize: 14,
+    fontSize: 11,
     fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.white,
+    color: theme.colors.accent,
+    textTransform: 'uppercase',
   },
   opponentText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.white,
+    flex: 1,
+    marginLeft: theme.spacing.sm,
+    fontSize: 11,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.textDark,
+    textAlign: 'right',
   },
   scrollView: {
     flex: 1,
@@ -273,7 +317,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: theme.spacing.md,
-    paddingBottom: theme.spacing.lg,
+    flexGrow: 1,
   },
 });

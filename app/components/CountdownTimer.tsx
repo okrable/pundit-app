@@ -1,12 +1,22 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import Animated, {
+  Easing,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { theme } from '../theme/theme';
 
-const SIZE = 56;
-const STROKE_WIDTH = 4;
+const SIZE = 58;
+const STROKE_WIDTH = 5;
 const RADIUS = (SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface CountdownTimerProps {
   duration: number;
@@ -23,25 +33,56 @@ export default function CountdownTimer({
   timeRemaining,
   setTimeRemaining,
 }: CountdownTimerProps) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const progress = useSharedValue(timeRemaining / duration);
+  const pulse = useSharedValue(1);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasCalledTimeUpRef = useRef(false);
+  const onTimeUpRef = useRef(onTimeUp);
+  const setTimeRemainingRef = useRef(setTimeRemaining);
 
-  // Get color based on time remaining
   const getColor = () => {
     const ratio = timeRemaining / duration;
-    if (ratio > 0.5) return theme.colors.correct; // Green
-    if (ratio > 0.25) return '#FFA500'; // Orange
-    return theme.colors.incorrect; // Red
+    if (ratio > 0.5) return theme.colors.correct;
+    if (ratio > 0.25) return '#D88927';
+    return theme.colors.incorrect;
   };
 
-  // Countdown logic
   useEffect(() => {
+    onTimeUpRef.current = onTimeUp;
+    setTimeRemainingRef.current = setTimeRemaining;
+  }, [onTimeUp, setTimeRemaining]);
+
+  useEffect(() => {
+    if (!isActive || timeRemaining > 0) {
+      hasCalledTimeUpRef.current = false;
+    }
+  }, [isActive, timeRemaining]);
+
+  useEffect(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     if (isActive && timeRemaining > 0) {
+      progress.value = withTiming((timeRemaining - 1) / duration, {
+        duration: 1000,
+        easing: Easing.linear,
+      });
+
       intervalRef.current = setInterval(() => {
-        setTimeRemaining(timeRemaining - 1);
+        setTimeRemainingRef.current(Math.max(timeRemaining - 1, 0));
       }, 1000);
-    } else if (timeRemaining === 0 && isActive) {
-      onTimeUp();
+    } else {
+      progress.value = withTiming(timeRemaining / duration, {
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
+
+    if (isActive && timeRemaining === 0 && !hasCalledTimeUpRef.current) {
+      hasCalledTimeUpRef.current = true;
+      onTimeUpRef.current();
     }
 
     return () => {
@@ -49,40 +90,30 @@ export default function CountdownTimer({
         clearInterval(intervalRef.current);
       }
     };
-  }, [isActive, timeRemaining]);
+  }, [duration, isActive, progress, timeRemaining]);
 
-  // Pulse animation when time is low
   useEffect(() => {
     if (isActive && timeRemaining <= 5 && timeRemaining > 0) {
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      pulse.value = withSequence(
+        withTiming(1.08, { duration: 120, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) })
+      );
     }
-  }, [timeRemaining, isActive]);
+  }, [isActive, pulse, timeRemaining]);
+
+  const animatedCircleProps = useAnimatedProps(() => ({
+    strokeDashoffset: CIRCUMFERENCE * (1 - progress.value),
+  }));
+
+  const animatedContainerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
 
   const color = getColor();
-  const progress = timeRemaining / duration;
-  // strokeDashoffset: 0 = full circle, CIRCUMFERENCE = empty circle
-  const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        { transform: [{ scale: pulseAnim }] },
-      ]}
-    >
+    <Animated.View style={[styles.container, animatedContainerStyle]}>
       <Svg width={SIZE} height={SIZE} style={styles.svg}>
-        {/* Background circle (track) */}
         <Circle
           cx={SIZE / 2}
           cy={SIZE / 2}
@@ -91,8 +122,7 @@ export default function CountdownTimer({
           strokeWidth={STROKE_WIDTH}
           fill="transparent"
         />
-        {/* Progress circle */}
-        <Circle
+        <AnimatedCircle
           cx={SIZE / 2}
           cy={SIZE / 2}
           r={RADIUS}
@@ -100,12 +130,11 @@ export default function CountdownTimer({
           strokeWidth={STROKE_WIDTH}
           fill="transparent"
           strokeDasharray={CIRCUMFERENCE}
-          strokeDashoffset={strokeDashoffset}
+          animatedProps={animatedCircleProps}
           strokeLinecap="round"
           transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
         />
       </Svg>
-      {/* Center text */}
       <View style={styles.textContainer}>
         <Text style={[styles.timeText, { color }]}>
           {timeRemaining}
@@ -132,5 +161,6 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 18,
     fontFamily: theme.fonts.gothamBold,
+    fontVariant: ['tabular-nums'],
   },
 });

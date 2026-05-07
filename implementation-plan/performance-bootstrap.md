@@ -1,65 +1,68 @@
 # Performance Bootstrap and Daily-Loop Loading
 
 ## Objective
-Keep Pundit visually the same while making the Wordle-style daily loop feel instant on warm opens:
-- open app
-- land in a usable state immediately
-- play today’s quiz once
-- see the result instantly
-- compare against friends without waiting on fresh network data first
+
+Keep warm opens fast while avoiding stale identity flashes after login/logout.
 
 ## Startup Sequence
+
 1. Load fonts.
-2. Hydrate cached auth/session metadata from local storage.
-3. Hydrate cached daily-loop resources from storage:
-   - today quiz
-   - today result
-   - profile stats
-   - friends leaderboard
-   - global leaderboard
-4. Render the app shell.
-5. Refresh auth and network-backed daily-loop resources in the background.
+2. Restore cached auth/session metadata.
+3. Hydrate cached daily-loop resources:
+   - today quiz;
+   - today result;
+   - profile stats;
+   - friends leaderboard;
+   - global leaderboard.
+4. Render the app shell from cached state where safe.
+5. Revalidate auth and network-backed resources in the background.
+
+## Auth Sync Sequence
+
+Login and cached-session restore both run the same authenticated sync path before normal tabs are released:
+
+1. Prompt Auth0 with Expo AuthSession.
+2. Exchange the authorization code once using the matching redirect URI and PKCE verifier.
+3. Store credentials and user info.
+4. Reconcile guest/auth daily result state.
+5. Prefetch profile, quiz, global leaderboard, and friends leaderboard data.
+6. Release the UI from `AuthSyncScreen`.
+
+Screens do not process AuthSession responses directly, and normal Me/Leaderboard navigation should not trigger protected refreshes after this transaction has completed.
 
 ## Cache Strategy
 
 ### Quiz
+
 - Keyed by quiz date.
 - Warm opens prefer cached quiz data first.
-- Revalidated in the background if stale.
+- Stale data is revalidated in the background.
 
 ### Same-Day Result
-- Stored per user (guest vs authenticated).
-- Used to prevent replay and to show the completed state immediately on warm opens.
-- Can be marked as `pending`, `synced`, or `failed` to reflect background submit state.
 
-### Profile Stats
-- Cached per authenticated user.
-- Me screen renders cached stats first, then silently refreshes when possible.
+- Stored per identity.
+- Guest and authenticated results are separate until reconciliation.
+- Used to prevent replay and show completed state immediately.
+- Can carry sync status for pending/failed authenticated submission paths.
 
-### Leaderboards
-- Global leaderboard is cached separately from the friends leaderboard.
-- Authenticated users default to the friends leaderboard.
-- Both views can render from cache on warm open and refresh in the background.
+### Profile and Leaderboards
+
+- Profile stats are cached per authenticated user.
+- Friends and global leaderboards are cached separately.
+- Me and League Tables render cached or placeholder content before background refresh.
+- Protected profile and friends leaderboard refreshes happen during authenticated session sync or explicit pull-to-refresh, not on tab focus.
 
 ## Result Submission Model
-- After the fifth answer, the app computes a local result immediately from the quiz payload.
-- That local result is persisted right away and shown without waiting for the server.
-- The actual `submitQuiz` request runs in the background.
-- If the app is interrupted before sync completes, the pending submission is retried on the next warm path.
-- Authenticated stat finalization remains server-authoritative and continues asynchronously.
+
+- After the fifth answer, the app computes an immediate local result from the quiz payload.
+- Authenticated plays submit to the server and finalize stats.
+- Guest plays are not submitted while still guest.
+- Pending authenticated submissions can retry on later warm paths.
 
 ## UX Rules
-- Generic full-screen spinners are reserved for true cold-miss fallback only.
-- Startup loading uses a branded bootstrap screen.
-- Games uses inline “warming up” messaging on the welcome screen if today’s quiz is still loading.
-- Me and League Tables prefer cached content or placeholder rows over centered loading wheels.
 
-## Source Files
-- `App.tsx`
-- `app/hooks/useAuthInit.ts`
-- `app/hooks/useAppBootstrap.ts`
-- `app/services/dailyLoop.ts`
-- `app/state/useQuizStore.ts`
-- `app/state/useProfileStore.ts`
-- `app/state/useLeaderboardStore.ts`
-- `app/storage/*`
+- Branded bootstrap is used for cold startup.
+- `AuthSyncScreen` is used for login/reconciliation handoff.
+- Daily quiz must not render stale `QuestionCard` state while identity reconciliation is active.
+- Generic full-screen spinners are reserved for true cold-miss fallback states.
+- App foreground events use public warm refresh only; protected data refresh remains authenticated-sync or manual.

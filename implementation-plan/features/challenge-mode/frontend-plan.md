@@ -1,5 +1,9 @@
 # Deprecated: Challenge Mode Frontend Plan
 
-The frontend plan in this file has been superseded by shipped implementation.
+The separate challenge-mode frontend plan has been superseded by the shipped shared quiz implementation.
 
-Use `implementation-plan/features/challenge-mode/README.md` plus code references in `app/screens/Challenge*.tsx` for current behavior.
+Use:
+
+- `implementation-plan/features/challenge-mode/README.md` for product behavior.
+- `implementation-plan/frontend-plan.md` for the shared gameplay surface.
+- `app/screens/Challenge*.tsx` and `app/components/QuestionCard.tsx` for implementation details.

@@ -1,300 +1,185 @@
-# Pundit Trivia v0.1
+# Pundit Trivia v1.1.0
 
-A daily sports trivia quiz app built with React Native (Expo), TypeScript, and Netlify Functions.
+Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScript, Netlify Functions, and CockroachDB.
 
-## Features
+## Current Product
 
-- Daily quiz with 5 sports trivia questions
-- Real-time answer submission and scoring
-- Streak tracking and personal best scores
-- Friends-first and global leaderboards
-- Branded startup bootstrap with stale-first cache hydration
-- Background prefetch for quiz, stats, and leaderboard data
-- Local-first result reveal with background stat reconciliation
-- Offline caching for quiz, results, stats, and leaderboard warm loads
-- Guest user system (no registration required)
+- Daily 5-question football quiz with typewriter prompt pacing.
+- Shared refreshed gameplay UI for daily quiz and challenge mode.
+- Reanimated question transitions, option reveal, circular timer, and answer reveal states.
+- Timer starts only after the question and options are visible.
+- Players can still answer after the timer reaches zero; correct post-zero answers receive the minimum score.
+- Compact post-quiz daily summary with final score, answer recap, and native text sharing.
+- Cached completed screen for already-played daily quizzes.
+- Guest play by default, with local-only guest daily results.
+- Auth0 sign-in for profile stats, leaderboards, friends, and challenge mode.
+- Guest-to-auth daily result reconciliation after login.
+- Centralized auth flow with login, quiz reconciliation, and first data prefetch behind a loading interstitial.
+- Me profile page, username support, settings, debug-log export, and guest-only cache controls.
+- Friends leaderboard, global leaderboard, friend links, and async challenge mode.
+- Stale-first cache hydration for quiz, result, profile, and leaderboard warm loads.
+
+## Versioning
+
+- Current app/docs version: `1.1.0`.
+- `package.json`, `app.json`, and `app/constants/version.ts` must stay aligned.
+- Settings displays the app version from `APP_VERSION`.
+- Release history is tracked in `CHANGELOG.md`.
 
 ## Tech Stack
 
-### Frontend
-- React Native (Expo)
+- Expo React Native
 - TypeScript
-- React Navigation (Bottom Tabs)
-- Zustand (State Management)
-- AsyncStorage (Local Persistence)
-
-### Backend
-- Netlify Functions (Serverless)
-- CockroachDB (PostgreSQL)
-- Node.js
+- React Navigation
+- Zustand
+- AsyncStorage and Expo SecureStore
+- Expo AuthSession with Auth0
+- React Native Reanimated
+- Netlify Functions
+- CockroachDB/PostgreSQL via `pg`
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js v20.19.0 or higher
-- npm or yarn
-- Expo CLI
-- CockroachDB instance
+- Node.js `>=20.19.4`
+- npm
+- Expo CLI via `npx expo`
+- CockroachDB database
+- Netlify CLI for local function development
 
-### Installation
+### Install
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd pundit-app
-```
-
-2. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Create a `.env` file based on `.env.example`:
+Create local environment variables from `.env.example`:
+
 ```bash
 cp .env.example .env
 ```
 
-4. Configure environment variables:
-- `DATABASE_URL`: Your CockroachDB connection string
-- `AUTH0_*`: Auth0 credentials (required for server-side token validation on authenticated endpoints)
-- `API_BASE_URL`: Your Netlify Functions URL
-- `QUIZ_TIMEZONE`: Server-side quiz day timezone (default: `Europe/London`)
-- `EXPO_PUBLIC_QUIZ_TIMEZONE`: Client-side quiz day timezone (should match `QUIZ_TIMEZONE`)
+Important variables:
 
-### Development
+- `DATABASE_URL`
+- `AUTH0_DOMAIN`
+- `EXPO_PUBLIC_AUTH0_DOMAIN`
+- `EXPO_PUBLIC_AUTH0_CLIENT_ID`
+- `EXPO_PUBLIC_API_BASE_URL`
+- `QUIZ_TIMEZONE`
+- `EXPO_PUBLIC_QUIZ_TIMEZONE`
 
-1. Start the Expo development server:
+## Development
+
+Start the Expo app:
+
 ```bash
 npm start
 ```
 
-2. Run on iOS:
+Run native targets:
+
 ```bash
 npm run ios
-```
-
-3. Run on Android:
-```bash
 npm run android
 ```
 
-4. Run on Web:
+Run local Netlify functions:
+
 ```bash
-npm run web
+npm run dev:functions
 ```
 
-5. Test Netlify Functions locally:
+Point the app at local functions:
+
 ```bash
-npx netlify dev
+EXPO_PUBLIC_API_BASE_URL=http://localhost:9999/.netlify/functions
+```
+
+Fast mobile loop with cache clear:
+
+```bash
+npm run dev:mobile
 ```
 
 ## Project Structure
 
-```
+```text
 pundit-app/
 ├── app/
-│   ├── components/       # Reusable UI components
-│   ├── navigation/       # Navigation configuration
-│   ├── screens/          # Screen components
-│   ├── services/         # API service layer
-│   ├── state/            # Zustand stores
-│   ├── storage/          # AsyncStorage utilities
-│   ├── styles/           # Shared styles
-│   ├── types/            # TypeScript types
-│   └── utils/            # Utility functions
-├── netlify/
-│   └── functions/        # Serverless backend functions
-│       ├── lib/          # Shared utilities
-│       ├── getDailyQuiz.ts
-│       ├── submitQuiz.ts
-│       ├── getLeaderboard.ts
-│       └── getUserStats.ts
-├── implementation-plan/  # Design documents
-└── App.tsx               # App entry point
+│   ├── components/
+│   ├── constants/
+│   ├── hooks/
+│   ├── navigation/
+│   ├── screens/
+│   ├── services/
+│   ├── state/
+│   ├── storage/
+│   ├── theme/
+│   └── types/
+├── assets/
+├── db/
+├── implementation-plan/
+├── netlify/functions/
+├── AUTH0_SETUP.md
+└── CHANGELOG.md
 ```
 
-## Database Schema
+## Daily Quiz Flow
 
-### `public.pu_player_ques`
+1. App hydrates cached daily-loop resources.
+2. Games tab shows welcome, completed, or reconciliation/loading state.
+3. Question prompt types out intentionally before answer options appear.
+4. Timer starts after all options are visible.
+5. Answer tap locks the choice, pauses briefly, reveals correctness, then transitions to the next question.
+6. After the fifth answer, the app shows the daily summary immediately.
+7. Authenticated plays submit to the server; guest plays remain local until migrated after login.
 
-```sql
-CREATE TABLE public.pu_player_ques (
-  date DATE NULL,
-  language STRING NULL,
-  rank INT4 NULL,
-  question_id STRING NOT NULL,
-  question STRING NULL,
-  player_id STRING NULL,
-  player_name STRING NULL,
-  player_0 STRING NULL,
-  player_1 STRING NULL,
-  player_2 STRING NULL,
-  player_3 STRING NULL,
-  CONSTRAINT pu_player_ques_pkey PRIMARY KEY (question_id ASC)
-)
-```
+## Auth and Guest Model
 
-## API Endpoints
+- Guests can play the daily quiz without registration.
+- Guest daily results are stored locally and do not call `submitQuiz` immediately.
+- After login, the centralized auth flow reconciles identity before releasing the UI:
+  - authenticated local/server result wins if present;
+  - otherwise a valid guest result is migrated to the authenticated user;
+  - stale guest cache is cleared after reconciliation.
+- Logout clears the local app session without opening the Auth0 browser logout flow.
 
-### `GET /.netlify/functions/getDailyQuiz`
-Fetch the daily quiz questions.
+## API Surface
 
-Query Parameters:
-- `date` (optional): YYYY-MM-DD format
-- `language` (optional): Language code (default: 'en')
+Netlify Functions live under `/.netlify/functions/`.
 
-Response:
-```json
-{
-  "id": "quiz-2026-01-08",
-  "date": "2026-01-08",
-  "questions": [
-    {
-      "id": "q1",
-      "prompt": "Question text?",
-      "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-      "correctOptionIndex": 0
-    }
-  ]
-}
-```
+Core groups:
 
-### `POST /.netlify/functions/submitQuiz`
-Submit quiz answers and get results.
+- Daily quiz: `getDailyQuiz`, `submitQuiz`, `getTodayResult`, `migrateGuestResult`
+- Profile: `getUserStats`, `updateProfile`, `checkUsername`, `setUsername`
+- Leaderboards: `getLeaderboard`, `getFriendsLeaderboard`
+- Friends: `createFriendLink`, `acceptFriendLink`, `getFriends`, `removeFriend`
+- Challenges: `createChallenge`, `getChallenge`, `joinChallenge`, `submitChallengeAnswers`, `revokeChallenge`, `getUserChallenges`
 
-Validation rules:
-- `answers` must be an array and include at least one answer
-- Maximum of 5 answers per submission
-- No duplicate `questionId` values
-- `selectedOptionIndex` must be an integer between 0 and 3 and within option bounds for each question
-- `timeRemainingMs` is optional but, when present, must be between 0 and 20000
-
-Request Body:
-```json
-{
-  "quizId": "quiz-2026-01-08",
-  "userId": "guest_12345",
-  "answers": [
-    {
-      "questionId": "q1",
-      "selectedOptionIndex": 0
-    }
-  ]
-}
-```
-
-Response:
-```json
-{
-  "date": "2026-01-08",
-  "quizId": "quiz-2026-01-08",
-  "score": 4,
-  "totalQuestions": 5,
-  "streak": 3,
-  "bestScore": 5,
-  "answers": [...]
-}
-```
-
-### `GET /.netlify/functions/getLeaderboard`
-Get the global leaderboard.
-
-Response:
-```json
-[
-  {
-    "userId": "user123",
-    "displayName": "Player 1",
-    "score": 5,
-    "streak": 10
-  }
-]
-```
-
-### `GET /.netlify/functions/getUserStats`
-Get user statistics.
-
-Query Parameters:
-- `userId`: User ID
-
-Response:
-```json
-{
-  "streak": 5,
-  "bestScore": 5
-}
-```
-
-## Deployment
-
-### Frontend (Expo)
-
-1. Build for production:
-```bash
-eas build --platform ios
-eas build --platform android
-```
-
-2. Submit to app stores:
-```bash
-eas submit --platform ios
-eas submit --platform android
-```
-
-### Backend (Netlify)
-
-1. Connect repository to Netlify
-2. Configure environment variables in Netlify dashboard
-3. Deploy:
-```bash
-netlify deploy --prod
-```
-
-## Environment Variables
-
-See `.env.example` for required environment variables.
-
-## Performance Model
-
-- App launch uses a short branded bootstrap screen while fonts and local daily-loop state hydrate.
-- Auth restoration is stale-first: cached user info renders first and token refresh happens in the background.
-- Explicit sign-out now clears both local tokens and the upstream Auth0 browser session, so logging into a different account requires an interactive auth flow.
-- Games, Me, and League Tables prefer cached same-day data on warm opens, then revalidate silently.
-- Final daily-quiz results render locally as soon as the fifth answer is locked in; server submission and stat finalization continue in the background.
+Protected endpoints validate Auth0 bearer tokens server-side and enforce `token.sub === userId`.
 
 ## Debugging
 
-- The app now keeps a small persistent client-side debug log for startup, auth, bootstrap, and daily-loop events.
-- Open Settings and use `Copy Debug Log` after reproducing a freeze or crash to export the latest trace.
+- Settings includes `Copy Debug Log` and `Clear Debug Log`.
+- Debug logs cover startup, auth, bootstrap, daily-loop, API, and reconciliation events.
+- Use `npx tsc --noEmit` before handing off changes.
 
-## Hardening rollout plan
+## Canonical Planning Docs
 
-To minimize risk, improvements are split into small PRs:
+The `implementation-plan/` folder is the current implementation source of truth. Update it in the same change as meaningful behavior changes.
 
-- **PR A (low-risk bundled fixes)**: stricter `submitQuiz` validation, correct `total_correct` stat accounting, secure friend-link code generation, and removal of verbose DB metadata logging.
-- **PR B (security hardening)**: ✅ implemented — authenticated endpoints now verify Auth0 access tokens and enforce `token.sub === userId`.
-- **PR C (daily consistency)**: ✅ implemented — centralized quiz-day timezone policy across quiz fetch, streaks, leaderboards, and client date-based caching.
+## Future Work
 
-## Future Enhancements
-
-- React error boundaries and crash-recovery UX
-- Offline answer queue with retry-on-reconnect
-- Endpoint-level rate limiting / abuse protection for quiz and challenge submits
-- API observability (structured logs + alerting for failures and latency)
-- Push notifications for daily quiz reminders
-- Multiple quiz categories
-- Historical quiz access
-- Product analytics/telemetry
-
-## Contributing
-
-1. Follow the implementation plan in `implementation-plan/` (this is the canonical status source).
-2. Use TypeScript for all new code
-3. Follow existing code style and patterns
-4. Test on both iOS and Android before submitting
+- App-level error boundaries and crash-recovery UX.
+- Offline answer queue with retry-on-reconnect.
+- Endpoint-level rate limiting and abuse controls.
+- API observability and alerting.
+- Push notifications.
+- Quiz archives and historical play.
+- Product analytics.
 
 ## License
 
 All rights reserved.
-# pundit-app

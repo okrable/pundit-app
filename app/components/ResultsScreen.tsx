@@ -1,8 +1,18 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import {
+  Image,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Quiz, QuizResultImmediate } from '../types';
 import { theme } from '../theme/theme';
+
+const logoImage = require('../../assets/logo/dark/pundit-black.png');
+const celebrationImage = require('../../assets/images/Asset 9.png');
 
 interface ResultsScreenProps {
   result: QuizResultImmediate;
@@ -10,99 +20,106 @@ interface ResultsScreenProps {
   onPlayAgain: () => void;
 }
 
-export default function ResultsScreen({ result, quiz, onPlayAgain }: ResultsScreenProps) {
-  const maxScore = result.totalQuestions * 100; // 500 for 5 questions
-  const percentage = Math.round((result.score / maxScore) * 100);
-  const correctCount = result.answers.filter(a => a.isCorrect).length;
+interface SummaryAnswer {
+  questionNumber: number;
+  correctAnswer: string;
+  isCorrect: boolean;
+}
 
-  const getMessage = () => {
-    if (percentage === 100) return "Perfect! You're a true pundit!";
-    if (percentage >= 80) return "Great job! Lightning fast!";
-    if (percentage >= 60) return "Solid performance!";
-    if (percentage >= 40) return "Not bad! Keep practicing!";
-    if (percentage >= 20) return "Room for improvement!";
-    return "Better luck next time!";
-  };
+export default function ResultsScreen({ result, quiz }: ResultsScreenProps) {
+  const summaryAnswers = useMemo<SummaryAnswer[]>(
+    () =>
+      result.answers.map((answer, index) => {
+        const question = quiz.questions.find(q => q.id === answer.questionId);
+        const correctOptionIndex = answer.correctOptionIndex ?? question?.correctOptionIndex ?? 0;
+        const correctAnswer = question?.options[correctOptionIndex] ?? 'Unknown';
 
-  const getAnswerInfo = (questionId: string, selectedIndex: number, correctIndex?: number) => {
-    const question = quiz.questions.find(q => q.id === questionId);
-    if (!question) return { correctAnswer: '', userAnswer: '' };
+        return {
+          questionNumber: index + 1,
+          correctAnswer,
+          isCorrect: answer.isCorrect,
+        };
+      }),
+    [quiz.questions, result.answers]
+  );
 
-    const correctAnswer = question.options[correctIndex ?? question.correctOptionIndex ?? 0];
-    const userAnswer = question.options[selectedIndex];
+  const correctCount = summaryAnswers.filter(answer => answer.isCorrect).length;
+  const answerEmojiRow = summaryAnswers.map(answer => (answer.isCorrect ? '⚽️' : '❌')).join('');
+  const syncMessage =
+    result.syncState === 'pending'
+      ? 'Stats syncing in the background.'
+      : result.syncState === 'failed'
+        ? 'We will retry syncing your result shortly.'
+        : null;
 
-    return { correctAnswer, userAnswer };
+  const handleShare = async () => {
+    const streakLine = typeof result.streak === 'number' ? `Streak: ${result.streak}` : '';
+    const shareText = [
+      `Pundit Daily Quiz - ${result.date}`,
+      `Final score: ${result.score}`,
+      `${correctCount}/${result.totalQuestions} correct ${answerEmojiRow}`,
+      streakLine,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    await Share.share({ message: shareText });
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Full Time!</Text>
-          <Text style={styles.subtitle}>{getMessage()}</Text>
+        <View style={styles.topBar}>
+          <Image source={logoImage} style={styles.logo} resizeMode="contain" />
         </View>
 
-        <View style={styles.scoreRow}>
-          <View style={styles.scoreCard}>
-            <Text style={styles.scoreValue}>{result.score}</Text>
-            <Text style={styles.scoreLabel}>points</Text>
-            <Text style={styles.correctCount}>{correctCount}/{result.totalQuestions} correct</Text>
-            {result.syncState === 'pending' && (
-              <Text style={styles.syncText}>Syncing your stats in the background...</Text>
-            )}
-            {result.syncState === 'failed' && (
-              <Text style={styles.syncText}>We will retry your score sync automatically.</Text>
-            )}
-          </View>
-          <View style={styles.statsColumn}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{result.streak}</Text>
-              <Text style={styles.statLabel}>Streak</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{result.bestScore}</Text>
-              <Text style={styles.statLabel}>Best</Text>
+        <View style={styles.summaryCard}>
+          <View style={styles.heroRow}>
+            <Image source={celebrationImage} style={styles.celebration} resizeMode="contain" />
+            <View style={styles.heroCopy}>
+              <Text style={styles.thanksTitle} adjustsFontSizeToFit numberOfLines={1}>
+                Thanks for playing!
+              </Text>
+              <Text style={styles.tomorrowText}>Come back tomorrow for a fresh five.</Text>
             </View>
           </View>
-        </View>
 
-        <View style={styles.answersSection}>
-          {result.answers.map((answer) => {
-            const { correctAnswer, userAnswer } = getAnswerInfo(
-              answer.questionId,
-              answer.selectedOptionIndex,
-              answer.correctOptionIndex
-            );
-            const isCorrect = answer.isCorrect;
+          <View style={styles.scoreBand}>
+            <Text style={styles.finalScoreLabel}>FINAL SCORE</Text>
+            <Text style={styles.finalScoreValue}>{result.score}</Text>
+          </View>
 
-            return (
-              <View
-                key={answer.questionId}
-                style={[
-                  styles.answerItem,
-                  isCorrect ? styles.answerItemCorrect : styles.answerItemIncorrect,
-                ]}
-              >
-                <View style={styles.answerContent}>
-                  {isCorrect ? (
-                    <Text style={styles.answerText}>{correctAnswer}</Text>
-                  ) : (
-                    <View style={styles.wrongAnswerContent}>
-                      <Text style={styles.userAnswerText}>{userAnswer}</Text>
-                      <Text style={styles.correctAnswerText}>{correctAnswer}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.answerIcon}>
-                  {isCorrect ? '⚽️' : '❌'}
+          <View style={styles.divider} />
+
+          <View style={styles.answersList}>
+            {summaryAnswers.map(answer => (
+              <View key={`${answer.questionNumber}-${answer.correctAnswer}`} style={styles.answerRow}>
+                <Text style={styles.questionLabel}>Q{answer.questionNumber}</Text>
+                <Text
+                  style={styles.answerName}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                  numberOfLines={1}
+                >
+                  {answer.correctAnswer.toUpperCase()}
+                </Text>
+                <Text
+                  style={[
+                    styles.answerIcon,
+                    answer.isCorrect ? styles.correctIcon : styles.incorrectIcon,
+                  ]}
+                >
+                  {answer.isCorrect ? '⚽️' : '❌'}
                 </Text>
               </View>
-            );
-          })}
+            ))}
+          </View>
+
+          {syncMessage ? <Text style={styles.syncText}>{syncMessage}</Text> : null}
         </View>
 
-        <TouchableOpacity style={styles.playAgainButton} onPress={onPlayAgain}>
-          <Text style={styles.playAgainButtonText}>Play Again</Text>
+        <TouchableOpacity style={styles.shareButton} onPress={handleShare} activeOpacity={0.86}>
+          <Text style={styles.shareButtonText}>Share result</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -116,153 +133,146 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: theme.spacing.lg,
-    justifyContent: 'space-between',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  title: {
-    fontSize: 26,
-    fontFamily: theme.fonts.gothamBlack,
-    color: theme.colors.textDark,
-    marginBottom: theme.spacing.xs,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: theme.colors.mediumGray,
-    fontFamily: theme.fonts.gothamBook,
-    textAlign: 'center',
-  },
-  scoreRow: {
-    flexDirection: 'row',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.lg,
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
   },
-  scoreCard: {
-    flex: 2,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.lg,
+  topBar: {
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  scoreValue: {
-    fontSize: 36,
+  logo: {
+    width: 132,
+    height: 44,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: '#E7DFD2',
+    padding: theme.spacing.md,
+    gap: theme.spacing.md,
+  },
+  heroRow: {
+    minHeight: 88,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  celebration: {
+    width: 88,
+    height: 80,
+  },
+  heroCopy: {
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  thanksTitle: {
+    fontSize: 24,
+    lineHeight: 29,
     fontFamily: theme.fonts.gothamBlack,
-    color: theme.colors.primary,
+    color: theme.colors.textDark,
   },
-  scoreLabel: {
+  tomorrowText: {
     fontSize: 13,
-    color: theme.colors.mediumGray,
+    lineHeight: 17,
     fontFamily: theme.fonts.gothamBook,
-  },
-  correctCount: {
-    fontSize: 12,
     color: theme.colors.mediumGray,
-    fontFamily: theme.fonts.gothamBook,
-    marginTop: theme.spacing.xs,
   },
-  syncText: {
-    marginTop: theme.spacing.sm,
-    fontSize: 11,
-    color: theme.colors.mediumGray,
-    fontFamily: theme.fonts.gothamBook,
-    textAlign: 'center',
-  },
-  statsColumn: {
-    flex: 1,
-    gap: theme.spacing.sm,
-  },
-  statItem: {
-    flex: 1,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.sm,
+  scoreBand: {
+    minHeight: 72,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.background,
+    borderLeftWidth: 5,
+    borderLeftColor: theme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statValue: {
-    fontSize: 20,
-    fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.textDark,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: theme.colors.mediumGray,
-    fontFamily: theme.fonts.gothamBook,
-  },
-  answersSection: {
-    flex: 1,
-    marginBottom: theme.spacing.md,
-  },
-  answerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.borderRadius.sm,
-    marginBottom: theme.spacing.xs,
   },
-  answerItemCorrect: {
-    backgroundColor: theme.colors.correctBg,
+  finalScoreLabel: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.mediumGray,
+    textTransform: 'uppercase',
   },
-  answerItemIncorrect: {
-    backgroundColor: theme.colors.incorrectBg,
-  },
-  answerContent: {
-    flex: 1,
-  },
-  answerText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.gothamMedium,
+  finalScoreValue: {
+    fontSize: 36,
+    lineHeight: 40,
+    fontFamily: theme.fonts.gothamBlack,
     color: theme.colors.textDark,
+    fontVariant: ['tabular-nums'],
   },
-  wrongAnswerContent: {
+  divider: {
+    height: 1,
+    backgroundColor: '#E7DFD2',
+  },
+  answersList: {
+    flex: 1,
+    justifyContent: 'space-evenly',
+  },
+  answerRow: {
+    minHeight: 34,
     flexDirection: 'row',
     alignItems: 'center',
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.sm,
     gap: theme.spacing.sm,
   },
-  userAnswerText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.incorrect,
-    textDecorationLine: 'line-through',
+  questionLabel: {
+    width: 30,
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: theme.fonts.gothamBlack,
+    color: theme.colors.accent,
   },
-  correctAnswerText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.gothamMedium,
+  answerName: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 19,
+    fontFamily: theme.fonts.gothamBlack,
     color: theme.colors.textDark,
   },
   answerIcon: {
-    fontSize: 16,
-    marginLeft: theme.spacing.sm,
+    width: 28,
+    textAlign: 'center',
+    fontSize: 17,
+    lineHeight: 21,
   },
-  playAgainButton: {
+  correctIcon: {
+    color: theme.colors.correct,
+  },
+  incorrectIcon: {
+    color: theme.colors.incorrect,
+  },
+  syncText: {
+    marginTop: 'auto',
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    textAlign: 'center',
+  },
+  shareButton: {
+    alignSelf: 'center',
+    minWidth: 160,
+    minHeight: 44,
+    borderRadius: 999,
     backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.xl,
+    borderWidth: 2,
+    borderColor: theme.colors.textDark,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.lg,
   },
-  playAgainButtonText: {
-    color: theme.colors.white,
+  shareButtonText: {
     fontSize: 16,
+    lineHeight: 20,
     fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.white,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,16 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as AuthSession from 'expo-auth-session';
 import { Ionicons } from '@expo/vector-icons';
 import { FriendsLeaderboardEntry, LeaderboardEntry } from '../types';
 import { useAuthStore } from '../state/useAuthStore';
-import { useAuthRequest, auth0Config } from '../services/auth0';
+import { useAuthRequest } from '../services/auth0';
 import { theme } from '../theme/theme';
 import Avatar from '../components/Avatar';
 import ManageFriendsModal from '../components/ManageFriendsModal';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
+import AuthSyncScreen from '../components/AuthSyncScreen';
+import { loginWithAuth0 } from '../services/authFlow';
 
 type ViewMode = 'friends' | 'global';
 
@@ -25,7 +26,6 @@ export default function LeaderboardScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('friends');
   const [refreshing, setRefreshing] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
-  const handledAuthCodeRef = useRef<string | null>(null);
   const [showManageFriends, setShowManageFriends] = useState(false);
 
   const {
@@ -45,10 +45,9 @@ export default function LeaderboardScreen() {
     isAuthenticated,
     isAuth0Available,
     forceInteractiveAuth,
-    setAuthResult,
     clearError,
   } = useAuthStore();
-  const [request, response, promptAsync] = useAuthRequest({
+  const [request, , promptAsync] = useAuthRequest({
     intent: 'signup',
     forceInteractive: forceInteractiveAuth,
   });
@@ -68,64 +67,23 @@ export default function LeaderboardScreen() {
   useEffect(() => {
     if (viewMode === 'friends' && (!isAuthenticated || !user?.sub)) {
       setViewMode('global');
-      return;
     }
-
-    void refreshCurrentView();
-  }, [isAuthenticated, refreshCurrentView, user?.sub, viewMode]);
-
-  useEffect(() => {
-    if (!isAuthLoading) {
-      return;
-    }
-
-    if (response?.type === 'success') {
-      const { code } = response.params;
-      if (handledAuthCodeRef.current === code) {
-        return;
-      }
-      handledAuthCodeRef.current = code;
-      void exchangeCodeForToken(code);
-    } else if (response) {
-      if (response.type === 'error') {
-        console.error('Auth error:', response.error);
-      }
-      setIsAuthLoading(false);
-    }
-  }, [isAuthLoading, response]);
-
-  const exchangeCodeForToken = async (code: string) => {
-    try {
-      const redirectUri = AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
-      const tokenResponse = await AuthSession.exchangeCodeAsync(
-        {
-          code,
-          clientId: auth0Config.clientId || '',
-          redirectUri,
-          extraParams: { code_verifier: request?.codeVerifier || '' },
-        },
-        { tokenEndpoint: auth0Config.tokenEndpoint }
-      );
-
-      const { accessToken } = tokenResponse;
-      const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const userInfo = await userInfoResponse.json();
-      setAuthResult(accessToken, userInfo);
-      setIsAuthLoading(false);
-    } catch (err) {
-      console.error('Token exchange error:', err);
-      handledAuthCodeRef.current = null;
-      setIsAuthLoading(false);
-    }
-  };
+  }, [isAuthenticated, user?.sub, viewMode]);
 
   const handleCreateAccount = async () => {
-    handledAuthCodeRef.current = null;
     setIsAuthLoading(true);
     clearError();
-    await promptAsync({ preferEphemeralSession: true });
+    try {
+      await loginWithAuth0({
+        intent: 'signup',
+        request,
+        promptAsync,
+      });
+    } catch (err) {
+      console.error('Token exchange error:', err);
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
   const handleRefresh = () => {
@@ -141,11 +99,6 @@ export default function LeaderboardScreen() {
 
   const handleSetViewMode = (nextMode: ViewMode) => {
     setViewMode(nextMode);
-    if (nextMode === 'friends' && user?.sub) {
-      void revalidateFriends(user.sub);
-      return;
-    }
-    void revalidateGlobal();
   };
 
   const renderSegmentedControl = () => {
@@ -241,17 +194,17 @@ export default function LeaderboardScreen() {
       <View style={styles.guestBanner}>
         <Text style={styles.guestBannerTitle}>Join our growing community!</Text>
         <Text style={styles.guestBannerText}>
-          Create a free account to compete on the leaderboard and track your stats.
+          Log in or create a free account to compete with friends and track your stats.
         </Text>
         <TouchableOpacity
           style={styles.createAccountButton}
           onPress={handleCreateAccount}
-          disabled={isAuthLoading}
+          disabled={isAuthLoading || !request}
         >
           {isAuthLoading ? (
             <ActivityIndicator size="small" color={theme.colors.white} />
           ) : (
-            <Text style={styles.createAccountButtonText}>Create Account</Text>
+            <Text style={styles.createAccountButtonText}>Sign In</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -298,6 +251,10 @@ export default function LeaderboardScreen() {
   const isFriendsView = viewMode === 'friends' && isAuthenticated;
   const activeLoading = isFriendsView ? loadingFriends : loadingGlobal;
   const activeData = isFriendsView ? friendsLeaderboard : globalLeaderboard;
+
+  if (isAuthLoading) {
+    return <AuthSyncScreen />;
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>

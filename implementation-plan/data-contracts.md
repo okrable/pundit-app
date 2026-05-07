@@ -1,16 +1,15 @@
-# Data Contracts (Current)
+# Data Contracts
 
-## Key Client Types
-See `app/types/index.ts` for canonical interfaces.
+Canonical TypeScript interfaces live in `app/types/index.ts`.
 
-Primary entities:
-- `Quiz`, `Question`
-- `AnswerWithTiming`, `QuizResultImmediate`, `QuizResult`
-- `LeaderboardEntry`, `UserStats`
-- Challenge entities (`ActiveChallenge`, `ChallengeHistoryItem`, `ChallengeSubmitResult`)
-- Friends entities (`Friend`, `FriendsLeaderboardEntry`, link responses)
+## Primary Client Types
 
-## Daily Quiz Response Shape (Current)
+- Daily quiz: `Quiz`, `Question`, `AnswerWithTiming`, `QuizResultImmediate`, `QuizResult`.
+- Profile/social: `UserProfile`, `UserStats`, `LeaderboardEntry`, friends types.
+- Challenge: active challenge, challenge history, challenge submit/result types.
+
+## Daily Quiz Payload
+
 ```json
 {
   "id": "quiz-YYYY-MM-DD",
@@ -26,17 +25,27 @@ Primary entities:
 }
 ```
 
-> Note: `correctOptionIndex` is intentionally present pre-submit by product decision to favor immediate UX and avoid extra answer-resolution calls.
+`correctOptionIndex` is intentionally present before submit so the app can reveal answers and build local results immediately.
 
-## Submit Quiz Request Constraints
-- `quizId`, `userId`, and non-empty `answers` are required.
-- Max 5 answers.
-- No duplicate `questionId` values in payload.
-- `selectedOptionIndex` must be an integer and within server-validated option bounds.
-- `timeRemainingMs` (when provided) must be within accepted range.
+## Answer Timing
 
-## Persistence Model
-- `users` table stores profile and aggregate stats.
-- `results` table stores daily submissions.
-- `challenges` table stores async head-to-head lifecycle and answer payloads.
-- Friendship and username-related tables/columns support social/profile flows.
+Answer payloads can include timing metadata. The client clamps timer behavior so:
+
+- timer starts after the prompt/options finish revealing;
+- answers at zero are valid;
+- correct post-zero answers receive the minimum score;
+- incorrect answers score zero.
+
+## Result Persistence
+
+- Authenticated daily submissions persist to the backend.
+- Guest daily results are cached locally first and can be migrated after login.
+- Same-day cached results prevent replay and drive `CompletedQuizScreen`.
+- Immediate in-memory results drive the current-session daily summary.
+
+## Database-Facing Model
+
+- `users` stores profile and aggregate stats.
+- `results` stores daily quiz submissions.
+- `challenges` stores async head-to-head lifecycle and answer payloads.
+- Friend and username structures support social/profile features.
