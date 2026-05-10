@@ -32,6 +32,11 @@
     "plugins": [
       "expo-secure-store",
       "react-native-auth0"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6c812acf-a8f4-4f27-a40e-4ad3fec3e416"
+      }
+    }
   }
 }

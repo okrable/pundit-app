@@ -103,6 +103,34 @@ Fast mobile loop with cache clear:
 npm run dev:mobile
 ```
 
+## Device Builds and TestFlight
+
+This project uses EAS Build for installable iOS builds and TestFlight submissions.
+
+Before the first TestFlight upload, decide the permanent iOS bundle identifier. The current value is `com.anonymous.pundittemp`; App Store Connect app records must match that value exactly, and changing it later means creating a different app identity. Because this repo has native `ios/` and `android/` folders, keep native IDs aligned with `app.json` when changing them.
+
+Log in to Expo:
+
+```bash
+npm run eas:login
+```
+
+Install a build on your own iPhone first:
+
+```bash
+npm run build:ios:device
+```
+
+The EAS dashboard build page will provide an install link/QR code. For iOS internal distribution, EAS may ask to register your device UDID and create ad hoc signing credentials.
+
+Send a build to TestFlight:
+
+```bash
+npm run build:ios:testflight
+```
+
+This creates a production iOS archive and submits it to App Store Connect. TestFlight requires a paid Apple Developer account and an App Store Connect app record whose bundle identifier matches `app.json`. After Apple processes the upload, add internal testers in App Store Connect. External friends can be invited through an external TestFlight group after the first Beta App Review.
+
 ## Project Structure
 
 ```text
