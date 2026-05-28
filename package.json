@@ -1,6 +1,6 @@
 {
   "name": "pundit-temp",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -10,6 +10,14 @@
     "dev:functions": "netlify functions:serve --functions netlify/functions --port 9999",
     "dev:netlify": "netlify dev --port 8888 --targetPort 8081",
     "dev:mobile": "expo start --clear",
+    "log:start": "node scripts/run-with-log.js -- npm start",
+    "log:web": "node scripts/run-with-log.js -- npm run web",
+    "log:dev:functions": "node scripts/run-with-log.js -- npm run dev:functions",
+    "log:dev:netlify": "node scripts/run-with-log.js -- npm run dev:netlify",
+    "log:dev:mobile": "node scripts/run-with-log.js -- npm run dev:mobile",
+    "seed:demo-leaderboard": "node scripts/seed-demo-leaderboard.js",
+    "inspect:leaderboard-performance": "node scripts/inspect-leaderboard-performance.js",
+    "repair:total-correct": "node scripts/repair-total-correct.js",
     "eas:login": "npx eas-cli@latest login",
     "build:ios:device": "npx eas-cli@latest build --platform ios --profile preview",
     "build:ios:testflight": "npx eas-cli@latest build --platform ios --profile production --auto-submit",

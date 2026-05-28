@@ -1,6 +1,10 @@
 import { Handler } from '@netlify/functions';
-import { query } from './lib/db';
-import { getQuizDate } from './lib/quizDate';
+import { getCurrentQuizWeekBounds, getPreviousQuizDate, getQuizDate } from './lib/quizDate';
+import {
+  getGlobalLeaderboardRows,
+  parseLeaderboardLimit,
+  parseLeaderboardPeriod,
+} from './lib/leaderboards';
 
 export const handler: Handler = async (event) => {
   const startedAt = Date.now();
@@ -23,46 +27,42 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const today = getQuizDate();
-    console.log('getLeaderboard.start', { today });
+    const now = new Date();
+    const today = getQuizDate(now);
+    const previousQuizDate = getPreviousQuizDate(today);
+    const period = parseLeaderboardPeriod(event.queryStringParameters?.period);
+    const limit = parseLeaderboardLimit(event.queryStringParameters?.limit);
 
-    // Query daily leaderboard (Auth0 users only - guests have no results in DB)
-    const leaderboard = await query<{
-      user_id: string;
-      display_name: string | null;
-      username: string | null;
-      score: number;
-      streak: number;
-      rank: number;
-    }>(
-      `SELECT
-        r.user_id,
-        u.display_name,
-        u.username,
-        r.score,
-        u.streak,
-        RANK() OVER (ORDER BY r.score DESC) as rank
-      FROM results r
-      JOIN users u ON r.user_id = u.id
-      WHERE r.quiz_date = $1
-      ORDER BY r.score DESC
-      LIMIT 100`,
-      [today]
+    if (!period) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'period must be daily or weekly' }),
+      };
+    }
+
+    const { weekStart, weekEnd } = getCurrentQuizWeekBounds(now);
+    console.log('getLeaderboard.start', { today, period, limit, weekStart, weekEnd });
+
+    // Auth0 users only in persisted rankings; guests can view but do not persist rows.
+    const leaderboard = await getGlobalLeaderboardRows(
+      period,
+      { quizDate: today, weekStart, weekEnd, previousQuizDate },
+      limit
     );
 
-    // Transform to API response format
-    const response = leaderboard.map((entry) => ({
-      userId: entry.user_id,
-      displayName: entry.display_name || 'Anonymous',
-      username: entry.username,
-      score: entry.score,
-      streak: entry.streak,
-      rank: Number(entry.rank),
-    }));
+    const response = {
+      period,
+      quizDate: today,
+      weekStart,
+      weekEnd,
+      leaderboard,
+    };
 
     console.log('getLeaderboard.success', {
       today,
-      count: response.length,
+      period,
+      count: leaderboard.length,
       durationMs: Date.now() - startedAt,
     });
 

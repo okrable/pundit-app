@@ -17,10 +17,11 @@ export default function useAppBootstrap(isAuthReady: boolean): boolean {
     logInfo('bootstrap.app.start', { isAuthReady });
     const bootstrapTimeout = setTimeout(() => {
       logWarn('bootstrap.app.timeout');
-    }, 2500);
+    }, 10000);
 
     async function bootstrap() {
       if (!isAuthReady) {
+        clearTimeout(bootstrapTimeout);
         return;
       }
 
@@ -55,6 +56,8 @@ export default function useAppBootstrap(isAuthReady: boolean): boolean {
         if (isMounted) {
           setIsReady(true);
         }
+      } finally {
+        clearTimeout(bootstrapTimeout);
       }
     }
 

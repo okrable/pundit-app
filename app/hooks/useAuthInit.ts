@@ -11,7 +11,7 @@ export default function useAuthInit(): boolean {
     logInfo('auth.init.start', { isAuth0Available });
     const bootstrapTimeout = setTimeout(() => {
       logWarn('auth.init.timeout');
-    }, 2000);
+    }, 8000);
 
     async function initAuth() {
       try {
@@ -26,6 +26,7 @@ export default function useAuthInit(): boolean {
         console.error('Error initializing auth bootstrap:', error);
         logError('auth.init.error', error);
       } finally {
+        clearTimeout(bootstrapTimeout);
         if (isMounted) {
           setIsReady(true);
         }

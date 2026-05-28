@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
+import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 
 const COOLDOWN_DAYS = 30;
 
@@ -71,6 +72,7 @@ export const handler: Handler = async (event) => {
       username: string | null;
       display_name: string | null;
       created_at: string;
+      last_played: string | null;
       username_last_changed_at: string | null;
     }>(
       `SELECT
@@ -83,6 +85,7 @@ export const handler: Handler = async (event) => {
         username,
         display_name,
         created_at,
+        last_played::TEXT as last_played,
         username_last_changed_at
       FROM users
       WHERE id = $1`,
@@ -111,6 +114,12 @@ export const handler: Handler = async (event) => {
     }
 
     const userStats = stats[0];
+    const today = getQuizDate();
+    const yesterday = getPreviousQuizDate(today);
+    const currentStreak =
+      userStats.last_played === today || userStats.last_played === yesterday
+        ? Number(userStats.streak || 0)
+        : 0;
 
     // Calculate username change availability
     let canChangeUsername = true;
@@ -131,7 +140,7 @@ export const handler: Handler = async (event) => {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        streak: userStats.streak || 0,
+        streak: currentStreak,
         bestScore: userStats.best_score || 0,
         totalQuizzes: userStats.total_quizzes || 0,
         challengeWins: userStats.challenge_wins || 0,

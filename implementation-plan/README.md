@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v1.1.0 documentation refresh
+> Last updated: v1.3.0 leaderboard refresh
 > Status: Active product with Daily Quiz, Challenge Mode, Friends, Auth0, and refreshed gameplay shipped
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -19,7 +19,7 @@
 - Auth0 accounts, Me profile, username/display-name support, and settings.
 - Centralized auth flow with post-login quiz reconciliation and first data prefetch behind `AuthSyncScreen`.
 - Guest-to-auth daily result migration/adoption where applicable.
-- Global leaderboard, friends leaderboard, friend links, and async challenge mode.
+- Daily and weekly global leaderboards, friends leaderboard, friend links, and async challenge mode.
 - Branded bootstrap, stale-first cache hydration, and debug-log export.
 
 ### Hardening Remaining

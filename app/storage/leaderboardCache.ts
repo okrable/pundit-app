@@ -1,63 +1,65 @@
 import {
   CacheEnvelope,
-  FriendsLeaderboardEntry,
-  LeaderboardEntry,
+  FriendsLeaderboardResponse,
+  GlobalLeaderboardResponse,
+  LeaderboardPeriod,
 } from '../types';
 import { clearCachedResource, getCachedResource, setCachedResource } from './resourceCache';
-
-interface FriendsLeaderboardCache {
-  leaderboard: FriendsLeaderboardEntry[];
-  totalFriends: number;
-  friendsPlayedToday: number;
-}
 
 const GLOBAL_CACHE_STALE_MS = 5 * 60 * 1000;
 const GLOBAL_CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 const FRIENDS_CACHE_STALE_MS = 2 * 60 * 1000;
 const FRIENDS_CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
-function getGlobalLeaderboardKey(): string {
-  return 'leaderboard_global';
+function getGlobalLeaderboardKey(period: LeaderboardPeriod): string {
+  return `leaderboard_global_${period}`;
 }
 
-function getFriendsLeaderboardKey(userId: string): string {
-  return `leaderboard_friends_${userId}`;
+function getFriendsLeaderboardKey(userId: string, period: LeaderboardPeriod): string {
+  return `leaderboard_friends_${period}_${userId}`;
 }
 
-export async function getCachedGlobalLeaderboard():
-  Promise<CacheEnvelope<LeaderboardEntry[]> | null> {
-  return getCachedResource<LeaderboardEntry[]>(getGlobalLeaderboardKey());
+export async function getCachedGlobalLeaderboard(
+  period: LeaderboardPeriod = 'daily'
+): Promise<CacheEnvelope<GlobalLeaderboardResponse> | null> {
+  return getCachedResource<GlobalLeaderboardResponse>(getGlobalLeaderboardKey(period));
 }
 
-export async function setCachedGlobalLeaderboard(entries: LeaderboardEntry[]): Promise<void> {
-  await setCachedResource(getGlobalLeaderboardKey(), entries, {
+export async function setCachedGlobalLeaderboard(data: GlobalLeaderboardResponse): Promise<void> {
+  await setCachedResource(getGlobalLeaderboardKey(data.period), data, {
     staleInMs: GLOBAL_CACHE_STALE_MS,
     expiresInMs: GLOBAL_CACHE_EXPIRY_MS,
-    scopeKey: 'global',
+    scopeKey: `global_${data.period}`,
   });
 }
 
-export async function clearCachedGlobalLeaderboard(): Promise<void> {
-  await clearCachedResource(getGlobalLeaderboardKey());
+export async function clearCachedGlobalLeaderboard(
+  period: LeaderboardPeriod = 'daily'
+): Promise<void> {
+  await clearCachedResource(getGlobalLeaderboardKey(period));
 }
 
 export async function getCachedFriendsLeaderboard(
-  userId: string
-): Promise<CacheEnvelope<FriendsLeaderboardCache> | null> {
-  return getCachedResource<FriendsLeaderboardCache>(getFriendsLeaderboardKey(userId));
+  userId: string,
+  period: LeaderboardPeriod = 'daily'
+): Promise<CacheEnvelope<FriendsLeaderboardResponse> | null> {
+  return getCachedResource<FriendsLeaderboardResponse>(getFriendsLeaderboardKey(userId, period));
 }
 
 export async function setCachedFriendsLeaderboard(
   userId: string,
-  data: FriendsLeaderboardCache
+  data: FriendsLeaderboardResponse
 ): Promise<void> {
-  await setCachedResource(getFriendsLeaderboardKey(userId), data, {
+  await setCachedResource(getFriendsLeaderboardKey(userId, data.period), data, {
     staleInMs: FRIENDS_CACHE_STALE_MS,
     expiresInMs: FRIENDS_CACHE_EXPIRY_MS,
-    scopeKey: userId,
+    scopeKey: `${userId}_${data.period}`,
   });
 }
 
-export async function clearCachedFriendsLeaderboard(userId: string): Promise<void> {
-  await clearCachedResource(getFriendsLeaderboardKey(userId));
+export async function clearCachedFriendsLeaderboard(
+  userId: string,
+  period: LeaderboardPeriod = 'daily'
+): Promise<void> {
+  await clearCachedResource(getFriendsLeaderboardKey(userId, period));
 }

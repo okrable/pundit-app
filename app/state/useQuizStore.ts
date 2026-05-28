@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import {
+  ApiError,
   finalizeQuizStats,
   getDailyQuiz,
   getTodayResult,
@@ -167,6 +168,15 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       logInfo('quiz.fetch.success', { targetDate, questionCount: quiz.questions.length });
       return quiz;
     } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 404) {
+        logWarn('quiz.fetch.missing', { targetDate, message: error.message });
+        set({
+          isQuizLoading: false,
+          quizError: error.message,
+        });
+        return cachedQuiz?.data ?? null;
+      }
+
       logError('quiz.fetch.error', error);
       set({
         isQuizLoading: false,

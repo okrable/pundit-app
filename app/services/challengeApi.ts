@@ -1,4 +1,4 @@
-import { useAuthStore } from '../state/useAuthStore';
+import { ApiError, fetchApi } from './api';
 import type {
   UserChallenges,
   CreateChallengeResponse,
@@ -8,57 +8,38 @@ import type {
   AnswerWithTiming,
 } from '../types';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
-
-class ChallengeApiError extends Error {
-  constructor(public statusCode: number, message: string) {
-    super(message);
-    this.name = 'ChallengeApiError';
-  }
-}
-
-async function fetchChallengeApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const token = useAuthStore.getState().token;
-
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...options?.headers,
-  };
-
-  if (token) {
-    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new ChallengeApiError(response.status, error.error || error.message || 'Request failed');
-  }
-
-  return response.json();
-}
+const CHALLENGE_TIMEOUT_MS = 15000;
+const CHALLENGE_SUBMIT_TIMEOUT_MS = 20000;
 
 export const challengeApi = {
   async createChallenge(userId: string, displayName?: string): Promise<CreateChallengeResponse> {
-    return fetchChallengeApi<CreateChallengeResponse>('/createChallenge', {
-      method: 'POST',
-      body: JSON.stringify({ userId, displayName }),
-    });
+    return fetchApi<CreateChallengeResponse>(
+      '/createChallenge',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, displayName }),
+      },
+      { timeoutMs: CHALLENGE_TIMEOUT_MS }
+    );
   },
 
   async getChallenge(code: string): Promise<GetChallengeResponse> {
-    return fetchChallengeApi<GetChallengeResponse>(`/getChallenge?code=${code}`);
+    return fetchApi<GetChallengeResponse>(
+      `/getChallenge?code=${code}`,
+      undefined,
+      { timeoutMs: CHALLENGE_TIMEOUT_MS }
+    );
   },
 
   async joinChallenge(code: string, userId: string, displayName?: string): Promise<JoinChallengeResponse> {
-    return fetchChallengeApi<JoinChallengeResponse>('/joinChallenge', {
-      method: 'POST',
-      body: JSON.stringify({ code, userId, displayName }),
-    });
+    return fetchApi<JoinChallengeResponse>(
+      '/joinChallenge',
+      {
+        method: 'POST',
+        body: JSON.stringify({ code, userId, displayName }),
+      },
+      { timeoutMs: CHALLENGE_TIMEOUT_MS }
+    );
   },
 
   async submitAnswers(
@@ -66,22 +47,34 @@ export const challengeApi = {
     userId: string,
     answers: AnswerWithTiming[]
   ): Promise<ChallengeSubmitResult> {
-    return fetchChallengeApi<ChallengeSubmitResult>('/submitChallengeAnswers', {
-      method: 'POST',
-      body: JSON.stringify({ challengeId, userId, answers }),
-    });
+    return fetchApi<ChallengeSubmitResult>(
+      '/submitChallengeAnswers',
+      {
+        method: 'POST',
+        body: JSON.stringify({ challengeId, userId, answers }),
+      },
+      { timeoutMs: CHALLENGE_SUBMIT_TIMEOUT_MS }
+    );
   },
 
   async revokeChallenge(challengeId: string, userId: string): Promise<void> {
-    await fetchChallengeApi<{ success: boolean }>('/revokeChallenge', {
-      method: 'POST',
-      body: JSON.stringify({ challengeId, userId }),
-    });
+    await fetchApi<{ success: boolean }>(
+      '/revokeChallenge',
+      {
+        method: 'POST',
+        body: JSON.stringify({ challengeId, userId }),
+      },
+      { timeoutMs: CHALLENGE_TIMEOUT_MS }
+    );
   },
 
   async getUserChallenges(userId: string): Promise<UserChallenges> {
-    return fetchChallengeApi<UserChallenges>(`/getUserChallenges?userId=${userId}`);
+    return fetchApi<UserChallenges>(
+      `/getUserChallenges?userId=${userId}`,
+      undefined,
+      { timeoutMs: CHALLENGE_TIMEOUT_MS }
+    );
   },
 };
 
-export { ChallengeApiError };
+export { ApiError as ChallengeApiError };

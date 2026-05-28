@@ -17,8 +17,10 @@ import { useAuthStore } from '../state/useAuthStore';
 import { theme } from '../theme/theme';
 import ShareChallengeModal from '../components/ShareChallengeModal';
 import type { ChallengeHistoryItem } from '../types';
+import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 
 export default function ChallengeScreen() {
+  const centeredContentStyle = useCenteredWebStyle(webContentWidth.standard);
   const navigation = useNavigation<any>();
   const { user, isAuthenticated } = useAuthStore();
   const {
@@ -220,7 +222,7 @@ export default function ChallengeScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[styles.contentContainer, centeredContentStyle]}
         showsVerticalScrollIndicator={false}
       >
         {/* Create/Active Challenge Section */}

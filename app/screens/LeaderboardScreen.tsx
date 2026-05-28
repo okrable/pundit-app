@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { FriendsLeaderboardEntry, LeaderboardEntry } from '../types';
+import { FriendsLeaderboardEntry, LeaderboardEntry, LeaderboardPeriod } from '../types';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAuthRequest } from '../services/auth0';
 import { theme } from '../theme/theme';
@@ -19,11 +19,14 @@ import ManageFriendsModal from '../components/ManageFriendsModal';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import AuthSyncScreen from '../components/AuthSyncScreen';
 import { loginWithAuth0 } from '../services/authFlow';
+import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 
 type ViewMode = 'friends' | 'global';
 
 export default function LeaderboardScreen() {
+  const centeredContentStyle = useCenteredWebStyle(webContentWidth.standard);
   const [viewMode, setViewMode] = useState<ViewMode>('friends');
+  const [period, setPeriod] = useState<LeaderboardPeriod>('daily');
   const [refreshing, setRefreshing] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [showManageFriends, setShowManageFriends] = useState(false);
@@ -32,7 +35,10 @@ export default function LeaderboardScreen() {
     friendsLeaderboard,
     totalFriends,
     friendsPlayedToday,
+    friendsPlayedThisWeek,
     globalLeaderboard,
+    friendsPeriod,
+    globalPeriod,
     loadingFriends,
     loadingGlobal,
     error,
@@ -55,14 +61,14 @@ export default function LeaderboardScreen() {
   const refreshCurrentView = useCallback(async () => {
     try {
       if (viewMode === 'friends' && isAuthenticated && user?.sub) {
-        await revalidateFriends(user.sub);
+        await revalidateFriends(user.sub, period);
       } else {
-        await revalidateGlobal();
+        await revalidateGlobal(period);
       }
     } finally {
       setRefreshing(false);
     }
-  }, [isAuthenticated, revalidateFriends, revalidateGlobal, user?.sub, viewMode]);
+  }, [isAuthenticated, period, revalidateFriends, revalidateGlobal, user?.sub, viewMode]);
 
   useEffect(() => {
     if (viewMode === 'friends' && (!isAuthenticated || !user?.sub)) {
@@ -93,12 +99,27 @@ export default function LeaderboardScreen() {
 
   const handleFriendsChanged = () => {
     if (user?.sub) {
-      void invalidateFriends(user.sub);
+      void invalidateFriends(user.sub, period);
     }
   };
 
   const handleSetViewMode = (nextMode: ViewMode) => {
     setViewMode(nextMode);
+    if (nextMode === 'friends' && isAuthenticated && user?.sub) {
+      void revalidateFriends(user.sub, period);
+    } else {
+      void revalidateGlobal(period);
+    }
+  };
+
+  const handleSetPeriod = (nextPeriod: LeaderboardPeriod) => {
+    if (nextPeriod === period) return;
+    setPeriod(nextPeriod);
+    if (viewMode === 'friends' && isAuthenticated && user?.sub) {
+      void revalidateFriends(user.sub, nextPeriod);
+    } else {
+      void revalidateGlobal(nextPeriod);
+    }
   };
 
   const renderSegmentedControl = () => {
@@ -126,12 +147,40 @@ export default function LeaderboardScreen() {
     );
   };
 
+  const renderPeriodControl = () => (
+    <View style={styles.segmentedControl}>
+      <TouchableOpacity
+        style={[styles.segment, period === 'daily' && styles.segmentActive]}
+        onPress={() => handleSetPeriod('daily')}
+      >
+        <Text style={[styles.segmentText, period === 'daily' && styles.segmentTextActive]}>
+          Daily
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.segment, period === 'weekly' && styles.segmentActive]}
+        onPress={() => handleSetPeriod('weekly')}
+      >
+        <Text style={[styles.segmentText, period === 'weekly' && styles.segmentTextActive]}>
+          Weekly
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderFriendsItem = ({ item }: { item: FriendsLeaderboardEntry }) => {
     const isCurrentUser = item.userId === user?.sub;
+    const hasPlayed = period === 'daily'
+      ? item.hasPlayedToday
+      : Boolean(item.hasPlayedThisWeek || item.gamesPlayed > 0);
+    const inactiveText = period === 'daily' ? 'Not yet played' : 'No games this week';
+    const scoreText = period === 'daily'
+      ? `${item.score} pts • Streak: ${item.streak}`
+      : `${item.score} pts • ${item.gamesPlayed} games • Streak: ${item.streak}`;
 
     return (
       <View style={[styles.leaderboardItem, isCurrentUser && styles.currentUserItem]}>
-        {item.hasPlayedToday && item.rank ? (
+        {hasPlayed && item.rank ? (
           <View style={styles.rankContainer}>
             <Text style={styles.rank}>#{item.rank}</Text>
           </View>
@@ -153,12 +202,10 @@ export default function LeaderboardScreen() {
             </Text>
             {isCurrentUser && <Text style={styles.youBadge}>You</Text>}
           </View>
-          {item.hasPlayedToday ? (
-            <Text style={styles.playerStats}>
-              {item.score} pts • Streak: {item.streak}
-            </Text>
+          {hasPlayed ? (
+            <Text style={styles.playerStats}>{scoreText}</Text>
           ) : (
-            <Text style={styles.notPlayedText}>Not yet played</Text>
+            <Text style={styles.notPlayedText}>{inactiveText}</Text>
           )}
         </View>
       </View>
@@ -181,7 +228,9 @@ export default function LeaderboardScreen() {
           {item.username ? `@${item.username}` : item.displayName || 'Anonymous'}
         </Text>
         <Text style={styles.playerStats}>
-          {item.score} pts • Streak: {item.streak}
+          {period === 'daily'
+            ? `${item.score} pts • Streak: ${item.streak}`
+            : `${item.score} pts • ${item.gamesPlayed} games • Streak: ${item.streak}`}
         </Text>
       </View>
     </View>
@@ -191,7 +240,7 @@ export default function LeaderboardScreen() {
     if (isAuthenticated || !isAuth0Available) return null;
 
     return (
-      <View style={styles.guestBanner}>
+      <View style={[styles.guestBanner, centeredContentStyle]}>
         <Text style={styles.guestBannerTitle}>Join our growing community!</Text>
         <Text style={styles.guestBannerText}>
           Log in or create a free account to compete with friends and track your stats.
@@ -230,12 +279,16 @@ export default function LeaderboardScreen() {
   const renderGlobalEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyText}>No leaderboard data yet</Text>
-      <Text style={styles.emptySubtext}>Be the first to complete today's quiz!</Text>
+      <Text style={styles.emptySubtext}>
+        {period === 'daily'
+          ? "Be the first to complete today's quiz!"
+          : 'Be the first to post a score this week!'}
+      </Text>
     </View>
   );
 
   const renderPlaceholder = () => (
-    <View style={styles.placeholderList}>
+    <View style={[styles.placeholderList, centeredContentStyle]}>
       {[0, 1, 2].map((item) => (
         <View key={item} style={styles.placeholderCard}>
           <View style={styles.placeholderRank} />
@@ -249,8 +302,14 @@ export default function LeaderboardScreen() {
   );
 
   const isFriendsView = viewMode === 'friends' && isAuthenticated;
-  const activeLoading = isFriendsView ? loadingFriends : loadingGlobal;
-  const activeData = isFriendsView ? friendsLeaderboard : globalLeaderboard;
+  const activeLoading = isFriendsView
+    ? loadingFriends && friendsPeriod === period
+    : loadingGlobal && globalPeriod === period;
+  const activeFriendsData = friendsPeriod === period ? friendsLeaderboard : [];
+  const activeGlobalData = globalPeriod === period ? globalLeaderboard : [];
+  const activeData = isFriendsView
+    ? activeFriendsData
+    : activeGlobalData;
 
   if (isAuthLoading) {
     return <AuthSyncScreen />;
@@ -260,7 +319,7 @@ export default function LeaderboardScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       {renderGuestBanner()}
 
-      <View style={styles.header}>
+      <View style={[styles.header, centeredContentStyle]}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>Leaderboard</Text>
           {isAuthenticated && (
@@ -273,23 +332,30 @@ export default function LeaderboardScreen() {
           )}
         </View>
         {renderSegmentedControl()}
+        {renderPeriodControl()}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {isFriendsView && totalFriends > 0 && (
           <Text style={styles.subtitle}>
-            {friendsPlayedToday} of {totalFriends} friends played today
+            {period === 'daily'
+              ? `${friendsPlayedToday} of ${totalFriends} friends played today`
+              : `${friendsPlayedThisWeek} of ${totalFriends} friends played this week`}
           </Text>
         )}
-        {!isFriendsView && <Text style={styles.subtitle}>Today's top players</Text>}
+        {!isFriendsView && (
+          <Text style={styles.subtitle}>
+            {period === 'daily' ? "Today's top players" : "This week's top players"}
+          </Text>
+        )}
       </View>
 
       {activeData.length === 0 && activeLoading ? (
         renderPlaceholder()
       ) : isFriendsView ? (
         <FlatList
-          data={friendsLeaderboard}
+          data={activeFriendsData}
           renderItem={renderFriendsItem}
           keyExtractor={(item) => item.userId}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, centeredContentStyle]}
           ListEmptyComponent={renderFriendsEmptyState}
           refreshControl={
             <RefreshControl
@@ -301,10 +367,10 @@ export default function LeaderboardScreen() {
         />
       ) : (
         <FlatList
-          data={globalLeaderboard}
+          data={activeGlobalData}
           renderItem={renderGlobalItem}
           keyExtractor={(item) => item.userId}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, centeredContentStyle]}
           ListEmptyComponent={renderGlobalEmptyState}
           refreshControl={
             <RefreshControl

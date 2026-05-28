@@ -2,7 +2,9 @@ import {
   Quiz,
   QuizResult,
   QuizResultImmediate,
+  GlobalLeaderboardResponse,
   LeaderboardEntry,
+  LeaderboardPeriod,
   UserStats,
   UserProfile,
   AnswerWithTiming,
@@ -17,6 +19,7 @@ import {
 } from '../types';
 import { useAuthStore } from '../state/useAuthStore';
 import { logError, logInfo, logWarn } from './debugLog';
+import { getQuizDate } from '../utils/quizDate';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
 const inflightRequests = new Map<string, Promise<unknown>>();
@@ -138,7 +141,7 @@ async function executeFetch<T>(
   }
 }
 
-async function fetchApi<T>(
+export async function fetchApi<T>(
   endpoint: string,
   options?: RequestInit,
   requestConfig?: ApiRequestConfig
@@ -230,6 +233,86 @@ export async function getDailyQuiz(date?: string): Promise<Quiz> {
   });
 }
 
+function getCurrentWeekBounds(referenceDate: Date = new Date()): { weekStart: string; weekEnd: string } {
+  const quizDate = getQuizDate(referenceDate);
+  const [year, month, day] = quizDate.split('-').map(Number);
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = utcDate.getUTCDay();
+  const daysSinceMonday = (dayOfWeek + 6) % 7;
+  const weekStartDate = new Date(utcDate);
+  weekStartDate.setUTCDate(utcDate.getUTCDate() - daysSinceMonday);
+  const weekEndDate = new Date(weekStartDate);
+  weekEndDate.setUTCDate(weekStartDate.getUTCDate() + 6);
+
+  return {
+    weekStart: weekStartDate.toISOString().split('T')[0],
+    weekEnd: weekEndDate.toISOString().split('T')[0],
+  };
+}
+
+function normalizeLeaderboardEntry(
+  entry: LeaderboardEntry,
+  period: LeaderboardPeriod
+): LeaderboardEntry {
+  return {
+    ...entry,
+    score: Number(entry.score ?? 0),
+    gamesPlayed: Number(entry.gamesPlayed ?? 1),
+    streak: Number(entry.streak ?? 0),
+    rank: Number(entry.rank ?? 0),
+  };
+}
+
+function normalizeGlobalLeaderboardResponse(
+  data: GlobalLeaderboardResponse | LeaderboardEntry[],
+  period: LeaderboardPeriod
+): GlobalLeaderboardResponse {
+  if (Array.isArray(data)) {
+    const quizDate = getQuizDate();
+    const { weekStart, weekEnd } = getCurrentWeekBounds();
+    return {
+      period,
+      quizDate,
+      weekStart,
+      weekEnd,
+      leaderboard: data.map((entry) => normalizeLeaderboardEntry(entry, period)),
+    };
+  }
+
+  return {
+    ...data,
+    period: data.period ?? period,
+    leaderboard: data.leaderboard.map((entry) => normalizeLeaderboardEntry(entry, period)),
+  };
+}
+
+function normalizeFriendsLeaderboardResponse(
+  data: FriendsLeaderboardResponse,
+  period: LeaderboardPeriod
+): FriendsLeaderboardResponse {
+  const quizDate = data.quizDate ?? getQuizDate();
+  const { weekStart, weekEnd } = data.weekStart && data.weekEnd
+    ? { weekStart: data.weekStart, weekEnd: data.weekEnd }
+    : getCurrentWeekBounds();
+
+  return {
+    ...data,
+    period: data.period ?? period,
+    quizDate,
+    weekStart,
+    weekEnd,
+    friendsPlayedThisWeek: data.friendsPlayedThisWeek ?? 0,
+    leaderboard: data.leaderboard.map((entry) => ({
+      ...entry,
+      score: Number(entry.score ?? 0),
+      gamesPlayed: Number(entry.gamesPlayed ?? (entry.hasPlayedToday ? 1 : 0)),
+      streak: Number(entry.streak ?? 0),
+      rank: entry.rank === null ? null : Number(entry.rank ?? 0),
+      hasPlayedThisWeek: entry.hasPlayedThisWeek ?? entry.hasPlayedToday,
+    })),
+  };
+}
+
 export async function submitQuiz(
   quizId: string,
   userId: string,
@@ -266,10 +349,14 @@ export async function finalizeQuizStats(
   });
 }
 
-export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
-  return fetchApi<LeaderboardEntry[]>('/getLeaderboard', undefined, {
+export async function getLeaderboard(
+  period: LeaderboardPeriod = 'daily',
+  limit = 100
+): Promise<GlobalLeaderboardResponse> {
+  const data = await fetchApi<GlobalLeaderboardResponse | LeaderboardEntry[]>(`/getLeaderboard?period=${period}&limit=${limit}`, undefined, {
     timeoutMs: LEADERBOARD_TIMEOUT_MS,
   });
+  return normalizeGlobalLeaderboardResponse(data, period);
 }
 
 export async function getUserStats(userId: string): Promise<UserStats> {
@@ -359,9 +446,15 @@ export async function removeFriend(
 }
 
 export async function getFriendsLeaderboard(
-  userId: string
+  userId: string,
+  period: LeaderboardPeriod = 'daily'
 ): Promise<FriendsLeaderboardResponse> {
-  return fetchApi<FriendsLeaderboardResponse>(
-    `/getFriendsLeaderboard?userId=${userId}`
+  const data = await fetchApi<FriendsLeaderboardResponse>(
+    `/getFriendsLeaderboard?userId=${userId}&period=${period}`,
+    undefined,
+    {
+      timeoutMs: LEADERBOARD_TIMEOUT_MS,
+    }
   );
+  return normalizeFriendsLeaderboardResponse(data, period);
 }

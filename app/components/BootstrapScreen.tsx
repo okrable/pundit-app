@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { theme } from '../theme/theme';
-
-const { width } = Dimensions.get('window');
+import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
 const LOADING_MESSAGES = [
   'Warming up',
   'Painting the lines',
@@ -13,6 +12,7 @@ const LOADING_MESSAGES = [
 
 export default function BootstrapScreen() {
   const [messageIndex, setMessageIndex] = React.useState(0);
+  const { width } = useWindowDimensions();
 
   React.useEffect(() => {
     const interval = setInterval(() => {
@@ -24,13 +24,15 @@ export default function BootstrapScreen() {
 
   return (
     <View style={styles.container}>
-      <Image
-        source={require('../../assets/logo/white/pundit-white.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
-      <Text style={styles.title}>{LOADING_MESSAGES[messageIndex]}</Text>
-      <ActivityIndicator size="small" color={theme.colors.white} style={styles.spinner} />
+      <CenteredWebContent maxWidth={webContentWidth.narrow} style={styles.content}>
+        <Image
+          source={require('../../assets/logo/white/pundit-white.png')}
+          style={[styles.logo, { width: Math.min(width * 0.62, 320) }]}
+          resizeMode="contain"
+        />
+        <Text style={styles.title}>{LOADING_MESSAGES[messageIndex]}</Text>
+        <ActivityIndicator size="small" color={theme.colors.white} style={styles.spinner} />
+      </CenteredWebContent>
     </View>
   );
 }
@@ -43,8 +45,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.xl,
   },
+  content: {
+    alignItems: 'center',
+  },
   logo: {
-    width: width * 0.62,
     height: 82,
     marginBottom: theme.spacing.lg,
   },

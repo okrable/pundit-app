@@ -15,6 +15,7 @@ import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
 import { theme } from '../theme/theme';
 import type { AnswerWithTiming } from '../types';
+import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 
 const REVEAL_SUSPENSE_DELAY = 1000;
 const RESULT_HOLD_DELAY = 1650;
@@ -30,6 +31,7 @@ function calculatePoints(timeRemaining: number): number {
 }
 
 export default function ChallengeQuizScreen() {
+  const centeredQuizStyle = useCenteredWebStyle(webContentWidth.quiz);
   const navigation = useNavigation<any>();
   const { user, isAuthenticated } = useAuthStore();
   const { currentChallenge, submitAnswers, clearCurrentChallenge, isLoading } = useChallengeStore();
@@ -209,7 +211,7 @@ export default function ChallengeQuizScreen() {
       >
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={[styles.contentContainer, centeredQuizStyle]}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.challengeContext}>

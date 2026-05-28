@@ -27,8 +27,11 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 
 ## Leaderboard APIs
 
-- `GET /getLeaderboard`
-- `GET /getFriendsLeaderboard`
+- `GET /getLeaderboard?period=daily|weekly&limit=100`
+- `GET /getFriendsLeaderboard?userId=...&period=daily|weekly`
+- Leaderboard responses include `period`, `quizDate`, `weekStart`, `weekEnd`, and ranked entries.
+- Global leaderboards are public to guests and authenticated users; persisted rankings include authenticated results only.
+- Friends leaderboards require an authenticated user and include the current user plus friends, with unplayed users shown unranked.
 
 ## Challenge APIs
 

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
 import { theme } from '../theme/theme';
 import LawsOfTheGameModal from './LawsOfTheGameModal';
-
-const { width, height } = Dimensions.get('window');
+import CenteredWebContent, { useIsDesktopWeb, webContentWidth } from './ResponsiveLayout';
 
 interface WelcomeScreenProps {
   onStartQuiz: () => void;
@@ -17,13 +16,21 @@ export default function WelcomeScreen({
   helperText = null,
 }: WelcomeScreenProps) {
   const [showLaws, setShowLaws] = useState(false);
+  const { width, height } = useWindowDimensions();
+  const isDesktopWeb = useIsDesktopWeb();
 
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
+      <CenteredWebContent
+        maxWidth={webContentWidth.narrow}
+        style={[
+          styles.content,
+          { transform: [{ translateY: isDesktopWeb ? -32 : -height * 0.125 }] },
+        ]}
+      >
         <Image
           source={require('../../assets/logo/white/pundit-white.png')}
-          style={styles.logo}
+          style={[styles.logo, { width: Math.min(width * 0.7, 360) }]}
           resizeMode="contain"
         />
 
@@ -49,7 +56,7 @@ export default function WelcomeScreen({
         </View>
 
         {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
-      </View>
+      </CenteredWebContent>
 
       <LawsOfTheGameModal
         visible={showLaws}
@@ -69,10 +76,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: theme.spacing.xl,
-    transform: [{ translateY: -height * 0.125 }],
   },
   logo: {
-    width: width * 0.7,
     height: 100,
     marginBottom: theme.spacing.lg,
   },

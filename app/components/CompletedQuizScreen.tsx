@@ -1,16 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Share } from 'react-native';
+import {
+  Image,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme/theme';
 import { CachedQuizResult } from '../storage/quizStorage';
-
-const { width } = Dimensions.get('window');
+import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
 
 interface CompletedQuizScreenProps {
   result: CachedQuizResult;
 }
 
 export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps) {
+  const { width } = useWindowDimensions();
   // Convert boolean array directly to emojis
   const emojis = result.answers.map(isCorrect => isCorrect ? '⚽️' : '❌').join('');
   const correctCount = result.answers.filter(isCorrect => isCorrect).length;
@@ -30,30 +38,32 @@ export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={styles.logoRow}>
-          <Image
-            source={require('../../assets/logo/white/pundit-white.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
+        <CenteredWebContent maxWidth={webContentWidth.narrow} style={styles.content}>
+          <View style={styles.logoRow}>
+            <Image
+              source={require('../../assets/logo/white/pundit-white.png')}
+              style={[styles.logo, { width: Math.min(width * 0.6, 300) }]}
+              resizeMode="contain"
+            />
+          </View>
 
-        <Text style={styles.subtitle}>Well played in today's game!</Text>
+          <Text style={styles.subtitle}>Well played in today's game!</Text>
 
-        <View style={styles.scoreBlock}>
-          <Text style={styles.scoreText}>{result.score} POINTS</Text>
-          <Text style={styles.emojiText}>{emojis}</Text>
-          {result.syncState === 'pending' && (
-            <Text style={styles.statusText}>Stats still syncing in the background.</Text>
-          )}
-          {result.syncState === 'failed' && (
-            <Text style={styles.statusText}>We will retry syncing your result shortly.</Text>
-          )}
-        </View>
+          <View style={styles.scoreBlock}>
+            <Text style={styles.scoreText}>{result.score} POINTS</Text>
+            <Text style={styles.emojiText}>{emojis}</Text>
+            {result.syncState === 'pending' && (
+              <Text style={styles.statusText}>Stats still syncing in the background.</Text>
+            )}
+            {result.syncState === 'failed' && (
+              <Text style={styles.statusText}>We will retry syncing your result shortly.</Text>
+            )}
+          </View>
 
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-          <Text style={styles.shareButtonText}>Share</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+            <Text style={styles.shareButtonText}>Share</Text>
+          </TouchableOpacity>
+        </CenteredWebContent>
       </SafeAreaView>
     </View>
   );
@@ -68,6 +78,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: theme.spacing.xl,
   },
+  content: {
+    flex: 1,
+  },
   logoRow: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -75,7 +88,6 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
   },
   logo: {
-    width: width * 0.6,
     height: 74,
   },
   subtitle: {

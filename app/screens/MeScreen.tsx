@@ -22,6 +22,7 @@ import EditProfileModal from '../components/EditProfileModal';
 import { useProfileStore } from '../state/useProfileStore';
 import AuthSyncScreen from '../components/AuthSyncScreen';
 import { loginWithAuth0 } from '../services/authFlow';
+import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 
 const EMPTY_STATS: UserStats = {
   streak: 0,
@@ -38,6 +39,7 @@ const EMPTY_STATS: UserStats = {
 };
 
 export default function MeScreen() {
+  const centeredProfileStyle = useCenteredWebStyle(webContentWidth.standard);
   const { stats, statsUserId, playedToday, revalidate, loading: profileLoading } = useProfileStore();
   const {
     user,
@@ -189,7 +191,7 @@ export default function MeScreen() {
           <Ionicons name="settings-sharp" size={24} color={theme.colors.textDark} />
         </TouchableOpacity>
 
-        <View style={styles.loggedOutContent}>
+        <View style={[styles.loggedOutContent, centeredProfileStyle]}>
           <Text style={styles.promoTitle}>Join our growing community!</Text>
           <Text style={styles.promoSubtitle}>
             View your stats, streak, leaderboards and more
@@ -243,7 +245,7 @@ export default function MeScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, centeredProfileStyle]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -287,7 +289,7 @@ export default function MeScreen() {
             <View style={styles.statCard}>
               <Text style={styles.statEmoji}>⭐</Text>
               <Text style={styles.statValue}>{localStats.bestScore}</Text>
-              <Text style={styles.statLabel}>High Score</Text>
+              <Text style={styles.statLabel}>Best Score</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statEmoji}>📊</Text>

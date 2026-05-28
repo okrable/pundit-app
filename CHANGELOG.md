@@ -2,6 +2,18 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v1.3.0 - Daily and weekly leaderboards
+
+- Added daily and weekly periods for global and friends leaderboards.
+- Added backend leaderboard response metadata and SQL indexes for current-week ranking.
+- Added period-aware leaderboard caching and UI controls.
+
+## v1.2.0 - Desktop web navigation and layout
+
+- Added a desktop web top navigation bar while preserving mobile bottom tabs.
+- Centered and constrained primary web content so quiz, results, leaderboard, challenge, and profile screens scale cleanly on desktop.
+- Capped viewport-scaled logos on web loading, welcome, and completed states.
+
 ## v1.1.0 - Current gameplay, auth, and documentation refresh
 
 - Refreshed daily quiz and challenge gameplay with denser shared question UI.

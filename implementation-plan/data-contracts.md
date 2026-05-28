@@ -47,5 +47,6 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 
 - `users` stores profile and aggregate stats.
 - `results` stores daily quiz submissions.
+- Daily leaderboards rank a single `quiz_date`; weekly leaderboards aggregate `results.score` from the current Monday-to-Sunday quiz week.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
 - Friend and username structures support social/profile features.

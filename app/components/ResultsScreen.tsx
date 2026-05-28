@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Quiz, QuizResultImmediate } from '../types';
 import { theme } from '../theme/theme';
+import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
 
 const logoImage = require('../../assets/logo/dark/pundit-black.png');
 const celebrationImage = require('../../assets/images/Asset 9.png');
@@ -68,7 +69,7 @@ export default function ResultsScreen({ result, quiz }: ResultsScreenProps) {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <View style={styles.content}>
+      <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
         <View style={styles.topBar}>
           <Image source={logoImage} style={styles.logo} resizeMode="contain" />
         </View>
@@ -121,7 +122,7 @@ export default function ResultsScreen({ result, quiz }: ResultsScreenProps) {
         <TouchableOpacity style={styles.shareButton} onPress={handleShare} activeOpacity={0.86}>
           <Text style={styles.shareButtonText}>Share result</Text>
         </TouchableOpacity>
-      </View>
+      </CenteredWebContent>
     </SafeAreaView>
   );
 }

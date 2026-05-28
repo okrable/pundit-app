@@ -64,13 +64,24 @@ export interface QuizResult {
   syncState?: SyncState;
 }
 
+export type LeaderboardPeriod = 'daily' | 'weekly';
+
 export interface LeaderboardEntry {
   userId: string;
   displayName: string | null;
   username: string | null;
   score: number;
+  gamesPlayed: number;
   streak: number;
   rank: number;
+}
+
+export interface GlobalLeaderboardResponse {
+  period: LeaderboardPeriod;
+  quizDate: string;
+  weekStart: string;
+  weekEnd: string;
+  leaderboard: LeaderboardEntry[];
 }
 
 export interface UserStats {
@@ -215,15 +226,22 @@ export interface FriendsLeaderboardEntry {
   displayName: string | null;
   username: string | null;
   score: number;
+  gamesPlayed: number;
   streak: number;
   rank: number | null;
   hasPlayedToday: boolean;
+  hasPlayedThisWeek?: boolean;
 }
 
 export interface FriendsLeaderboardResponse {
+  period: LeaderboardPeriod;
+  quizDate: string;
+  weekStart: string;
+  weekEnd: string;
   leaderboard: FriendsLeaderboardEntry[];
   totalFriends: number;
   friendsPlayedToday: number;
+  friendsPlayedThisWeek: number;
 }
 
 export interface CreateFriendLinkResponse {

@@ -12,6 +12,7 @@ import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
 import { getTodayQuizResult } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
+import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 
 const REVEAL_SUSPENSE_DELAY = 1000;
 const RESULT_HOLD_DELAY = 1650;
@@ -27,6 +28,7 @@ function calculatePoints(timeRemaining: number): number {
 }
 
 export default function DailyQuizScreen() {
+  const centeredQuizStyle = useCenteredWebStyle(webContentWidth.quiz);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showingResult, setShowingResult] = useState(false);
@@ -358,7 +360,7 @@ export default function DailyQuizScreen() {
       >
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={[styles.contentContainer, centeredQuizStyle]}
           showsVerticalScrollIndicator={false}
         >
           {currentQuestion && (

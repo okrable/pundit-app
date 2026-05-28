@@ -16,6 +16,7 @@ import { useAuthStore } from '../state/useAuthStore';
 import { theme } from '../theme/theme';
 import type { ChallengeSubmitResult } from '../types';
 import Avatar from '../components/Avatar';
+import CenteredWebContent, { webContentWidth } from '../components/ResponsiveLayout';
 
 const logoImage = require('../../assets/logo/dark/pundit-black.png');
 const celebrationImage = require('../../assets/images/Asset 9.png');
@@ -143,7 +144,7 @@ export default function ChallengeResultsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <View style={styles.content}>
+      <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
         <View style={styles.topBar}>
           <Image source={logoImage} style={styles.logo} resizeMode="contain" />
         </View>
@@ -238,7 +239,7 @@ export default function ChallengeResultsScreen() {
             <Text style={styles.backButtonText}>Back to challenges</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </CenteredWebContent>
     </SafeAreaView>
   );
 }

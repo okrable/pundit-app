@@ -4,6 +4,7 @@ dist/
 ios/build/
 android/app/build/
 android/.gradle/
+runtime/
 .DS_Store
 *.log
 .env

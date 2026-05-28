@@ -172,16 +172,19 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   },
 
   markPlayedToday: async (result: QuizResultImmediate | QuizResult, userId: string) => {
+    const isGuest = userId.startsWith('guest_');
+    const alreadyPlayedToday = get().playedToday;
     const currentStats = get().stats ?? (userId.startsWith('guest_') ? GUEST_STATS : null);
     if (!currentStats) {
+      const isServerConfirmed = result.syncState === undefined || result.syncState === 'synced';
       const nextStats: UserStats = {
         ...GUEST_STATS,
-        streak: result.streak,
+        streak: isGuest || isServerConfirmed ? result.streak : 0,
         bestScore: Math.max(result.bestScore, result.score),
-        totalQuizzes: 1,
+        totalQuizzes: isGuest || isServerConfirmed ? 1 : 0,
       };
 
-      if (!userId.startsWith('guest_')) {
+      if (!isGuest) {
         await setCachedUserStats(userId, nextStats);
       }
 
@@ -194,16 +197,17 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       return;
     }
 
+    const isServerConfirmed = result.syncState === undefined || result.syncState === 'synced';
     const nextStats: UserStats = {
       ...currentStats,
-      streak: Math.max(currentStats.streak, result.streak),
+      streak: isGuest || isServerConfirmed ? result.streak : currentStats.streak,
       bestScore: Math.max(currentStats.bestScore, result.bestScore, result.score),
-      totalQuizzes: userId.startsWith('guest_')
-        ? Math.max(currentStats.totalQuizzes, 1)
-        : Math.max(currentStats.totalQuizzes, 1),
+      totalQuizzes: isGuest && !alreadyPlayedToday
+        ? currentStats.totalQuizzes + 1
+        : currentStats.totalQuizzes,
     };
 
-    if (!userId.startsWith('guest_')) {
+    if (!isGuest) {
       await setCachedUserStats(userId, nextStats);
     }
 
