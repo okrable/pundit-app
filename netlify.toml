@@ -1,6 +1,10 @@
 [build]
+  command = "npm run build:web"
   functions = "netlify/functions"
-  publish = "netlify/static"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20.19.4"
 
 [functions]
   node_bundler = "esbuild"
@@ -9,4 +13,10 @@
 [[redirects]]
   from = "/f/*"
   to = "/.netlify/functions/f/:splat"
+  status = 200
+
+# Expo web app fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200

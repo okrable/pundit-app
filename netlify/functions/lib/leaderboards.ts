@@ -71,6 +71,7 @@ export async function getGlobalLeaderboardRows(
           r.user_id,
           SUM(r.score)::INT as score,
           COUNT(*)::INT as games_played,
+          BOOL_OR(r.quiz_date = $3::DATE) as has_played_today,
           MIN(r.created_at) as first_result_at
         FROM results r
         WHERE r.quiz_date BETWEEN $1 AND $2
@@ -88,6 +89,7 @@ export async function getGlobalLeaderboardRows(
             ELSE 0
           END as streak,
           RANK() OVER (ORDER BY ws.score DESC) as rank,
+          ws.has_played_today,
           ws.first_result_at
         FROM weekly_scores ws
         JOIN users u ON u.id = ws.user_id
@@ -99,7 +101,9 @@ export async function getGlobalLeaderboardRows(
         score,
         games_played,
         streak,
-        rank
+        rank,
+        has_played_today,
+        true as has_played_this_week
       FROM ranked
       ORDER BY rank ASC, games_played DESC, first_result_at ASC, user_id ASC
       LIMIT $5`,
@@ -134,7 +138,9 @@ export async function getGlobalLeaderboardRows(
       score,
       games_played,
       streak,
-      rank
+      rank,
+      true as has_played_today,
+      true as has_played_this_week
     FROM ranked
     ORDER BY rank ASC, created_at ASC, user_id ASC
     LIMIT $3`,

@@ -3,7 +3,6 @@
 .netlify
 node_modules
 runtime
-dist
 ios/build
 android/app/build
 android/.gradle
