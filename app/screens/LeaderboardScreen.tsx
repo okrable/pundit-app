@@ -32,15 +32,13 @@ export default function LeaderboardScreen() {
   const [showManageFriends, setShowManageFriends] = useState(false);
 
   const {
-    friendsLeaderboard,
-    totalFriends,
-    friendsPlayedToday,
-    friendsPlayedThisWeek,
-    globalLeaderboard,
-    friendsPeriod,
-    globalPeriod,
-    loadingFriends,
-    loadingGlobal,
+    friendsLeaderboards,
+    totalFriendsByPeriod,
+    friendsPlayedTodayByPeriod,
+    friendsPlayedThisWeekByPeriod,
+    globalLeaderboards,
+    loadingFriendsByPeriod,
+    loadingGlobalByPeriod,
     error,
     revalidateFriends,
     revalidateGlobal,
@@ -61,9 +59,9 @@ export default function LeaderboardScreen() {
   const refreshCurrentView = useCallback(async () => {
     try {
       if (viewMode === 'friends' && isAuthenticated && user?.sub) {
-        await revalidateFriends(user.sub, period);
+        await revalidateFriends(user.sub, period, { force: true });
       } else {
-        await revalidateGlobal(period);
+        await revalidateGlobal(period, { force: true });
       }
     } finally {
       setRefreshing(false);
@@ -303,13 +301,16 @@ export default function LeaderboardScreen() {
 
   const isFriendsView = viewMode === 'friends' && isAuthenticated;
   const activeLoading = isFriendsView
-    ? loadingFriends && friendsPeriod === period
-    : loadingGlobal && globalPeriod === period;
-  const activeFriendsData = friendsPeriod === period ? friendsLeaderboard : [];
-  const activeGlobalData = globalPeriod === period ? globalLeaderboard : [];
+    ? loadingFriendsByPeriod[period]
+    : loadingGlobalByPeriod[period];
+  const activeFriendsData = friendsLeaderboards[period];
+  const activeGlobalData = globalLeaderboards[period];
   const activeData = isFriendsView
     ? activeFriendsData
     : activeGlobalData;
+  const totalFriends = totalFriendsByPeriod[period];
+  const friendsPlayedToday = friendsPlayedTodayByPeriod[period];
+  const friendsPlayedThisWeek = friendsPlayedThisWeekByPeriod[period];
 
   if (isAuthLoading) {
     return <AuthSyncScreen />;

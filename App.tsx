@@ -14,6 +14,7 @@ import BootstrapScreen from './app/components/BootstrapScreen';
 import { prefetchDailyLoop } from './app/services/dailyLoop';
 import { theme } from './app/theme/theme';
 import { logError, logInfo, startDebugSession } from './app/services/debugLog';
+import { MobileWebAppShell } from './app/components/ResponsiveLayout';
 
 const Stack = createNativeStackNavigator();
 
@@ -121,9 +122,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <AppContent />
-      </NavigationContainer>
+      <MobileWebAppShell>
+        <NavigationContainer>
+          <AppContent />
+        </NavigationContainer>
+      </MobileWebAppShell>
     </SafeAreaProvider>
   );
 }

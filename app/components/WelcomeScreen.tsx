@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
 import { theme } from '../theme/theme';
 import LawsOfTheGameModal from './LawsOfTheGameModal';
-import CenteredWebContent, { useIsDesktopWeb, webContentWidth } from './ResponsiveLayout';
+import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
 
 interface WelcomeScreenProps {
   onStartQuiz: () => void;
@@ -17,7 +17,7 @@ export default function WelcomeScreen({
 }: WelcomeScreenProps) {
   const [showLaws, setShowLaws] = useState(false);
   const { width, height } = useWindowDimensions();
-  const isDesktopWeb = useIsDesktopWeb();
+  const verticalLift = -Math.min(height * 0.125, 92);
 
   return (
     <View style={styles.container}>
@@ -25,7 +25,7 @@ export default function WelcomeScreen({
         maxWidth={webContentWidth.narrow}
         style={[
           styles.content,
-          { transform: [{ translateY: isDesktopWeb ? -32 : -height * 0.125 }] },
+          { transform: [{ translateY: verticalLift }] },
         ]}
       >
         <Image

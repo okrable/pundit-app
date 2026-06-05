@@ -21,6 +21,7 @@ import Animated, {
 import { Question } from '../types';
 import { theme } from '../theme/theme';
 import CountdownTimer from './CountdownTimer';
+import { useMobileLayoutMetrics } from './ResponsiveLayout';
 
 const TYPING_SPEED = 30;
 const TYPING_SPEED_FAST = 8;
@@ -82,6 +83,9 @@ interface OptionTileProps {
   isCorrectOption: boolean;
   isWrongSelected: boolean;
   onPress: () => void;
+  minHeight: number;
+  padding: number;
+  useSingleColumn: boolean;
 }
 
 function OptionTile({
@@ -93,6 +97,9 @@ function OptionTile({
   isCorrectOption,
   isWrongSelected,
   onPress,
+  minHeight,
+  padding,
+  useSingleColumn,
 }: OptionTileProps) {
   const scale = useSharedValue(1);
 
@@ -148,7 +155,11 @@ function OptionTile({
   return (
     <Animated.View
       layout={LinearTransition.duration(180)}
-      style={[styles.optionWrapper, animatedStyle]}
+      style={[
+        styles.optionWrapper,
+        useSingleColumn ? styles.optionWrapperSingleColumn : null,
+        animatedStyle,
+      ]}
     >
       <Animated.View
         entering={FadeIn.duration(OPTION_FADE_DURATION).delay(index * OPTION_STAGGER_DELAY)}
@@ -156,6 +167,7 @@ function OptionTile({
         <Pressable
           style={({ pressed }) => [
             tileStyles,
+            { minHeight, padding },
             pressed && !isLocked ? styles.optionButtonPressed : null,
           ]}
           onPress={onPress}
@@ -198,6 +210,7 @@ export default function QuestionCard({
   onTimeUp,
 }: QuestionCardProps) {
   const [displayedText, setDisplayedText] = useState('');
+  const layout = useMobileLayoutMetrics();
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const [revealPhraseSetIndex, setRevealPhraseSetIndex] = useState<number | null>(null);
   const typingTimer = useRef<NodeJS.Timeout | null>(null);
@@ -307,7 +320,17 @@ export default function QuestionCard({
         : revealPhraseSet.locked;
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingHorizontal: layout.screenPadding,
+          paddingTop: layout.quizTopPadding,
+          paddingBottom: layout.quizBottomPadding,
+          gap: layout.verticalGap,
+        },
+      ]}
+    >
       <View style={styles.topBar}>
         <Image
           source={logoImage}
@@ -341,9 +364,22 @@ export default function QuestionCard({
       <Animated.View
         key={question.id}
         entering={FadeIn.duration(220)}
-        style={[styles.questionContent, questionContentAnimatedStyle]}
+        style={[
+          styles.questionContent,
+          { gap: layout.verticalGap },
+          questionContentAnimatedStyle,
+        ]}
       >
-        <View style={styles.playArea}>
+        <View
+          style={[
+            styles.playArea,
+            {
+              minHeight: layout.playAreaMinHeight,
+              padding: layout.cardPadding,
+              gap: layout.verticalGap,
+            },
+          ]}
+        >
           <View style={styles.timerRow}>
             <CountdownTimer
               duration={timerDuration}
@@ -369,7 +405,13 @@ export default function QuestionCard({
           <View style={styles.promptFrame}>
             <Animated.Text
               entering={FadeIn.duration(160)}
-              style={styles.prompt}
+              style={[
+                styles.prompt,
+                {
+                  fontSize: layout.promptFontSize,
+                  lineHeight: layout.promptLineHeight,
+                },
+              ]}
             >
               {displayedText}
             </Animated.Text>
@@ -388,7 +430,7 @@ export default function QuestionCard({
           </Text>
         </View>
 
-        <View style={styles.optionsStage}>
+        <View style={[styles.optionsStage, { minHeight: layout.optionStageMinHeight }]}>
           {isTypingComplete && (
             <View style={styles.optionsContainer}>
               {question.options.map((option, index) => {
@@ -408,6 +450,9 @@ export default function QuestionCard({
                     isCorrectOption={isCorrectOption}
                     isWrongSelected={isWrongSelected}
                     onPress={() => onSelectOption(index)}
+                    minHeight={layout.optionMinHeight}
+                    padding={layout.optionPadding}
+                    useSingleColumn={layout.useSingleColumnOptions}
                   />
                 );
               })}
@@ -561,13 +606,14 @@ const styles = StyleSheet.create({
     flexBasis: '48%',
     flexGrow: 1,
   },
+  optionWrapperSingleColumn: {
+    flexBasis: '100%',
+  },
   optionButton: {
-    minHeight: 78,
     backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: '#D9D0C1',
-    padding: theme.spacing.md,
     gap: theme.spacing.sm,
     justifyContent: 'center',
   },

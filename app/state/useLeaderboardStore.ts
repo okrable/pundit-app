@@ -14,30 +14,68 @@ import {
   setCachedFriendsLeaderboard,
   setCachedGlobalLeaderboard,
 } from '../storage/leaderboardCache';
+import { isResourceStale } from '../storage/resourceCache';
 import { useAuthStore } from './useAuthStore';
 import { logError, logInfo, logWarn } from '../services/debugLog';
 import { getQuizDate } from '../utils/quizDate';
 
+type LeaderboardByPeriod<T> = Record<LeaderboardPeriod, T>;
+type LoadingByPeriod = Record<LeaderboardPeriod, boolean>;
+
+interface RevalidateOptions {
+  force?: boolean;
+}
+
 interface LeaderboardState {
-  friendsLeaderboard: FriendsLeaderboardEntry[];
-  totalFriends: number;
-  friendsPlayedToday: number;
-  friendsPlayedThisWeek: number;
-  globalLeaderboard: LeaderboardEntry[];
-  friendsPeriod: LeaderboardPeriod;
-  globalPeriod: LeaderboardPeriod;
-  friendsCache: CacheEnvelope<FriendsLeaderboardResponse> | null;
-  globalCache: CacheEnvelope<GlobalLeaderboardResponse> | null;
-  loadingFriends: boolean;
-  loadingGlobal: boolean;
+  friendsLeaderboards: LeaderboardByPeriod<FriendsLeaderboardEntry[]>;
+  totalFriendsByPeriod: LeaderboardByPeriod<number>;
+  friendsPlayedTodayByPeriod: LeaderboardByPeriod<number>;
+  friendsPlayedThisWeekByPeriod: LeaderboardByPeriod<number>;
+  globalLeaderboards: LeaderboardByPeriod<LeaderboardEntry[]>;
+  friendsCaches: LeaderboardByPeriod<CacheEnvelope<FriendsLeaderboardResponse> | null>;
+  globalCaches: LeaderboardByPeriod<CacheEnvelope<GlobalLeaderboardResponse> | null>;
+  loadingFriendsByPeriod: LoadingByPeriod;
+  loadingGlobalByPeriod: LoadingByPeriod;
   error: string | null;
   hydrateFromCache: (userId: string, period?: LeaderboardPeriod) => Promise<void>;
-  revalidateFriends: (userId: string, period?: LeaderboardPeriod) => Promise<void>;
-  revalidateGlobal: (period?: LeaderboardPeriod) => Promise<void>;
+  revalidateFriends: (
+    userId: string,
+    period?: LeaderboardPeriod,
+    options?: RevalidateOptions
+  ) => Promise<void>;
+  revalidateGlobal: (period?: LeaderboardPeriod, options?: RevalidateOptions) => Promise<void>;
   prefetchDailyLoop: (userId: string, isAuthenticated: boolean) => Promise<void>;
   invalidateFriends: (userId: string, period?: LeaderboardPeriod) => Promise<void>;
   reset: () => void;
 }
+
+const emptyFriendsLeaderboards = (): LeaderboardByPeriod<FriendsLeaderboardEntry[]> => ({
+  daily: [],
+  weekly: [],
+});
+
+const emptyGlobalLeaderboards = (): LeaderboardByPeriod<LeaderboardEntry[]> => ({
+  daily: [],
+  weekly: [],
+});
+
+const emptyNumberByPeriod = (): LeaderboardByPeriod<number> => ({
+  daily: 0,
+  weekly: 0,
+});
+
+const emptyCaches = <T>(): LeaderboardByPeriod<CacheEnvelope<T> | null> => ({
+  daily: null,
+  weekly: null,
+});
+
+const emptyLoading = (): LoadingByPeriod => ({
+  daily: false,
+  weekly: false,
+});
+
+const friendsRequests = new Map<string, Promise<void>>();
+const globalRequests = new Map<LeaderboardPeriod, Promise<void>>();
 
 function isCurrentAuthUser(userId: string): boolean {
   const authState = useAuthStore.getState();
@@ -93,60 +131,98 @@ function buildSelfOnlyFriendsResponse(
 }
 
 function hasUsableFriendsData(
-  state: Pick<LeaderboardState, 'friendsLeaderboard' | 'friendsCache'>,
+  state: Pick<LeaderboardState, 'friendsLeaderboards' | 'friendsCaches'>,
   period: LeaderboardPeriod
 ): boolean {
   return (
-    state.friendsLeaderboard.length > 0 ||
+    state.friendsLeaderboards[period].length > 0 ||
     Boolean(
-      state.friendsCache?.data.period === period &&
-        state.friendsCache.data.leaderboard.length > 0
+      state.friendsCaches[period]?.data.period === period &&
+        state.friendsCaches[period]?.data.leaderboard.length
     )
   );
 }
 
 export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
-  friendsLeaderboard: [],
-  totalFriends: 0,
-  friendsPlayedToday: 0,
-  friendsPlayedThisWeek: 0,
-  globalLeaderboard: [],
-  friendsPeriod: 'daily',
-  globalPeriod: 'daily',
-  friendsCache: null,
-  globalCache: null,
-  loadingFriends: false,
-  loadingGlobal: false,
+  friendsLeaderboards: emptyFriendsLeaderboards(),
+  totalFriendsByPeriod: emptyNumberByPeriod(),
+  friendsPlayedTodayByPeriod: emptyNumberByPeriod(),
+  friendsPlayedThisWeekByPeriod: emptyNumberByPeriod(),
+  globalLeaderboards: emptyGlobalLeaderboards(),
+  friendsCaches: emptyCaches<FriendsLeaderboardResponse>(),
+  globalCaches: emptyCaches<GlobalLeaderboardResponse>(),
+  loadingFriendsByPeriod: emptyLoading(),
+  loadingGlobalByPeriod: emptyLoading(),
   error: null,
 
   hydrateFromCache: async (userId: string, period: LeaderboardPeriod = 'daily') => {
     logInfo('leaderboard.cache.hydrate.start', { userId, period });
-    const [friendsCache, globalCache] = await Promise.all([
-      userId.startsWith('guest_') ? Promise.resolve(null) : getCachedFriendsLeaderboard(userId, period),
-      getCachedGlobalLeaderboard(period),
-    ]);
+    const [dailyFriendsCache, weeklyFriendsCache, dailyGlobalCache, weeklyGlobalCache] =
+      await Promise.all([
+        userId.startsWith('guest_')
+          ? Promise.resolve(null)
+          : getCachedFriendsLeaderboard(userId, 'daily'),
+        userId.startsWith('guest_')
+          ? Promise.resolve(null)
+          : getCachedFriendsLeaderboard(userId, 'weekly'),
+        getCachedGlobalLeaderboard('daily'),
+        getCachedGlobalLeaderboard('weekly'),
+      ]);
 
-    set({
-      friendsLeaderboard: friendsCache?.data.leaderboard ?? [],
-      totalFriends: friendsCache?.data.totalFriends ?? 0,
-      friendsPlayedToday: friendsCache?.data.friendsPlayedToday ?? 0,
-      friendsPlayedThisWeek: friendsCache?.data.friendsPlayedThisWeek ?? 0,
-      globalLeaderboard: globalCache?.data.leaderboard ?? [],
-      friendsPeriod: period,
-      globalPeriod: period,
-      friendsCache,
-      globalCache,
+    set((state) => ({
+      friendsLeaderboards: {
+        daily: dailyFriendsCache?.data.leaderboard ?? state.friendsLeaderboards.daily,
+        weekly: weeklyFriendsCache?.data.leaderboard ?? state.friendsLeaderboards.weekly,
+      },
+      totalFriendsByPeriod: {
+        daily: dailyFriendsCache?.data.totalFriends ?? state.totalFriendsByPeriod.daily,
+        weekly: weeklyFriendsCache?.data.totalFriends ?? state.totalFriendsByPeriod.weekly,
+      },
+      friendsPlayedTodayByPeriod: {
+        daily:
+          dailyFriendsCache?.data.friendsPlayedToday ??
+          state.friendsPlayedTodayByPeriod.daily,
+        weekly:
+          weeklyFriendsCache?.data.friendsPlayedToday ??
+          state.friendsPlayedTodayByPeriod.weekly,
+      },
+      friendsPlayedThisWeekByPeriod: {
+        daily:
+          dailyFriendsCache?.data.friendsPlayedThisWeek ??
+          state.friendsPlayedThisWeekByPeriod.daily,
+        weekly:
+          weeklyFriendsCache?.data.friendsPlayedThisWeek ??
+          state.friendsPlayedThisWeekByPeriod.weekly,
+      },
+      globalLeaderboards: {
+        daily: dailyGlobalCache?.data.leaderboard ?? state.globalLeaderboards.daily,
+        weekly: weeklyGlobalCache?.data.leaderboard ?? state.globalLeaderboards.weekly,
+      },
+      friendsCaches: {
+        daily: dailyFriendsCache,
+        weekly: weeklyFriendsCache,
+      },
+      globalCaches: {
+        daily: dailyGlobalCache,
+        weekly: weeklyGlobalCache,
+      },
       error: null,
-    });
+    }));
     logInfo('leaderboard.cache.hydrate.success', {
       userId,
       period,
-      friendsCount: friendsCache?.data.leaderboard.length ?? 0,
-      globalCount: globalCache?.data.leaderboard.length ?? 0,
+      friendsDailyCount: dailyFriendsCache?.data.leaderboard.length ?? 0,
+      friendsWeeklyCount: weeklyFriendsCache?.data.leaderboard.length ?? 0,
+      globalDailyCount: dailyGlobalCache?.data.leaderboard.length ?? 0,
+      globalWeeklyCount: weeklyGlobalCache?.data.leaderboard.length ?? 0,
     });
   },
 
-  revalidateFriends: async (userId: string, period: LeaderboardPeriod = 'daily') => {
+  revalidateFriends: async (
+    userId: string,
+    period: LeaderboardPeriod = 'daily',
+    options: RevalidateOptions = {}
+  ) => {
     if (userId.startsWith('guest_') || !useAuthStore.getState().token) {
       logInfo('leaderboard.friends.skip', {
         userId,
@@ -157,106 +233,220 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
       return;
     }
 
-    logInfo('leaderboard.friends.start', { userId, period });
-    set({ loadingFriends: true, error: null, friendsPeriod: period });
-    try {
-      const data = await getFriendsLeaderboard(userId, period);
-      await setCachedFriendsLeaderboard(userId, data);
-      const refreshedCache = await getCachedFriendsLeaderboard(userId, period);
-
-      if (get().friendsPeriod !== period || !isCurrentAuthUser(userId)) {
-        logInfo('leaderboard.friends.stale_response', { userId, period });
-        return;
-      }
-
-      set({
-        friendsLeaderboard: data.leaderboard,
-        totalFriends: data.totalFriends,
-        friendsPlayedToday: data.friendsPlayedToday,
-        friendsPlayedThisWeek: data.friendsPlayedThisWeek,
-        friendsCache: refreshedCache,
-        loadingFriends: false,
-        error: null,
-      });
-      logInfo('leaderboard.friends.success', { userId, period, count: data.leaderboard.length });
-    } catch (error) {
-      if (get().friendsPeriod !== period || !isCurrentAuthUser(userId)) {
-        return;
-      }
-
-      if (hasUsableFriendsData(get(), period)) {
-        logWarn('leaderboard.friends.refresh_failed_using_stale', {
-          userId,
-          period,
-          message: error instanceof Error ? error.message : 'Failed to load friends leaderboard',
-        });
-        set({
-          loadingFriends: false,
-          error: null,
-        });
-        return;
-      }
-
-      if (
-        error instanceof ApiError &&
-        error.statusCode === 408 &&
-        get().totalFriends === 0 &&
-        get().friendsLeaderboard.length <= 1
-      ) {
-        const fallback = buildSelfOnlyFriendsResponse(userId, period);
-        await setCachedFriendsLeaderboard(userId, fallback);
-        const refreshedCache = await getCachedFriendsLeaderboard(userId, period);
-        logWarn('leaderboard.friends.timeout_self_only_fallback', { userId, period });
-        set({
-          friendsLeaderboard: fallback.leaderboard,
-          totalFriends: fallback.totalFriends,
-          friendsPlayedToday: fallback.friendsPlayedToday,
-          friendsPlayedThisWeek: fallback.friendsPlayedThisWeek,
-          friendsCache: refreshedCache,
-          loadingFriends: false,
-          error: null,
-        });
-        return;
-      }
-
-      logError('leaderboard.friends.error', error);
-      set({
-        loadingFriends: false,
-        error: error instanceof Error ? error.message : 'Failed to load friends leaderboard',
-      });
+    const cache = get().friendsCaches[period];
+    if (!options.force && cache && !isResourceStale(cache)) {
+      logInfo('leaderboard.friends.fresh_cache_skip', { userId, period });
+      return;
     }
+
+    const requestKey = `${userId}:${period}`;
+    const inFlightRequest = friendsRequests.get(requestKey);
+    if (inFlightRequest) {
+      logInfo('leaderboard.friends.in_flight_reuse', { userId, period });
+      return inFlightRequest;
+    }
+
+    const request = (async () => {
+      logInfo('leaderboard.friends.start', { userId, period, force: Boolean(options.force) });
+      set((state) => ({
+        loadingFriendsByPeriod: {
+          ...state.loadingFriendsByPeriod,
+          [period]: true,
+        },
+        error: null,
+      }));
+
+      try {
+        const data = await getFriendsLeaderboard(userId, period);
+        await setCachedFriendsLeaderboard(userId, data);
+        const refreshedCache = await getCachedFriendsLeaderboard(userId, period);
+
+        if (!isCurrentAuthUser(userId)) {
+          logInfo('leaderboard.friends.stale_response', { userId, period });
+          return;
+        }
+
+        set((state) => ({
+          friendsLeaderboards: {
+            ...state.friendsLeaderboards,
+            [period]: data.leaderboard,
+          },
+          totalFriendsByPeriod: {
+            ...state.totalFriendsByPeriod,
+            [period]: data.totalFriends,
+          },
+          friendsPlayedTodayByPeriod: {
+            ...state.friendsPlayedTodayByPeriod,
+            [period]: data.friendsPlayedToday,
+          },
+          friendsPlayedThisWeekByPeriod: {
+            ...state.friendsPlayedThisWeekByPeriod,
+            [period]: data.friendsPlayedThisWeek,
+          },
+          friendsCaches: {
+            ...state.friendsCaches,
+            [period]: refreshedCache,
+          },
+          loadingFriendsByPeriod: {
+            ...state.loadingFriendsByPeriod,
+            [period]: false,
+          },
+          error: null,
+        }));
+        logInfo('leaderboard.friends.success', { userId, period, count: data.leaderboard.length });
+      } catch (error) {
+        if (!isCurrentAuthUser(userId)) {
+          return;
+        }
+
+        if (hasUsableFriendsData(get(), period)) {
+          logWarn('leaderboard.friends.refresh_failed_using_stale', {
+            userId,
+            period,
+            message: error instanceof Error ? error.message : 'Failed to load friends leaderboard',
+          });
+          set((state) => ({
+            loadingFriendsByPeriod: {
+              ...state.loadingFriendsByPeriod,
+              [period]: false,
+            },
+            error: null,
+          }));
+          return;
+        }
+
+        if (
+          error instanceof ApiError &&
+          error.statusCode === 408 &&
+          get().totalFriendsByPeriod[period] === 0 &&
+          get().friendsLeaderboards[period].length <= 1
+        ) {
+          const fallback = buildSelfOnlyFriendsResponse(userId, period);
+          await setCachedFriendsLeaderboard(userId, fallback);
+          const refreshedCache = await getCachedFriendsLeaderboard(userId, period);
+          logWarn('leaderboard.friends.timeout_self_only_fallback', { userId, period });
+          set((state) => ({
+            friendsLeaderboards: {
+              ...state.friendsLeaderboards,
+              [period]: fallback.leaderboard,
+            },
+            totalFriendsByPeriod: {
+              ...state.totalFriendsByPeriod,
+              [period]: fallback.totalFriends,
+            },
+            friendsPlayedTodayByPeriod: {
+              ...state.friendsPlayedTodayByPeriod,
+              [period]: fallback.friendsPlayedToday,
+            },
+            friendsPlayedThisWeekByPeriod: {
+              ...state.friendsPlayedThisWeekByPeriod,
+              [period]: fallback.friendsPlayedThisWeek,
+            },
+            friendsCaches: {
+              ...state.friendsCaches,
+              [period]: refreshedCache,
+            },
+            loadingFriendsByPeriod: {
+              ...state.loadingFriendsByPeriod,
+              [period]: false,
+            },
+            error: null,
+          }));
+          return;
+        }
+
+        logError('leaderboard.friends.error', error);
+        set((state) => ({
+          loadingFriendsByPeriod: {
+            ...state.loadingFriendsByPeriod,
+            [period]: false,
+          },
+          error: error instanceof Error ? error.message : 'Failed to load friends leaderboard',
+        }));
+      } finally {
+        friendsRequests.delete(requestKey);
+        set((state) => ({
+          loadingFriendsByPeriod: {
+            ...state.loadingFriendsByPeriod,
+            [period]: false,
+          },
+        }));
+      }
+    })();
+
+    friendsRequests.set(requestKey, request);
+    return request;
   },
 
-  revalidateGlobal: async (period: LeaderboardPeriod = 'daily') => {
-    logInfo('leaderboard.global.start', { period });
-    set({ loadingGlobal: true, error: null, globalPeriod: period });
-    try {
-      const data = await getLeaderboard(period);
-      await setCachedGlobalLeaderboard(data);
-      const refreshedCache = await getCachedGlobalLeaderboard(period);
-
-      if (get().globalPeriod !== period) {
-        logInfo('leaderboard.global.stale_response', { period });
-        return;
-      }
-
-      set({
-        globalLeaderboard: data.leaderboard,
-        globalCache: refreshedCache,
-        loadingGlobal: false,
-        error: null,
-      });
-      logInfo('leaderboard.global.success', { period, count: data.leaderboard.length });
-    } catch (error) {
-      logError('leaderboard.global.error', error);
-      if (get().globalPeriod !== period) {
-        return;
-      }
-      set({
-        loadingGlobal: false,
-        error: error instanceof Error ? error.message : 'Failed to load leaderboard',
-      });
+  revalidateGlobal: async (
+    period: LeaderboardPeriod = 'daily',
+    options: RevalidateOptions = {}
+  ) => {
+    const cache = get().globalCaches[period];
+    if (!options.force && cache && !isResourceStale(cache)) {
+      logInfo('leaderboard.global.fresh_cache_skip', { period });
+      return;
     }
+
+    const inFlightRequest = globalRequests.get(period);
+    if (inFlightRequest) {
+      logInfo('leaderboard.global.in_flight_reuse', { period });
+      return inFlightRequest;
+    }
+
+    const request = (async () => {
+      logInfo('leaderboard.global.start', { period, force: Boolean(options.force) });
+      set((state) => ({
+        loadingGlobalByPeriod: {
+          ...state.loadingGlobalByPeriod,
+          [period]: true,
+        },
+        error: null,
+      }));
+
+      try {
+        const data = await getLeaderboard(period);
+        await setCachedGlobalLeaderboard(data);
+        const refreshedCache = await getCachedGlobalLeaderboard(period);
+
+        set((state) => ({
+          globalLeaderboards: {
+            ...state.globalLeaderboards,
+            [period]: data.leaderboard,
+          },
+          globalCaches: {
+            ...state.globalCaches,
+            [period]: refreshedCache,
+          },
+          loadingGlobalByPeriod: {
+            ...state.loadingGlobalByPeriod,
+            [period]: false,
+          },
+          error: null,
+        }));
+        logInfo('leaderboard.global.success', { period, count: data.leaderboard.length });
+      } catch (error) {
+        logError('leaderboard.global.error', error);
+        set((state) => ({
+          loadingGlobalByPeriod: {
+            ...state.loadingGlobalByPeriod,
+            [period]: false,
+          },
+          error: error instanceof Error ? error.message : 'Failed to load leaderboard',
+        }));
+      } finally {
+        globalRequests.delete(period);
+        set((state) => ({
+          loadingGlobalByPeriod: {
+            ...state.loadingGlobalByPeriod,
+            [period]: false,
+          },
+        }));
+      }
+    })();
+
+    globalRequests.set(period, request);
+    return request;
   },
 
   prefetchDailyLoop: async (userId: string, isAuthenticated: boolean) => {
@@ -271,30 +461,28 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   invalidateFriends: async (userId: string, period: LeaderboardPeriod = 'daily') => {
     if (userId.startsWith('guest_')) {
       set({
-        friendsLeaderboard: [],
-        totalFriends: 0,
-        friendsPlayedToday: 0,
-        friendsPlayedThisWeek: 0,
-        friendsCache: null,
+        friendsLeaderboards: emptyFriendsLeaderboards(),
+        totalFriendsByPeriod: emptyNumberByPeriod(),
+        friendsPlayedTodayByPeriod: emptyNumberByPeriod(),
+        friendsPlayedThisWeekByPeriod: emptyNumberByPeriod(),
+        friendsCaches: emptyCaches<FriendsLeaderboardResponse>(),
       });
       return;
     }
 
-    await get().revalidateFriends(userId, period);
+    await get().revalidateFriends(userId, period, { force: true });
   },
 
   reset: () => set({
-    friendsLeaderboard: [],
-    totalFriends: 0,
-    friendsPlayedToday: 0,
-    friendsPlayedThisWeek: 0,
-    globalLeaderboard: [],
-    friendsPeriod: 'daily',
-    globalPeriod: 'daily',
-    friendsCache: null,
-    globalCache: null,
-    loadingFriends: false,
-    loadingGlobal: false,
+    friendsLeaderboards: emptyFriendsLeaderboards(),
+    totalFriendsByPeriod: emptyNumberByPeriod(),
+    friendsPlayedTodayByPeriod: emptyNumberByPeriod(),
+    friendsPlayedThisWeekByPeriod: emptyNumberByPeriod(),
+    globalLeaderboards: emptyGlobalLeaderboards(),
+    friendsCaches: emptyCaches<FriendsLeaderboardResponse>(),
+    globalCaches: emptyCaches<GlobalLeaderboardResponse>(),
+    loadingFriendsByPeriod: emptyLoading(),
+    loadingGlobalByPeriod: emptyLoading(),
     error: null,
   }),
 }));

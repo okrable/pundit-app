@@ -7,51 +7,39 @@ const { Pool } = require('pg');
 const DEFAULT_TIMEZONE = 'Europe/London';
 const DEFAULT_PLAYER_COUNT = 30;
 const DEFAULT_HISTORY_DAYS = 7;
+const DEMO_EMAIL_DOMAIN = 'demo.pundit.local';
 
-const adjectives = [
-  'rapid',
-  'clever',
-  'tidy',
-  'brave',
-  'sharp',
-  'prime',
-  'loyal',
-  'urban',
-  'golden',
-  'north',
-  'south',
-  'eastern',
-  'western',
-  'lucky',
-  'calm',
-  'bold',
-  'quick',
-  'rising',
-  'steady',
-  'local',
-];
-
-const nouns = [
-  'striker',
-  'keeper',
-  'winger',
-  'captain',
-  'gaffer',
-  'ultra',
-  'sweeper',
-  'playmaker',
-  'finisher',
-  'tactician',
-  'scout',
-  'pundit',
-  'derby',
-  'midfield',
-  'fullback',
-  'academy',
-  'stadium',
-  'corner',
-  'fixture',
-  'touchline',
+const seededProfiles = [
+  { username: 'matchdaymike', displayName: 'Matchday Mike' },
+  { username: 'crossbar_joe', displayName: 'Crossbar Joe' },
+  { username: 'tiki_tom', displayName: 'Tiki Tom' },
+  { username: 'livvy_92', displayName: 'Livvy92' },
+  { username: 'northstandben', displayName: 'North Stand Ben' },
+  { username: 'xGmerchant', displayName: 'xG Merchant' },
+  { username: 'FinalWhistle', displayName: 'Final Whistle' },
+  { username: 'sammy_scores', displayName: 'Sammy Scores' },
+  { username: 'ollie_onside', displayName: 'Ollie Onside' },
+  { username: 'pressingPete', displayName: 'Pressing Pete' },
+  { username: 'laura_laces', displayName: 'Laura Laces' },
+  { username: 'VARcheck', displayName: 'VAR Check' },
+  { username: 'tommy_touchline', displayName: 'Tommy Touchline' },
+  { username: 'Ellis_7', displayName: 'Ellis7' },
+  { username: 'awaydayalex', displayName: 'Away Day Alex' },
+  { username: 'NinaFC', displayName: 'Nina FC' },
+  { username: 'cornerkickchris', displayName: 'Corner Kick Chris' },
+  { username: 'RoryRowsZ', displayName: 'Rory Rows Z' },
+  { username: 'halfspacehan', displayName: 'Half Space Han' },
+  { username: 'jules_joga', displayName: 'Jules Joga' },
+  { username: 'keeperkev', displayName: 'Keeper Kev' },
+  { username: 'MadsUnited', displayName: 'Mads United' },
+  { username: 'sixtysecondsub', displayName: 'Sixty Second Sub' },
+  { username: 'paulieplays', displayName: 'Paulie Plays' },
+  { username: 'RachRovers', displayName: 'Rach Rovers' },
+  { username: 'soph_sweeper', displayName: 'Soph Sweeper' },
+  { username: 'the_false_nine', displayName: 'The False Nine' },
+  { username: 'jamie_journo', displayName: 'Jamie Journo' },
+  { username: 'BootRoomBaz', displayName: 'Boot Room Baz' },
+  { username: 'ClaraCatenaccio', displayName: 'Clara Catenaccio' },
 ];
 
 function parseNumberArg(name, fallback) {
@@ -108,27 +96,90 @@ function pseudoRandom(seed) {
 }
 
 function buildPlayers(count) {
-  const random = pseudoRandom(20260527);
+  const random = pseudoRandom(20260605);
   const seen = new Set();
   const players = [];
 
-  while (players.length < count) {
-    const adjective = adjectives[Math.floor(random() * adjectives.length)];
-    const noun = nouns[Math.floor(random() * nouns.length)];
-    const suffix = String(Math.floor(100 + random() * 900));
-    const username = `demo_${adjective}_${noun}_${suffix}`.slice(0, 20);
+  for (const profile of seededProfiles) {
+    if (players.length >= count) break;
+    const username = profile.username.slice(0, 20);
+    const normalizedUsername = username.toLowerCase();
 
-    if (seen.has(username)) continue;
-    seen.add(username);
+    if (seen.has(normalizedUsername)) continue;
+    seen.add(normalizedUsername);
 
     players.push({
-      id: `demo|${username}`,
+      id: `demo|${normalizedUsername}`,
       username,
-      displayName: `Demo ${username.replace(/^demo_/, '').replace(/_/g, ' ')}`,
+      normalizedUsername,
+      displayName: profile.displayName,
+      email: `${normalizedUsername}@${DEMO_EMAIL_DOMAIN}`,
+    });
+  }
+
+  while (players.length < count) {
+    const suffix = String(Math.floor(1000 + random() * 9000));
+    const username = `touchline${suffix}`;
+    const normalizedUsername = username.toLowerCase();
+
+    if (seen.has(normalizedUsername)) continue;
+    seen.add(normalizedUsername);
+
+    players.push({
+      id: `demo|${normalizedUsername}`,
+      username,
+      normalizedUsername,
+      displayName: `Touchline ${suffix}`,
+      email: `${normalizedUsername}@${DEMO_EMAIL_DOMAIN}`,
     });
   }
 
   return players;
+}
+
+function withUsername(player, username) {
+  const normalizedUsername = username.toLowerCase();
+
+  return {
+    ...player,
+    id: `demo|${normalizedUsername}`,
+    username,
+    normalizedUsername,
+    email: `${normalizedUsername}@${DEMO_EMAIL_DOMAIN}`,
+  };
+}
+
+async function avoidUsernameCollisions(client, players) {
+  const existing = await client.query(
+    `SELECT id, username_normalized
+     FROM users
+     WHERE username_normalized IS NOT NULL`
+  );
+  const usernameOwners = new Map(
+    existing.rows.map((row) => [row.username_normalized, row.id])
+  );
+
+  return players.map((player) => {
+    const owner = usernameOwners.get(player.normalizedUsername);
+    if (!owner || owner === player.id) {
+      usernameOwners.set(player.normalizedUsername, player.id);
+      return player;
+    }
+
+    for (let suffix = 2; suffix < 100; suffix += 1) {
+      const suffixText = String(suffix);
+      const username = `${player.username.slice(0, 20 - suffixText.length)}${suffixText}`;
+      const normalizedUsername = username.toLowerCase();
+
+      if (!usernameOwners.has(normalizedUsername)) {
+        const availablePlayer = withUsername(player, username);
+        usernameOwners.set(normalizedUsername, availablePlayer.id);
+        return availablePlayer;
+      }
+    }
+
+    throw new Error(`Could not find an available username for ${player.username}`);
+  });
 }
 
 function buildAnswers(score) {
@@ -156,7 +207,7 @@ async function seed() {
   const historyDays = parseNumberArg('days', DEFAULT_HISTORY_DAYS);
   const friendOwnerId = parseStringArg('friend-user-id', process.env.DEMO_FRIEND_OWNER_ID || '');
   const today = getQuizDate();
-  const players = buildPlayers(playerCount);
+  let players = buildPlayers(playerCount);
   const dates = Array.from({ length: historyDays }, (_, index) =>
     shiftDate(today, index - historyDays + 1)
   );
@@ -179,6 +230,8 @@ async function seed() {
       }
     }
 
+    players = await avoidUsernameCollisions(client, players);
+
     await client.query(
       `DELETE FROM results
        WHERE user_id = ANY($1)`,
@@ -200,6 +253,7 @@ async function seed() {
         `INSERT INTO users (
           id,
           display_name,
+          email,
           username,
           username_normalized,
           username_last_changed_at,
@@ -210,9 +264,10 @@ async function seed() {
           created_at,
           last_played
         )
-        VALUES ($1, $2, $3, $3, now(), $4, $5, $6, $7, now(), $8)
+        VALUES ($1, $2, $3, $4, $5, now(), $6, $7, $8, $9, now(), $10)
         ON CONFLICT (id) DO UPDATE SET
           display_name = EXCLUDED.display_name,
+          email = EXCLUDED.email,
           username = EXCLUDED.username,
           username_normalized = EXCLUDED.username_normalized,
           streak = EXCLUDED.streak,
@@ -223,7 +278,9 @@ async function seed() {
         [
           player.id,
           player.displayName,
+          player.email,
           player.username,
+          player.normalizedUsername,
           historyDays,
           bestScore,
           historyDays,

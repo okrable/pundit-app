@@ -2,6 +2,12 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v1.4.0 - Mobile-first web app
+
+- Reworked the web app into a centered mobile shell that mirrors the native app layout.
+- Removed the desktop-only web navigation path so web keeps bottom tabs across device sizes.
+- Added compact quiz layout sizing for short and narrow mobile browsers.
+
 ## v1.3.0 - Daily and weekly leaderboards
 
 - Added daily and weekly periods for global and friends leaderboards.
