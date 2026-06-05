@@ -7,6 +7,9 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 - Reworked the web app into a centered mobile shell that mirrors the native app layout.
 - Removed the desktop-only web navigation path so web keeps bottom tabs across device sizes.
 - Added compact quiz layout sizing for short and narrow mobile browsers.
+- Reduced leaderboard stutter by keeping daily and weekly leaderboard data cached independently and deduping repeated refreshes.
+- Updated the demo leaderboard seeder with 30 ordinary-looking seeded accounts and internal demo email markers.
+- Updated the web favicon to use the main Pundit app icon.
 
 ## v1.3.0 - Daily and weekly leaderboards
 

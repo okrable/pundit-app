@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v1.3.0 leaderboard refresh
+> Last updated: v1.4.0 mobile web and leaderboard stability refresh
 > Status: Active product with Daily Quiz, Challenge Mode, Friends, Auth0, and refreshed gameplay shipped
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -21,6 +21,8 @@
 - Guest-to-auth daily result migration/adoption where applicable.
 - Daily and weekly global leaderboards, friends leaderboard, friend links, and async challenge mode.
 - Branded bootstrap, stale-first cache hydration, and debug-log export.
+- Mobile-first web shell aligned with the native bottom-tab layout.
+- Period-keyed leaderboard cache state to avoid daily/weekly switch stutter.
 
 ### Hardening Remaining
 
