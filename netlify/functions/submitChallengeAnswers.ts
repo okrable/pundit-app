@@ -20,10 +20,12 @@ interface DbChallenge {
   quiz_date: string;
   creator_id: string;
   creator_display_name: string | null;
+  creator_username: string | null;
   creator_score: number | null;
   creator_answers: any | null;
   opponent_id: string | null;
   opponent_display_name: string | null;
+  opponent_username: string | null;
   opponent_score: number | null;
   opponent_answers: any | null;
   status: string;
@@ -265,7 +267,7 @@ export const handler: Handler = async (event) => {
       const myResult = isCreator ? creatorResult : opponentResult;
       const myScore = isCreator ? updatedChallenge.creator_score : updatedChallenge.opponent_score;
       const theirScore = isCreator ? updatedChallenge.opponent_score : updatedChallenge.creator_score;
-      const theirDisplayName = isCreator ? updatedChallenge.opponent_display_name : updatedChallenge.creator_display_name;
+      const theirUsername = isCreator ? updatedChallenge.opponent_username : updatedChallenge.creator_username;
       const theirAnswers = isCreator ? updatedChallenge.opponent_answers : updatedChallenge.creator_answers;
 
       logRequestEnd({ endpoint: 'submitChallengeAnswers', requestId, userId }, Date.now() - requestStartedAt, 200);
@@ -277,7 +279,7 @@ export const handler: Handler = async (event) => {
           result: myResult,
           yourScore: myScore,
           opponentScore: theirScore,
-          opponentDisplayName: theirDisplayName,
+          opponentUsername: theirUsername,
           yourAnswers: detailedAnswers,
           opponentAnswers: typeof theirAnswers === 'string' ? JSON.parse(theirAnswers) : theirAnswers,
         }),

@@ -8,7 +8,7 @@
 - Speed-based scoring with post-zero minimum score for correct answers.
 - Daily summary immediately after play and completed state on return.
 - Guest play with local-only daily result storage.
-- Auth0 sign-in, profile stats, username/display-name support, and settings.
+- Auth0 sign-in, profile stats, permanent username setup, and settings.
 - Guest-to-auth result migration/adoption after login.
 - Global leaderboard, friends leaderboard, friend links, and friend list.
 - Async 1v1 challenge mode with create/join/play/reveal/history.

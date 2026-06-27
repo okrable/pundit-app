@@ -11,7 +11,6 @@ export interface LeaderboardDateWindow {
 
 export interface LeaderboardEntry {
   userId: string;
-  displayName: string | null;
   username: string | null;
   score: number;
   gamesPlayed: number;
@@ -23,7 +22,6 @@ export interface LeaderboardEntry {
 
 interface LeaderboardRow {
   user_id: string;
-  display_name: string | null;
   username: string | null;
   score: number | string | null;
   games_played: number | string | null;
@@ -48,7 +46,6 @@ export function parseLeaderboardLimit(value: string | undefined): number {
 function mapLeaderboardRow(row: LeaderboardRow): LeaderboardEntry {
   return {
     userId: row.user_id,
-    displayName: row.display_name,
     username: row.username,
     score: Number(row.score ?? 0),
     gamesPlayed: Number(row.games_played ?? 0),
@@ -80,7 +77,6 @@ export async function getGlobalLeaderboardRows(
       ranked AS (
         SELECT
           ws.user_id,
-          u.display_name,
           u.username,
           ws.score,
           ws.games_played,
@@ -96,7 +92,6 @@ export async function getGlobalLeaderboardRows(
       )
       SELECT
         user_id,
-        display_name,
         username,
         score,
         games_played,
@@ -117,7 +112,6 @@ export async function getGlobalLeaderboardRows(
     `WITH ranked AS (
       SELECT
         r.user_id,
-        u.display_name,
         u.username,
         r.score,
         1::INT as games_played,
@@ -133,7 +127,6 @@ export async function getGlobalLeaderboardRows(
     )
     SELECT
       user_id,
-      display_name,
       username,
       score,
       games_played,
@@ -183,7 +176,6 @@ export async function getFriendsLeaderboardRows(
       )
       SELECT
         u.id as user_id,
-        u.display_name,
         u.username,
         ws.score,
         COALESCE(ws.games_played, 0)::INT as games_played,
@@ -202,7 +194,7 @@ export async function getFriendsLeaderboardRows(
         ranked.rank ASC NULLS LAST,
         ws.games_played DESC NULLS LAST,
         ws.first_result_at ASC NULLS LAST,
-        u.display_name ASC NULLS LAST,
+        u.username ASC NULLS LAST,
         u.id ASC`,
       [userId, dates.weekStart, dates.weekEnd, dates.quizDate, dates.previousQuizDate]
     );
@@ -228,7 +220,6 @@ export async function getFriendsLeaderboardRows(
     )
     SELECT
       u.id as user_id,
-      u.display_name,
       u.username,
       r.score,
       CASE WHEN r.score IS NULL THEN 0 ELSE 1 END as games_played,
@@ -246,7 +237,7 @@ export async function getFriendsLeaderboardRows(
       CASE WHEN r.score IS NULL THEN 1 ELSE 0 END,
       ranked.rank ASC NULLS LAST,
       r.created_at ASC NULLS LAST,
-      u.display_name ASC NULLS LAST,
+      u.username ASC NULLS LAST,
       u.id ASC`,
     [userId, dates.quizDate, dates.previousQuizDate]
   );

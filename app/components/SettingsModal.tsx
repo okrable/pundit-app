@@ -130,7 +130,9 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
                     <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
                   </View>
                   <View style={styles.accountDetails}>
-                    <Text style={styles.accountName}>{user.name || 'User'}</Text>
+                    <Text style={styles.accountName}>
+                      {user.username ? `@${user.username}` : 'Username required'}
+                    </Text>
                     {user.email && <Text style={styles.accountEmail}>{user.email}</Text>}
                   </View>
                 </View>

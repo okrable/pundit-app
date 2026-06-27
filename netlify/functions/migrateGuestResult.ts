@@ -11,7 +11,6 @@ interface MigrateGuestResultRequest {
   totalQuestions: number;
   answers: boolean[]; // Boolean array from cached result
   userProfile?: {
-    displayName?: string;
     email?: string;
     avatarUrl?: string;
   };
@@ -153,12 +152,12 @@ export const handler: Handler = async (event) => {
       // Upsert user record
       await queryWithClient(
         client,
-        `INSERT INTO users (id, display_name, email, avatar_url, created_at)
-         VALUES ($1, $2, $3, $4, now())
+        `INSERT INTO users (id, email, avatar_url, created_at)
+         VALUES ($1, $2, $3, now())
          ON CONFLICT (id) DO UPDATE SET
            email = COALESCE(EXCLUDED.email, users.email),
            avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url)`,
-        [userId, userProfile?.displayName || null, userProfile?.email || null, userProfile?.avatarUrl || null]
+        [userId, userProfile?.email || null, userProfile?.avatarUrl || null]
       );
 
       // Insert result with boolean array. If it already exists, this is an idempotent retry.

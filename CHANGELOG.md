@@ -2,6 +2,17 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v1.5.0 - Username-first profile
+
+- Rebuilt the Me screen around permanent usernames, gameplay stats, streak status, and challenge record.
+- Removed display-name editing and switched profile, leaderboard, friends, and challenge identity surfaces to username-only labels.
+- Added first-run account setup copy requiring users to choose a permanent username and accept the under-development notice.
+
+## v1.4.1 - Results sync polish
+
+- Finalized post-game stats immediately after authenticated quiz submits without an extra stats fetch.
+- Hid normal pending stats-sync copy while preserving failed-sync retry messaging.
+
 ## v1.4.0 - Mobile-first web app
 
 - Reworked the web app into a centered mobile shell that mirrors the native app layout.

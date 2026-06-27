@@ -6,7 +6,6 @@ import { assertAuthorizedUser } from './lib/auth';
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$/;
 const MIN_LENGTH = 3;
 const MAX_LENGTH = 20;
-const COOLDOWN_DAYS = 30;
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -90,35 +89,13 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Check cooldown for existing users
+    // Usernames are permanent after initial creation.
     const user = await query<{
       username: string | null;
-      username_last_changed_at: string | null;
     }>(
-      'SELECT username, username_last_changed_at FROM users WHERE id = $1',
+      'SELECT username FROM users WHERE id = $1',
       [userId]
     );
-
-    if (user.length > 0 && user[0].username_last_changed_at) {
-      const lastChanged = new Date(user[0].username_last_changed_at);
-      const cooldownEnd = new Date(lastChanged.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
-      const now = new Date();
-
-      if (now < cooldownEnd) {
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            success: false,
-            error: `Username can be changed again on ${cooldownEnd.toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}`,
-          }),
-        };
-      }
-    }
 
     // Check if username is same as current (no-op)
     if (user.length > 0 && user[0].username?.toLowerCase() === normalized) {
@@ -132,16 +109,26 @@ export const handler: Handler = async (event) => {
       };
     }
 
+    if (user.length > 0 && user[0].username) {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Usernames are permanent and cannot be changed.',
+        }),
+      };
+    }
+
     // Atomic update with uniqueness check
     // Use upsert to handle both new and existing users
     try {
       await query(
-        `INSERT INTO users (id, username, username_normalized, username_last_changed_at)
-         VALUES ($1, $2, $3, NOW())
+        `INSERT INTO users (id, username, username_normalized)
+         VALUES ($1, $2, $3)
          ON CONFLICT (id) DO UPDATE SET
            username = $2,
-           username_normalized = $3,
-           username_last_changed_at = NOW()`,
+           username_normalized = $3`,
         [userId, username, normalized]
       );
 

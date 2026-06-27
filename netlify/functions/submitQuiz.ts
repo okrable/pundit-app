@@ -13,7 +13,6 @@ interface SubmitQuizRequest {
     timeRemainingMs?: number;
   }[];
   userProfile?: {
-    displayName?: string;
     email?: string;
     avatarUrl?: string;
   };
@@ -271,16 +270,16 @@ export const handler: Handler = async (event) => {
         dbTimings[name] = (dbTimings[name] || 0) + (Date.now() - startedAt);
       };
 
-      // Required for FK on results.user_id and keeps profile fields fresh.
+      // Required for FK on results.user_id and keeps account metadata fresh.
       let t = Date.now();
       await queryWithClient(
         client,
-        `INSERT INTO users (id, display_name, email, avatar_url, created_at)
-         VALUES ($1, $2, $3, $4, now())
+        `INSERT INTO users (id, email, avatar_url, created_at)
+         VALUES ($1, $2, $3, now())
          ON CONFLICT (id) DO UPDATE SET
            email = COALESCE(EXCLUDED.email, users.email),
            avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url)`,
-        [userId, userProfile?.displayName || null, userProfile?.email || null, userProfile?.avatarUrl || null]
+        [userId, userProfile?.email || null, userProfile?.avatarUrl || null]
       );
       dbMark('user_upsert', t);
 
@@ -405,7 +404,6 @@ export const handler: Handler = async (event) => {
         streak: lastKnownStreak,
         bestScore: Math.max(lastKnownBestScore, score),
         statsPending: true,
-        statsRefreshAfterMs: 800,
       };
     } else {
       responseBody = {

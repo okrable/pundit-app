@@ -10,7 +10,6 @@ import {
   AnswerWithTiming,
   CheckUsernameResponse,
   SetUsernameResponse,
-  UpdateProfileResponse,
   CreateFriendLinkResponse,
   AcceptFriendLinkResponse,
   GetFriendsResponse,
@@ -389,7 +388,7 @@ export async function migrateGuestResult(
   });
 }
 
-// Username and Profile API functions
+// Username API functions
 
 export async function checkUsername(username: string): Promise<CheckUsernameResponse> {
   return fetchApi<CheckUsernameResponse>(`/checkUsername?username=${encodeURIComponent(username)}`);
@@ -399,16 +398,6 @@ export async function setUsername(userId: string, username: string): Promise<Set
   return fetchApi<SetUsernameResponse>('/setUsername', {
     method: 'POST',
     body: JSON.stringify({ userId, username }),
-  });
-}
-
-export async function updateProfile(
-  userId: string,
-  displayName: string
-): Promise<UpdateProfileResponse> {
-  return fetchApi<UpdateProfileResponse>('/updateProfile', {
-    method: 'POST',
-    body: JSON.stringify({ userId, displayName }),
   });
 }
 

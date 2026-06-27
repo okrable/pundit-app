@@ -5,7 +5,6 @@ import { assertAuthorizedUser } from './lib/auth';
 interface JoinChallengeRequest {
   code: string;
   userId: string;
-  displayName?: string;
   username?: string;
 }
 
@@ -16,7 +15,9 @@ interface DbChallenge {
   quiz_date: string;
   creator_id: string;
   creator_display_name: string | null;
+  creator_username: string | null;
   opponent_id: string | null;
+  opponent_username: string | null;
   status: string;
   expires_at: string;
 }
@@ -42,7 +43,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const body: JoinChallengeRequest = JSON.parse(event.body || '{}');
-    const { code, userId, displayName, username } = body;
+    const { code, userId, username } = body;
 
     if (!code || !userId) {
       return {
@@ -77,7 +78,7 @@ export const handler: Handler = async (event) => {
        AND expires_at > NOW()
        AND creator_id != $1
        RETURNING *`,
-      [userId, displayName || null, username || null, code.toUpperCase()]
+      [userId, null, username || null, code.toUpperCase()]
     );
 
     let challenge: DbChallenge;
@@ -178,7 +179,7 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         challengeId: challenge.id,
         creator: {
-          displayName: challenge.creator_display_name,
+          username: challenge.creator_username,
         },
         questions: formattedQuestions,
       }),

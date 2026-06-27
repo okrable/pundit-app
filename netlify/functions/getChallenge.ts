@@ -8,9 +8,11 @@ interface DbChallenge {
   quiz_date: string;
   creator_id: string;
   creator_display_name: string | null;
+  creator_username: string | null;
   creator_score: number | null;
   opponent_id: string | null;
   opponent_display_name: string | null;
+  opponent_username: string | null;
   opponent_score: number | null;
   status: string;
   expires_at: string;
@@ -95,12 +97,12 @@ export const handler: Handler = async (event) => {
         status: challenge.status,
         creator: {
           userId: challenge.creator_id,
-          displayName: challenge.creator_display_name,
+          username: challenge.creator_username,
         },
         opponent: challenge.opponent_id
           ? {
               userId: challenge.opponent_id,
-              displayName: challenge.opponent_display_name,
+              username: challenge.opponent_username,
             }
           : null,
         quizDate: challenge.quiz_date,

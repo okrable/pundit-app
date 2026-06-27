@@ -42,7 +42,6 @@ interface AuthState {
   bootstrapFromStorage: () => Promise<string | null>;
   setAuthResult: (token: string, user: User, refreshToken?: string) => Promise<void>;
   setUsername: (username: string) => void;
-  setDisplayName: (name: string) => void;
   setUsernameRequired: (required: boolean) => void;
   beginAuthSync: (source: 'login' | 'restore') => void;
   finishAuthSync: () => void;
@@ -203,33 +202,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const updatedUser = state.user
         ? { ...state.user, username, usernameRequired: false }
         : null;
-
-      // Persist updated user info
-      if (updatedUser) {
-        storeUserInfo({
-          sub: updatedUser.sub,
-          email: updatedUser.email,
-          name: updatedUser.name,
-          picture: updatedUser.picture,
-          username: updatedUser.username,
-        });
-      }
-
-      return { user: updatedUser };
-    });
-  },
-
-  setDisplayName: (name: string) => {
-    set((state) => {
-      if (!state.user) {
-        return { user: null };
-      }
-
-      if (state.user.name === name) {
-        return state;
-      }
-
-      const updatedUser = state.user ? { ...state.user, name } : null;
 
       // Persist updated user info
       if (updatedUser) {

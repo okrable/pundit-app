@@ -88,7 +88,7 @@ export default function ManageFriendsModal({
   const handleRemoveFriend = (friend: Friend) => {
     Alert.alert(
       'Remove Friend',
-      `Are you sure you want to remove ${friend.displayName || friend.username || 'this friend'} from your leaderboard?`,
+      `Are you sure you want to remove ${friend.username ? `@${friend.username}` : 'this friend'} from your leaderboard?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -120,14 +120,13 @@ export default function ManageFriendsModal({
     <View style={styles.friendItem}>
       <Avatar
         userId={item.id}
-        displayName={item.displayName}
         username={item.username}
         imageUrl={item.avatarUrl}
         size="md"
       />
       <View style={styles.friendInfo}>
         <Text style={styles.friendName}>
-          {item.username ? `@${item.username}` : item.displayName || 'Anonymous'}
+          {item.username ? `@${item.username}` : 'Anonymous'}
         </Text>
         <Text style={styles.friendStats}>Streak: {item.streak}</Text>
       </View>

@@ -147,7 +147,7 @@ export default function ChallengeQuizScreen() {
               navigation.replace('ChallengeResults', {
                 result,
                 code: currentChallenge.code,
-                opponentName: currentChallenge.opponentName,
+                opponentUsername: currentChallenge.opponentUsername,
                 isCreator: currentChallenge.isCreator,
               });
             } catch (error) {
@@ -216,14 +216,14 @@ export default function ChallengeQuizScreen() {
         >
           <View style={styles.challengeContext}>
             <Text style={styles.challengeLabel}>Challenge Mode</Text>
-            {currentChallenge.opponentName ? (
+            {currentChallenge.opponentUsername ? (
               <Text
                 style={styles.opponentText}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.82}
               >
-                vs {currentChallenge.opponentName}
+                vs @{currentChallenge.opponentUsername}
               </Text>
             ) : (
               <Text style={styles.opponentText}>Code {currentChallenge.code}</Text>

@@ -25,7 +25,7 @@ type RouteParams = {
   ChallengeResults: {
     result: ChallengeSubmitResult;
     code: string;
-    opponentName: string | null;
+    opponentUsername: string | null;
     isCreator: boolean;
   };
 };
@@ -37,13 +37,14 @@ export default function ChallengeResultsScreen() {
   const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
 
-  const { result, code, opponentName } = route.params;
+  const { result, code, opponentUsername } = route.params;
   const isWaiting = result.status === 'waiting';
   const isComplete = result.status === 'complete';
   const correctCount = result.yourAnswers.filter(answer => answer.isCorrect).length;
   const opponentCorrectCount =
     result.opponentAnswers?.filter(answer => answer.isCorrect).length ?? 0;
-  const opponentAvatarId = `opponent_${result.opponentDisplayName || opponentName || code}`;
+  const displayOpponentUsername = result.opponentUsername || opponentUsername;
+  const opponentAvatarId = `opponent_${displayOpponentUsername || code}`;
 
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(code);
@@ -84,8 +85,8 @@ export default function ChallengeResultsScreen() {
 
   const getResultSubtitle = () => {
     if (isWaiting) {
-      return opponentName
-        ? `Waiting for ${opponentName} to play.`
+      return displayOpponentUsername
+        ? `Waiting for @${displayOpponentUsername} to play.`
         : 'Share your code and wait for an opponent.';
     }
 
@@ -174,7 +175,6 @@ export default function ChallengeResultsScreen() {
               <View style={styles.playerSummary}>
                 <Avatar
                   userId={user?.sub || 'you'}
-                  displayName={user?.name}
                   username={user?.username}
                   imageUrl={user?.picture}
                   size="md"
@@ -190,7 +190,7 @@ export default function ChallengeResultsScreen() {
               <View style={styles.playerSummary}>
                 <Avatar
                   userId={opponentAvatarId}
-                  displayName={result.opponentDisplayName || opponentName}
+                  username={displayOpponentUsername}
                   size="md"
                 />
                 <Text
@@ -199,7 +199,7 @@ export default function ChallengeResultsScreen() {
                   adjustsFontSizeToFit
                   minimumFontScale={0.78}
                 >
-                  {result.opponentDisplayName || opponentName || 'Opponent'}
+                  {displayOpponentUsername ? `@${displayOpponentUsername}` : 'Opponent'}
                 </Text>
                 <Text style={styles.playerMeta}>
                   {opponentCorrectCount}/{result.opponentAnswers?.length ?? result.yourAnswers.length}

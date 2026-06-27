@@ -12,13 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { FriendsLeaderboardEntry, LeaderboardEntry, LeaderboardPeriod } from '../types';
 import { useAuthStore } from '../state/useAuthStore';
-import { useAuthRequest } from '../services/auth0';
 import { theme } from '../theme/theme';
 import Avatar from '../components/Avatar';
 import ManageFriendsModal from '../components/ManageFriendsModal';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import AuthSyncScreen from '../components/AuthSyncScreen';
-import { loginWithAuth0 } from '../services/authFlow';
+import { loginWithAuth0, useAuthFlowRequest } from '../services/authFlow';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 
 type ViewMode = 'friends' | 'global';
@@ -51,7 +50,7 @@ export default function LeaderboardScreen() {
     forceInteractiveAuth,
     clearError,
   } = useAuthStore();
-  const [request, , promptAsync] = useAuthRequest({
+  const [request, promptAsync] = useAuthFlowRequest({
     intent: 'signup',
     forceInteractive: forceInteractiveAuth,
   });
@@ -189,14 +188,13 @@ export default function LeaderboardScreen() {
         )}
         <Avatar
           userId={item.userId}
-          displayName={item.displayName}
           username={item.username}
           size="md"
         />
         <View style={styles.playerInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.playerName}>
-              {item.username ? `@${item.username}` : item.displayName || 'Anonymous'}
+              {item.username ? `@${item.username}` : 'Anonymous'}
             </Text>
             {isCurrentUser && <Text style={styles.youBadge}>You</Text>}
           </View>
@@ -217,13 +215,12 @@ export default function LeaderboardScreen() {
       </View>
       <Avatar
         userId={item.userId}
-        displayName={item.displayName}
         username={item.username}
         size="md"
       />
       <View style={styles.playerInfo}>
         <Text style={styles.playerName}>
-          {item.username ? `@${item.username}` : item.displayName || 'Anonymous'}
+          {item.username ? `@${item.username}` : 'Anonymous'}
         </Text>
         <Text style={styles.playerStats}>
           {period === 'daily'

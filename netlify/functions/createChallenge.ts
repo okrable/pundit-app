@@ -6,7 +6,6 @@ import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from
 
 interface CreateChallengeRequest {
   userId: string;
-  displayName?: string;
   username?: string;
 }
 
@@ -44,7 +43,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const body: CreateChallengeRequest = JSON.parse(event.body || '{}');
-    const { userId, displayName, username } = body;
+    const { userId, username } = body;
 
     logRequestStart({ endpoint: 'createChallenge', requestId, userId });
 
@@ -146,7 +145,7 @@ export const handler: Handler = async (event) => {
       `INSERT INTO challenges (code, quiz_id, quiz_date, creator_id, creator_display_name, creator_username, expires_at, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
        RETURNING id`,
-      [code, quizId, today, userId, displayName || null, username || null, expiresAt.toISOString()]
+      [code, quizId, today, userId, null, username || null, expiresAt.toISOString()]
     );
 
     const challengeId = result[0].id;

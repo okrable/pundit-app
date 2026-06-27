@@ -47,9 +47,7 @@ export default function ResultsScreen({ result, quiz }: ResultsScreenProps) {
   const correctCount = summaryAnswers.filter(answer => answer.isCorrect).length;
   const answerEmojiRow = summaryAnswers.map(answer => (answer.isCorrect ? '⚽️' : '❌')).join('');
   const syncMessage =
-    result.syncState === 'pending'
-      ? 'Stats syncing in the background.'
-      : result.syncState === 'failed'
+    result.syncState === 'failed'
         ? 'We will retry syncing your result shortly.'
         : null;
 

@@ -50,7 +50,6 @@ export const handler: Handler = async (event) => {
     // Since friendships are stored with user_a < user_b, we need to check both columns
     const friends = await query<{
       id: string;
-      display_name: string | null;
       username: string | null;
       avatar_url: string | null;
       streak: number;
@@ -58,7 +57,6 @@ export const handler: Handler = async (event) => {
     }>(
       `SELECT
         u.id,
-        u.display_name,
         u.username,
         u.avatar_url,
         u.streak,
@@ -68,14 +66,13 @@ export const handler: Handler = async (event) => {
         CASE WHEN f.user_a = $1 THEN f.user_b ELSE f.user_a END = u.id
       )
       WHERE f.user_a = $1 OR f.user_b = $1
-      ORDER BY u.username ASC NULLS LAST, u.display_name ASC NULLS LAST`,
+      ORDER BY u.username ASC NULLS LAST, u.id ASC`,
       [userId]
     );
 
     // Format response
     const formattedFriends = friends.map((f) => ({
       id: f.id,
-      displayName: f.display_name,
       username: f.username,
       avatarUrl: f.avatar_url,
       streak: f.streak,

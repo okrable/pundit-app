@@ -131,14 +131,13 @@ export const handler: Handler = async (event) => {
 
     // Get the friend's info to return
     const friendInfo = await query<{
-      display_name: string | null;
       username: string | null;
     }>(
-      `SELECT display_name, username FROM users WHERE id = $1`,
+      `SELECT username FROM users WHERE id = $1`,
       [link.user_id]
     );
 
-    const friend = friendInfo[0] || { display_name: null, username: null };
+    const friend = friendInfo[0] || { username: null };
 
     return {
       statusCode: 200,
@@ -146,7 +145,6 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         success: true,
         friendId: link.user_id,
-        friendDisplayName: friend.display_name,
         friendUsername: friend.username,
       }),
     };

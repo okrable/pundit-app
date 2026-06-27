@@ -14,7 +14,7 @@ interface CurrentChallenge {
   code: string;
   questions: Question[];
   isCreator: boolean;
-  opponentName: string | null;
+  opponentUsername: string | null;
 }
 
 interface ChallengeState {
@@ -31,8 +31,8 @@ interface ChallengeState {
   error: string | null;
 
   // Actions
-  createChallenge: (userId: string, displayName?: string) => Promise<string>;
-  joinChallenge: (code: string, userId: string, displayName?: string) => Promise<void>;
+  createChallenge: (userId: string, username?: string | null) => Promise<string>;
+  joinChallenge: (code: string, userId: string, username?: string | null) => Promise<void>;
   submitAnswers: (userId: string, answers: AnswerWithTiming[]) => Promise<ChallengeSubmitResult>;
   revokeChallenge: (userId: string) => Promise<void>;
   fetchUserChallenges: (userId: string) => Promise<void>;
@@ -49,30 +49,28 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  createChallenge: async (userId, displayName) => {
+  createChallenge: async (userId, username) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await challengeApi.createChallenge(userId, displayName);
+      const response = await challengeApi.createChallenge(userId, username);
       set({
         currentChallenge: {
           challengeId: response.challengeId,
           code: response.code,
           questions: response.questions,
           isCreator: true,
-          opponentName: null,
+          opponentUsername: null,
         },
         activeChallenge: {
           challengeId: response.challengeId,
           code: response.code,
           status: 'pending',
-          creatorDisplayName: displayName || null,
-          creatorUsername: null,
+          creatorUsername: username || null,
           opponentUsername: null,
           isCreator: true,
           createdAt: new Date().toISOString(),
           hasCreatorPlayed: false,
           hasOpponentPlayed: false,
-          opponentDisplayName: null,
           expiresAt: response.expiresAt,
         },
         isLoading: false,
@@ -85,17 +83,17 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     }
   },
 
-  joinChallenge: async (code, userId, displayName) => {
+  joinChallenge: async (code, userId, username) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await challengeApi.joinChallenge(code, userId, displayName);
+      const response = await challengeApi.joinChallenge(code, userId, username);
       set({
         currentChallenge: {
           challengeId: response.challengeId,
           code,
           questions: response.questions,
           isCreator: false,
-          opponentName: response.creator.displayName,
+          opponentUsername: response.creator.username,
         },
         isLoading: false,
       });

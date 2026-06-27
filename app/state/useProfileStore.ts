@@ -14,10 +14,7 @@ const GUEST_STATS: UserStats = {
   challengeLosses: 0,
   challengeDraws: 0,
   username: null,
-  displayName: null,
   createdAt: null,
-  canChangeUsername: true,
-  usernameChangeAvailableAt: null,
 };
 
 interface ProfileState {

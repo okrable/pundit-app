@@ -52,9 +52,6 @@ export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps
           <View style={styles.scoreBlock}>
             <Text style={styles.scoreText}>{result.score} POINTS</Text>
             <Text style={styles.emojiText}>{emojis}</Text>
-            {result.syncState === 'pending' && (
-              <Text style={styles.statusText}>Stats still syncing in the background.</Text>
-            )}
             {result.syncState === 'failed' && (
               <Text style={styles.statusText}>We will retry syncing your result shortly.</Text>
             )}

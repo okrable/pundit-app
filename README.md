@@ -1,4 +1,4 @@
-# Pundit Trivia v1.4.0
+# Pundit Trivia v1.5.0
 
 Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScript, Netlify Functions, and CockroachDB.
 
@@ -23,7 +23,7 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 
 ## Versioning
 
-- Current app/docs version: `1.4.0`.
+- Current app/docs version: `1.5.0`.
 - `package.json`, `app.json`, and `app/constants/version.ts` must stay aligned.
 - Settings displays the app version from `APP_VERSION`.
 - Release history is tracked in `CHANGELOG.md`.
@@ -191,7 +191,7 @@ Netlify Functions live under `/.netlify/functions/`.
 Core groups:
 
 - Daily quiz: `getDailyQuiz`, `submitQuiz`, `getTodayResult`, `migrateGuestResult`
-- Profile: `getUserStats`, `updateProfile`, `checkUsername`, `setUsername`
+- Profile: `getUserStats`, `checkUsername`, `setUsername`
 - Leaderboards: `getLeaderboard`, `getFriendsLeaderboard`
 - Friends: `createFriendLink`, `acceptFriendLink`, `getFriends`, `removeFriend`
 - Challenges: `createChallenge`, `getChallenge`, `joinChallenge`, `submitChallengeAnswers`, `revokeChallenge`, `getUserChallenges`

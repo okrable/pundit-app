@@ -3,8 +3,6 @@ import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 
-const COOLDOWN_DAYS = 30;
-
 export const handler: Handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -48,10 +46,7 @@ export const handler: Handler = async (event) => {
           challengeLosses: 0,
           challengeDraws: 0,
           username: null,
-          displayName: null,
           createdAt: null,
-          canChangeUsername: true,
-          usernameChangeAvailableAt: null,
         }),
       };
     }
@@ -70,10 +65,8 @@ export const handler: Handler = async (event) => {
       challenge_losses: number;
       challenge_draws: number;
       username: string | null;
-      display_name: string | null;
       created_at: string;
       last_played: string | null;
-      username_last_changed_at: string | null;
     }>(
       `SELECT
         streak,
@@ -83,10 +76,8 @@ export const handler: Handler = async (event) => {
         COALESCE(challenge_losses, 0) as challenge_losses,
         COALESCE(challenge_draws, 0) as challenge_draws,
         username,
-        display_name,
         created_at,
-        last_played::TEXT as last_played,
-        username_last_changed_at
+        last_played::TEXT as last_played
       FROM users
       WHERE id = $1`,
       [userId]
@@ -105,10 +96,7 @@ export const handler: Handler = async (event) => {
           challengeLosses: 0,
           challengeDraws: 0,
           username: null,
-          displayName: null,
           createdAt: null,
-          canChangeUsername: true,
-          usernameChangeAvailableAt: null,
         }),
       };
     }
@@ -121,21 +109,6 @@ export const handler: Handler = async (event) => {
         ? Number(userStats.streak || 0)
         : 0;
 
-    // Calculate username change availability
-    let canChangeUsername = true;
-    let usernameChangeAvailableAt: string | null = null;
-
-    if (userStats.username_last_changed_at) {
-      const lastChanged = new Date(userStats.username_last_changed_at);
-      const cooldownEnd = new Date(lastChanged.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
-      const now = new Date();
-
-      if (now < cooldownEnd) {
-        canChangeUsername = false;
-        usernameChangeAvailableAt = cooldownEnd.toISOString();
-      }
-    }
-
     return {
       statusCode: 200,
       headers,
@@ -147,10 +120,7 @@ export const handler: Handler = async (event) => {
         challengeLosses: userStats.challenge_losses || 0,
         challengeDraws: userStats.challenge_draws || 0,
         username: userStats.username,
-        displayName: userStats.display_name,
         createdAt: userStats.created_at,
-        canChangeUsername,
-        usernameChangeAvailableAt,
       }),
     };
   } catch (error) {

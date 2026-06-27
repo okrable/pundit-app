@@ -41,6 +41,7 @@ export default function UsernameModal({
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [acceptedDevelopmentTerms, setAcceptedDevelopmentTerms] = useState(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -50,6 +51,7 @@ export default function UsernameModal({
       setIsAvailable(null);
       setIsChecking(false);
       setIsSubmitting(false);
+      setAcceptedDevelopmentTerms(false);
     }
   }, [visible, currentUsername]);
 
@@ -153,7 +155,13 @@ export default function UsernameModal({
     }
   };
 
-  const canSubmit = isAvailable && !isChecking && !isSubmitting && input.length >= MIN_LENGTH;
+  const isCreatingUsername = !currentUsername;
+  const canSubmit =
+    isAvailable &&
+    !isChecking &&
+    !isSubmitting &&
+    input.length >= MIN_LENGTH &&
+    (!isCreatingUsername || acceptedDevelopmentTerms);
 
   return (
     <Modal
@@ -179,10 +187,10 @@ export default function UsernameModal({
 
           <View style={styles.content}>
             <Text style={styles.title}>
-              {currentUsername ? 'Change Username' : 'Choose a Username'}
+              {isRequired ? 'Welcome to Pundit' : 'Choose a Username'}
             </Text>
             <Text style={styles.subtitle}>
-              Your username is how other players will identify you.
+              Choose your permanent username to finish setting up your account.
             </Text>
 
             {/* Input Section */}
@@ -225,6 +233,23 @@ export default function UsernameModal({
               </View>
             </View>
 
+            {isCreatingUsername && (
+              <TouchableOpacity
+                style={styles.termsRow}
+                onPress={() => setAcceptedDevelopmentTerms((accepted) => !accepted)}
+                activeOpacity={0.82}
+              >
+                <Ionicons
+                  name={acceptedDevelopmentTerms ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={acceptedDevelopmentTerms ? theme.colors.primary : theme.colors.mediumGray}
+                />
+                <Text style={styles.termsText}>
+                  I understand Pundit is under development and features, data, or availability may change while the app is being tested.
+                </Text>
+              </TouchableOpacity>
+            )}
+
             {/* Submit Button */}
             <TouchableOpacity
               style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
@@ -235,14 +260,14 @@ export default function UsernameModal({
                 <ActivityIndicator size="small" color={theme.colors.white} />
               ) : (
                 <Text style={styles.submitButtonText}>
-                  {currentUsername ? 'Update Username' : 'Set Username'}
+                  Set Username
                 </Text>
               )}
             </TouchableOpacity>
 
             {isRequired && (
               <Text style={styles.requiredNote}>
-                A username is required to continue.
+                Choose carefully. Usernames cannot be changed later.
               </Text>
             )}
           </View>
@@ -342,6 +367,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.fonts.gothamBook,
     color: theme.colors.mediumGray,
+  },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  termsText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.textDark,
   },
   submitButton: {
     backgroundColor: theme.colors.primary,

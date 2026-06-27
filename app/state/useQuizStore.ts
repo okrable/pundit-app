@@ -4,7 +4,6 @@ import {
   finalizeQuizStats,
   getDailyQuiz,
   getTodayResult,
-  getUserStats,
   migrateGuestResult,
   submitQuiz,
 } from '../services/api';
@@ -74,7 +73,6 @@ function buildUserProfile(): UserProfile | undefined {
   }
 
   return {
-    displayName: authState.user.name,
     email: authState.user.email,
     avatarUrl: authState.user.picture,
   };
@@ -487,32 +485,32 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
       if (!userId.startsWith('guest_')) {
         logInfo('quiz.submit.success', { userId, quizId: submittedQuizId, statsPending: true });
-        const refreshDelay = serverResult.statsRefreshAfterMs ?? 800;
-        setTimeout(async () => {
-          let finalizeSucceeded = false;
+        void (async () => {
+          let finalizedResult: QuizResultImmediate | null = null;
 
           try {
             const finalizeResult = await finalizeQuizStats(submittedQuizId, userId, profile);
-            finalizeSucceeded = Boolean(finalizeResult.finalized || finalizeResult.skipped);
+            if (finalizeResult.finalized || finalizeResult.skipped) {
+              finalizedResult = {
+                ...(get().result ?? result ?? mergedResult),
+                streak: finalizeResult.streak ?? mergedResult.streak,
+                bestScore: finalizeResult.bestScore ?? mergedResult.bestScore,
+                statsPending: false,
+                syncState: 'synced',
+              };
+            }
           } catch (finalizeError) {
             console.error('Failed to finalize quiz stats:', finalizeError);
           }
 
-          if (!finalizeSucceeded) {
+          if (!finalizedResult) {
             return;
           }
 
           try {
-            const latestStats = await getUserStats(userId);
-            await useProfileStore.getState().applyServerStats(latestStats);
+            await useProfileStore.getState().markPlayedToday(finalizedResult, userId);
             await saveDailyQuizResult(
-              {
-                ...(get().result ?? result ?? mergedResult),
-                streak: latestStats.streak,
-                bestScore: latestStats.bestScore,
-                statsPending: false,
-                syncState: 'synced',
-              },
+              finalizedResult,
               userId,
               'synced'
             );
@@ -520,8 +518,8 @@ export const useQuizStore = create<QuizState>((set, get) => ({
               result: state.result
                 ? {
                     ...state.result,
-                    streak: latestStats.streak,
-                    bestScore: latestStats.bestScore,
+                    streak: finalizedResult.streak,
+                    bestScore: finalizedResult.bestScore,
                     statsPending: false,
                     syncState: 'synced',
                   }
@@ -529,8 +527,8 @@ export const useQuizStore = create<QuizState>((set, get) => ({
               cachedResult: state.cachedResult
                 ? {
                     ...state.cachedResult,
-                    streak: latestStats.streak,
-                    bestScore: latestStats.bestScore,
+                    streak: finalizedResult.streak,
+                    bestScore: finalizedResult.bestScore,
                     syncState: 'synced',
                     cachedAt: new Date().toISOString(),
                   }
@@ -540,7 +538,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
           } catch (statsError) {
             console.error('Failed to refresh user stats after quiz submit:', statsError);
           }
-        }, refreshDelay);
+        })();
       }
     } catch (error) {
       logError('quiz.submit.error', {

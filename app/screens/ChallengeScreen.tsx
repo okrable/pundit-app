@@ -57,8 +57,7 @@ export default function ChallengeScreen() {
     setIsCreating(true);
     clearError();
     try {
-      const displayName = user?.name;
-      const code = await createChallenge(userId, displayName);
+      const code = await createChallenge(userId, user?.username);
       setCreatedCode(code);
       setShowShareModal(true);
     } catch (err) {
@@ -103,8 +102,7 @@ export default function ChallengeScreen() {
     setIsJoining(true);
     clearError();
     try {
-      const displayName = user?.name;
-      await joinChallenge(joinCode.toUpperCase().trim(), userId, displayName);
+      await joinChallenge(joinCode.toUpperCase().trim(), userId, user?.username);
       setJoinCode('');
       navigation.navigate('ChallengeQuiz');
     } catch (err) {
@@ -179,7 +177,7 @@ export default function ChallengeScreen() {
         />
         <View style={styles.historyInfo}>
           <Text style={styles.historyOpponent}>
-            vs {item.opponentDisplayName || 'Anonymous'}
+            vs {item.opponentUsername ? `@${item.opponentUsername}` : 'Anonymous'}
           </Text>
           <Text style={styles.historyDate}>
             {new Date(item.completedAt).toLocaleDateString()}
@@ -235,10 +233,10 @@ export default function ChallengeScreen() {
               </View>
               <Text style={styles.roleIndicator}>
                 {activeChallenge.isCreator
-                  ? activeChallenge.opponentDisplayName
-                    ? `You challenged ${activeChallenge.opponentDisplayName}`
+                  ? activeChallenge.opponentUsername
+                    ? `You challenged @${activeChallenge.opponentUsername}`
                     : 'Waiting for a challenger...'
-                  : `vs ${activeChallenge.creatorDisplayName || 'Anonymous'}`}
+                  : `vs ${activeChallenge.creatorUsername ? `@${activeChallenge.creatorUsername}` : 'Anonymous'}`}
               </Text>
               <View style={styles.codeDisplay}>
                 <Text style={styles.codeLabel}>Challenge Code</Text>

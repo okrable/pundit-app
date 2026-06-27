@@ -20,7 +20,7 @@ export default function useDeepLinkHandler() {
       const response = await acceptFriendLink(code, user.sub);
 
       if (response.success) {
-        const friendName = response.friendDisplayName || response.friendUsername || 'your friend';
+        const friendName = response.friendUsername ? `@${response.friendUsername}` : 'your friend';
         Alert.alert(
           'Friend Added!',
           `You and ${friendName} are now connected. Check your friends leaderboard!`,

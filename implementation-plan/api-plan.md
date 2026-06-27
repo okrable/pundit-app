@@ -21,9 +21,10 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 ## Profile APIs
 
 - `GET /getUserStats`
-- `POST /updateProfile`
 - `GET /checkUsername`
 - `POST /setUsername`
+
+Usernames are the only player-facing identity. `setUsername` is for initial setup only; existing usernames are permanent except same-value idempotent retries.
 
 ## Leaderboard APIs
 

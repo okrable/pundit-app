@@ -47,7 +47,6 @@ export interface QuizResultImmediate {
   bestScore: number;
   answers: QuizAnswerDetail[];
   statsPending?: boolean;
-  statsRefreshAfterMs?: number;
   syncState?: SyncState;
   isOptimistic?: boolean;
 }
@@ -68,7 +67,6 @@ export type LeaderboardPeriod = 'daily' | 'weekly';
 
 export interface LeaderboardEntry {
   userId: string;
-  displayName: string | null;
   username: string | null;
   score: number;
   gamesPlayed: number;
@@ -92,14 +90,10 @@ export interface UserStats {
   challengeLosses: number;
   challengeDraws: number;
   username: string | null;
-  displayName: string | null;
   createdAt: string | null;
-  canChangeUsername: boolean;
-  usernameChangeAvailableAt: string | null;
 }
 
 export interface UserProfile {
-  displayName?: string;
   email?: string;
   avatarUrl?: string;
 }
@@ -116,19 +110,9 @@ export interface SetUsernameResponse {
   error?: string;
 }
 
-export interface UpdateProfileResponse {
-  success: boolean;
-  profile?: {
-    displayName: string | null;
-    username: string | null;
-  };
-  error?: string;
-}
-
 // Challenge Mode Types
 export interface ChallengeHistoryItem {
   challengeId: string;
-  opponentDisplayName: string | null;
   opponentUsername: string | null;
   yourScore: number;
   opponentScore: number;
@@ -146,9 +130,7 @@ export interface ActiveChallenge {
   challengeId: string;
   code: string;
   status: 'pending' | 'active';
-  creatorDisplayName: string | null;
   creatorUsername: string | null;
-  opponentDisplayName: string | null;
   opponentUsername: string | null;
   isCreator: boolean;
   createdAt: string;
@@ -176,7 +158,7 @@ export interface ChallengeSubmitResult {
   yourAnswers: ChallengeAnswer[];
   result?: 'win' | 'loss' | 'draw';
   opponentScore?: number;
-  opponentDisplayName?: string;
+  opponentUsername?: string | null;
   opponentAnswers?: ChallengeAnswer[];
 }
 
@@ -192,7 +174,7 @@ export interface CreateChallengeResponse {
 export interface JoinChallengeResponse {
   challengeId: string;
   creator: {
-    displayName: string | null;
+    username: string | null;
   };
   questions: Question[];
 }
@@ -202,10 +184,10 @@ export interface GetChallengeResponse {
   code: string;
   status: 'pending' | 'active' | 'completed' | 'expired' | 'revoked';
   creator: {
-    displayName: string | null;
+    username: string | null;
   };
   opponent: {
-    displayName: string | null;
+    username: string | null;
   } | null;
   canJoin: boolean;
   expiresAt: string;
@@ -214,7 +196,6 @@ export interface GetChallengeResponse {
 // Friends & Personal Leaderboard Types
 export interface Friend {
   id: string;
-  displayName: string | null;
   username: string | null;
   avatarUrl: string | null;
   streak: number;
@@ -223,7 +204,6 @@ export interface Friend {
 
 export interface FriendsLeaderboardEntry {
   userId: string;
-  displayName: string | null;
   username: string | null;
   score: number;
   gamesPlayed: number;
@@ -253,7 +233,6 @@ export interface CreateFriendLinkResponse {
 export interface AcceptFriendLinkResponse {
   success: boolean;
   friendId?: string;
-  friendDisplayName?: string | null;
   friendUsername?: string | null;
   error?: string;
 }

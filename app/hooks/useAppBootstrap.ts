@@ -36,7 +36,6 @@ export default function useAppBootstrap(isAuthReady: boolean): boolean {
             userId: user.sub,
             source: 'restore',
             userProfile: {
-              displayName: user.name,
               email: user.email,
               avatarUrl: user.picture,
             },

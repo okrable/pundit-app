@@ -11,17 +11,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../state/useAuthStore';
-import { useAuthRequest } from '../services/auth0';
 import { getUserId } from '../storage/userStorage';
 import { theme } from '../theme/theme';
 import { UserStats } from '../types';
 import SettingsModal from '../components/SettingsModal';
 import Avatar from '../components/Avatar';
 import UsernameModal from '../components/UsernameModal';
-import EditProfileModal from '../components/EditProfileModal';
 import { useProfileStore } from '../state/useProfileStore';
 import AuthSyncScreen from '../components/AuthSyncScreen';
-import { loginWithAuth0 } from '../services/authFlow';
+import { loginWithAuth0, useAuthFlowRequest } from '../services/authFlow';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 
 const EMPTY_STATS: UserStats = {
@@ -32,10 +30,7 @@ const EMPTY_STATS: UserStats = {
   challengeLosses: 0,
   challengeDraws: 0,
   username: null,
-  displayName: null,
   createdAt: null,
-  canChangeUsername: true,
-  usernameChangeAvailableAt: null,
 };
 
 export default function MeScreen() {
@@ -48,20 +43,18 @@ export default function MeScreen() {
     token,
     forceInteractiveAuth,
     setUsername,
-    setDisplayName,
     setUsernameRequired,
   } = useAuthStore();
   const [authLoadingIntent, setAuthLoadingIntent] = useState<'signup' | 'login' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [signupRequest, , promptSignup] = useAuthRequest({
+  const [signupRequest, promptSignup] = useAuthFlowRequest({
     intent: 'signup',
     forceInteractive: forceInteractiveAuth,
   });
-  const [loginRequest, , promptLogin] = useAuthRequest({
+  const [loginRequest, promptLogin] = useAuthFlowRequest({
     intent: 'login',
     forceInteractive: true,
   });
@@ -71,19 +64,25 @@ export default function MeScreen() {
       return;
     }
 
-    if (stats.username && stats.username !== user.username) {
-      setUsername(stats.username);
-    } else if (user.usernameRequired && !user.username) {
-      setUsernameRequired(true);
-      setShowUsernameModal(true);
+    if (stats.username) {
+      if (stats.username !== user.username) {
+        setUsername(stats.username);
+      }
+      setUsernameRequired(false);
+      setShowUsernameModal(false);
+      return;
     }
 
-    if (stats.displayName && stats.displayName !== user.name) {
-      setDisplayName(stats.displayName);
+    if (user.username) {
+      setUsernameRequired(false);
+      setShowUsernameModal(false);
+      return;
     }
+
+    setUsernameRequired(true);
+    setShowUsernameModal(true);
   }, [
     isAuthenticated,
-    setDisplayName,
     setUsername,
     setUsernameRequired,
     stats,
@@ -140,29 +139,25 @@ export default function MeScreen() {
 
   const handleUsernameSuccess = (username: string) => {
     setUsername(username);
+    setUsernameRequired(false);
     setShowUsernameModal(false);
-  };
-
-  const handleDisplayNameChange = (name: string) => {
-    setDisplayName(name);
-  };
-
-  const handleUsernameChange = (username: string) => {
-    setUsername(username);
+    if (user?.sub) {
+      void revalidate(user.sub);
+    }
   };
 
   const getStreakMessage = (streak: number): string => {
-    if (streak === 0) return 'Start your streak today!';
-    if (streak === 1) return '1 day - keep it going!';
-    if (streak < 5) return `${streak} days - nice work!`;
-    if (streak < 10) return `${streak} days - you're on fire!`;
-    return `${streak} days - legendary!`;
+    if (streak === 0) return 'Start your streak today.';
+    if (streak === 1) return '1 day. Keep it going.';
+    if (streak < 5) return `${streak} days. Nice work.`;
+    if (streak < 10) return `${streak} days. Strong run.`;
+    return `${streak} days. Legendary form.`;
   };
 
   const getStreakCta = (hasPlayedToday: boolean): string => {
     return hasPlayedToday
-      ? 'Come back tomorrow to keep your streak!'
-      : 'Play today to keep your streak!';
+      ? 'Come back tomorrow to protect it.'
+      : 'Play today to protect it.';
   };
 
   const formatMemberSince = (dateStr: string | null): string => {
@@ -176,6 +171,8 @@ export default function MeScreen() {
   };
 
   const localStats = stats ?? EMPTY_STATS;
+  const profileUsername = localStats.username || user?.username || null;
+  const usernameRequired = Boolean(user?.usernameRequired || (!profileUsername && statsUserId === user?.sub));
 
   if (authLoadingIntent !== null) {
     return <AuthSyncScreen />;
@@ -192,9 +189,10 @@ export default function MeScreen() {
         </TouchableOpacity>
 
         <View style={[styles.loggedOutContent, centeredProfileStyle]}>
-          <Text style={styles.promoTitle}>Join our growing community!</Text>
+          <Ionicons name="person-circle-outline" size={72} color={theme.colors.primary} />
+          <Text style={styles.promoTitle}>Build your Pundit record</Text>
           <Text style={styles.promoSubtitle}>
-            View your stats, streak, leaderboards and more
+            Create an account to keep your stats, streaks, leaderboards, and challenge history together.
           </Text>
 
           {isAuth0Available && (
@@ -258,49 +256,76 @@ export default function MeScreen() {
         <View style={styles.profileSection}>
           <Avatar
             userId={user?.sub || ''}
-            displayName={localStats.displayName || user?.name}
-            username={localStats.username || user?.username}
+            username={profileUsername}
             imageUrl={user?.picture}
             size="xl"
           />
-          <Text style={styles.displayName}>
-            {localStats.displayName || user?.name || user?.email || 'Player'}
-          </Text>
-          {(localStats.username || user?.username) && (
-            <Text style={styles.username}>@{localStats.username || user?.username}</Text>
-          )}
-          <TouchableOpacity
-            style={styles.editProfileButton}
-            onPress={() => setShowEditProfileModal(true)}
+          <Text
+            style={[styles.usernameTitle, !profileUsername && styles.usernameTitleMissing]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
           >
-            <Text style={styles.editProfileButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
+            {profileUsername ? `@${profileUsername}` : 'Choose your username'}
+          </Text>
+          <View style={styles.identityPill}>
+            <Ionicons
+              name={profileUsername ? 'lock-closed' : 'alert-circle'}
+              size={14}
+              color={profileUsername ? theme.colors.primary : theme.colors.accent}
+            />
+            <Text style={styles.identityPillText}>
+              {profileUsername ? 'Permanent username' : 'Required to continue'}
+            </Text>
+          </View>
+          <Text style={styles.memberSince}>
+            Joined {formatMemberSince(localStats.createdAt)}
+          </Text>
+          {!profileUsername && (
+            <TouchableOpacity
+              style={styles.chooseUsernameButton}
+              onPress={() => setShowUsernameModal(true)}
+            >
+              <Text style={styles.chooseUsernameButtonText}>Choose Username</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.streakBand}>
+          <View style={styles.streakIcon}>
+            <Ionicons name="flame" size={22} color={theme.colors.accent} />
+          </View>
+          <View style={styles.streakCopy}>
+            <Text style={styles.streakTitle}>Streak Status</Text>
+            <Text style={styles.streakMessage}>{getStreakMessage(localStats.streak)}</Text>
+            <Text style={styles.streakCta}>{getStreakCta(playedToday)}</Text>
+          </View>
         </View>
 
         <View style={styles.statsSection}>
           <Text style={styles.sectionTitle}>STATS</Text>
 
-          <View style={styles.statsRow}>
+          <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>🔥</Text>
+              <Ionicons name="flame-outline" size={22} color={theme.colors.accent} />
               <Text style={styles.statValue}>{localStats.streak}</Text>
               <Text style={styles.statLabel}>Streak</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>⭐</Text>
+              <Ionicons name="star-outline" size={22} color={theme.colors.primary} />
               <Text style={styles.statValue}>{localStats.bestScore}</Text>
               <Text style={styles.statLabel}>Best Score</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>📊</Text>
+              <Ionicons name="stats-chart-outline" size={22} color={theme.colors.correct} />
               <Text style={styles.statValue}>{localStats.totalQuizzes}</Text>
               <Text style={styles.statLabel}>Quizzes</Text>
             </View>
           </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>🏆</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCardWide}>
+              <Ionicons name="trophy-outline" size={22} color={theme.colors.primary} />
               <Text style={styles.statValueSmall}>
                 {formatChallengeRecord(
                   localStats.challengeWins,
@@ -308,23 +333,16 @@ export default function MeScreen() {
                   localStats.challengeDraws
                 )}
               </Text>
-              <Text style={styles.statLabel}>W-L-D</Text>
+              <Text style={styles.statLabel}>Challenge W-L-D</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>📅</Text>
+            <View style={styles.statCardWide}>
+              <Ionicons name="calendar-outline" size={22} color={theme.colors.mediumGray} />
               <Text style={styles.statValueSmall}>
                 {formatMemberSince(localStats.createdAt)}
               </Text>
               <Text style={styles.statLabel}>Joined</Text>
             </View>
           </View>
-        </View>
-
-        <View style={styles.streakSection}>
-          <View style={styles.divider} />
-          <Text style={styles.streakTitle}>Streak Status</Text>
-          <Text style={styles.streakMessage}>{getStreakMessage(localStats.streak)}</Text>
-          <Text style={styles.streakCta}>{getStreakCta(playedToday)}</Text>
         </View>
       </ScrollView>
 
@@ -337,19 +355,8 @@ export default function MeScreen() {
         visible={showUsernameModal}
         onClose={() => setShowUsernameModal(false)}
         onSuccess={handleUsernameSuccess}
-        currentUsername={localStats.username || user?.username}
-        isRequired={user?.usernameRequired}
-      />
-
-      <EditProfileModal
-        visible={showEditProfileModal}
-        onClose={() => setShowEditProfileModal(false)}
-        currentDisplayName={localStats.displayName || user?.name}
-        currentUsername={localStats.username || user?.username}
-        canChangeUsername={localStats.canChangeUsername}
-        usernameChangeAvailableAt={localStats.usernameChangeAvailableAt}
-        onDisplayNameChange={handleDisplayNameChange}
-        onUsernameChange={handleUsernameChange}
+        currentUsername={profileUsername}
+        isRequired={usernameRequired}
       />
     </SafeAreaView>
   );
@@ -371,9 +378,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.xxl,
     paddingBottom: theme.spacing.xxl,
+    gap: theme.spacing.lg,
   },
   loggedOutContent: {
     flex: 1,
@@ -383,18 +391,20 @@ const styles = StyleSheet.create({
   },
   promoTitle: {
     fontSize: 22,
+    lineHeight: 28,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
     textAlign: 'center',
+    marginTop: theme.spacing.md,
     marginBottom: theme.spacing.sm,
   },
   promoSubtitle: {
     fontSize: 15,
+    lineHeight: 22,
     fontFamily: theme.fonts.gothamBook,
     color: theme.colors.mediumGray,
     textAlign: 'center',
     marginBottom: theme.spacing.xl,
-    lineHeight: 22,
   },
   primaryButton: {
     backgroundColor: theme.colors.accent,
@@ -420,101 +430,143 @@ const styles = StyleSheet.create({
   },
   profileSection: {
     alignItems: 'center',
-    marginBottom: theme.spacing.xl,
+    gap: theme.spacing.sm,
   },
-  displayName: {
-    fontSize: 22,
-    fontFamily: theme.fonts.gothamBold,
+  usernameTitle: {
+    maxWidth: '100%',
+    fontSize: 28,
+    lineHeight: 34,
+    fontFamily: theme.fonts.gothamBlack,
     color: theme.colors.textDark,
-    marginTop: theme.spacing.md,
-  },
-  username: {
-    fontSize: 15,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.mediumGray,
     marginTop: theme.spacing.xs,
   },
-  editProfileButton: {
-    marginTop: theme.spacing.md,
+  usernameTitleMissing: {
+    fontSize: 24,
+    color: theme.colors.mediumGray,
+  },
+  identityPill: {
+    minHeight: 30,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.white,
+    paddingHorizontal: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  identityPillText: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.textDark,
+  },
+  memberSince: {
+    fontSize: 13,
+    lineHeight: 17,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+  },
+  chooseUsernameButton: {
+    marginTop: theme.spacing.xs,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.primary,
     borderRadius: theme.borderRadius.md,
   },
-  editProfileButtonText: {
+  chooseUsernameButtonText: {
     fontSize: 14,
     fontFamily: theme.fonts.gothamMedium,
-    color: theme.colors.primary,
+    color: theme.colors.white,
+  },
+  streakBand: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  streakIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  streakTitle: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+  },
+  streakMessage: {
+    fontSize: 15,
+    lineHeight: 19,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.textDark,
+  },
+  streakCta: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
   },
   statsSection: {
-    marginBottom: theme.spacing.xl,
+    gap: theme.spacing.md,
   },
   sectionTitle: {
     fontSize: 13,
+    lineHeight: 16,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.mediumGray,
-    marginBottom: theme.spacing.md,
     letterSpacing: 1,
   },
-  statsRow: {
+  statsGrid: {
     flexDirection: 'row',
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
   },
   statCard: {
     flex: 1,
+    minHeight: 104,
     backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.lg,
+    padding: theme.spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 108,
+    gap: theme.spacing.xs,
   },
-  statEmoji: {
-    fontSize: 24,
-    marginBottom: theme.spacing.sm,
+  statCardWide: {
+    flex: 1,
+    minHeight: 104,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.xs,
   },
   statValue: {
     fontSize: 24,
+    lineHeight: 29,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
+    fontVariant: ['tabular-nums'],
   },
   statValueSmall: {
     fontSize: 18,
+    lineHeight: 23,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
     textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   statLabel: {
-    fontSize: 12,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.mediumGray,
-    marginTop: theme.spacing.xs,
-  },
-  streakSection: {
-    alignItems: 'center',
-  },
-  divider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: theme.colors.lightGray,
-    marginBottom: theme.spacing.lg,
-  },
-  streakTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.textDark,
-    marginBottom: theme.spacing.sm,
-  },
-  streakMessage: {
-    fontSize: 16,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.textDark,
-    textAlign: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  streakCta: {
-    fontSize: 14,
+    fontSize: 11,
+    lineHeight: 14,
     fontFamily: theme.fonts.gothamBook,
     color: theme.colors.mediumGray,
     textAlign: 'center',

@@ -27,7 +27,7 @@
 ### Profile and Social
 
 - Me tab renders authenticated stats/profile or guest conversion state.
-- Username/display-name updates are supported with server-side rules.
+- Username is the only player-facing identity; initial setup is required for authenticated users without a username, and usernames are permanent after creation.
 - Friends graph powers friends leaderboard and friend invite flows.
 
 ## Cross-Cutting Decisions

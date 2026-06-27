@@ -64,7 +64,7 @@ Current behavior:
 
 ### Auth
 
-`useAuthStore` owns user/token/session state, refresh-token restore, auth-state versioning, and username/display-name mutations.
+`useAuthStore` owns user/token/session state, refresh-token restore, auth-state versioning, and permanent username setup.
 
 Login/logout orchestration lives in `app/services/authFlow.ts`:
 
@@ -88,6 +88,8 @@ Important behaviors:
 ### Profile and Leaderboards
 
 `useProfileStore` and `useLeaderboardStore` render cached data first and revalidate in the background. Leaderboard caches are separated by daily/weekly period and friend scope. Profile revalidation discards stale responses if auth state changes mid-flight.
+
+The Me screen is a stats-led profile surface. Authenticated users without a username must complete the welcome setup modal, choose a permanent username, and accept the under-development notice before normal profile use. Username is the only player-facing identity across profile, leaderboards, friends, and challenges.
 
 ## Settings
 

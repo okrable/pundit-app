@@ -7,7 +7,6 @@ interface FinalizeStatsRequest {
   quizId: string;
   userId: string;
   userProfile?: {
-    displayName?: string;
     email?: string;
     avatarUrl?: string;
   };
@@ -63,12 +62,12 @@ export const handler: Handler = async (event) => {
     const updated = await withTransaction(async (client) => {
       await queryWithClient(
         client,
-        `INSERT INTO users (id, display_name, email, avatar_url, created_at)
-         VALUES ($1, $2, $3, $4, now())
+        `INSERT INTO users (id, email, avatar_url, created_at)
+         VALUES ($1, $2, $3, now())
          ON CONFLICT (id) DO UPDATE SET
            email = COALESCE(EXCLUDED.email, users.email),
            avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url)`,
-        [userId, userProfile?.displayName || null, userProfile?.email || null, userProfile?.avatarUrl || null]
+        [userId, userProfile?.email || null, userProfile?.avatarUrl || null]
       );
 
       const resultRows = await queryWithClient<{
