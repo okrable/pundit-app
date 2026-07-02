@@ -1,8 +1,8 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BottomTabNavigator from './app/navigation/BottomTabNavigator';
 import ChallengeQuizScreen from './app/screens/ChallengeQuizScreen';
 import ChallengeResultsScreen from './app/screens/ChallengeResultsScreen';
@@ -17,11 +17,64 @@ import { logError, logInfo, startDebugSession } from './app/services/debugLog';
 import { MobileWebAppShell } from './app/components/ResponsiveLayout';
 
 const Stack = createNativeStackNavigator();
+const navigationRef = createNavigationContainerRef<any>();
+
+interface AppErrorBoundaryState {
+  error: Error | null;
+}
+
+class AppErrorBoundary extends React.Component<React.PropsWithChildren, AppErrorBoundaryState> {
+  state: AppErrorBoundaryState = {
+    error: null,
+  };
+
+  static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    logError('app.react_error_boundary', {
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+    });
+  }
+
+  handleRetry = () => {
+    this.setState({ error: null });
+  };
+
+  render() {
+    if (!this.state.error) {
+      return this.props.children;
+    }
+
+    return (
+      <View style={styles.errorBoundaryContainer}>
+        <View style={styles.errorBoundaryContent}>
+          <Text style={styles.errorBoundaryTitle}>Something went wrong</Text>
+          <Text style={styles.errorBoundaryMessage}>
+            The app hit a display error. Your quiz progress and account data are kept separately from this screen.
+          </Text>
+          <TouchableOpacity style={styles.errorBoundaryButton} onPress={this.handleRetry}>
+            <Text style={styles.errorBoundaryButtonText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+}
 
 // Separate component to use hooks that need navigation context
 function AppContent() {
   // Handle deep links for friend invites
-  useDeepLinkHandler();
+  useDeepLinkHandler({
+    onChallengeJoined: React.useCallback(() => {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate('ChallengeQuiz');
+      }
+    }, []),
+  });
   const hasSeenActiveState = React.useRef(false);
 
   React.useEffect(() => {
@@ -123,10 +176,56 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <MobileWebAppShell>
-        <NavigationContainer>
-          <AppContent />
-        </NavigationContainer>
+        <AppErrorBoundary>
+          <NavigationContainer ref={navigationRef}>
+            <AppContent />
+          </NavigationContainer>
+        </AppErrorBoundary>
       </MobileWebAppShell>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  errorBoundaryContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.xl,
+  },
+  errorBoundaryContent: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+  },
+  errorBoundaryTitle: {
+    fontFamily: theme.fonts.gothamBlack,
+    fontSize: 24,
+    color: theme.colors.textDark,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  errorBoundaryMessage: {
+    fontFamily: theme.fonts.gothamBook,
+    fontSize: 15,
+    lineHeight: 22,
+    color: theme.colors.neutralDark,
+    textAlign: 'center',
+    marginBottom: theme.spacing.xl,
+  },
+  errorBoundaryButton: {
+    minHeight: 48,
+    minWidth: 132,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.xl,
+  },
+  errorBoundaryButtonText: {
+    fontFamily: theme.fonts.gothamBold,
+    fontSize: 16,
+    color: theme.colors.white,
+  },
+});

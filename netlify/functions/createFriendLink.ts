@@ -17,6 +17,10 @@ function generateFriendCode(): string {
   return code;
 }
 
+function getSiteUrl(): string {
+  return (process.env.URL || process.env.DEPLOY_PRIME_URL || 'https://pundit-app.netlify.app').replace(/\/$/, '');
+}
+
 export const handler: Handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -93,8 +97,7 @@ export const handler: Handler = async (event) => {
     );
 
     // Build share URL using the API base URL domain
-    const apiBaseUrl = process.env.URL || 'https://pundit-app.netlify.app';
-    const shareUrl = `${apiBaseUrl}/f/${code}`;
+    const shareUrl = `${getSiteUrl()}/f/${code}`;
 
     return {
       statusCode: 201,

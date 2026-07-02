@@ -6,7 +6,6 @@ import {
   Modal,
   TouchableOpacity,
   Share,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -15,6 +14,7 @@ import { theme } from '../theme/theme';
 interface ShareChallengeModalProps {
   visible: boolean;
   code: string;
+  shareUrl: string;
   onClose: () => void;
   onPlayNow: () => void;
 }
@@ -22,13 +22,14 @@ interface ShareChallengeModalProps {
 export default function ShareChallengeModal({
   visible,
   code,
+  shareUrl,
   onClose,
   onPlayNow,
 }: ShareChallengeModalProps) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopyCode = async () => {
-    await Clipboard.setStringAsync(code);
+  const handleCopyLink = async () => {
+    await Clipboard.setStringAsync(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -36,7 +37,7 @@ export default function ShareChallengeModal({
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `I challenge you to beat my score on Pundit! Enter code: ${code}`,
+        message: `I challenge you to beat my score on Pundit! ${shareUrl}`,
         title: 'Pundit Challenge',
       });
     } catch (error) {
@@ -63,12 +64,12 @@ export default function ShareChallengeModal({
             <Ionicons name="flash" size={40} color={theme.colors.accent} />
             <Text style={styles.title}>Challenge Created!</Text>
             <Text style={styles.subtitle}>
-              Share this code with a friend to start the challenge
+              Share this link with a friend to start the challenge
             </Text>
           </View>
 
           {/* Code Display */}
-          <TouchableOpacity style={styles.codeContainer} onPress={handleCopyCode}>
+          <TouchableOpacity style={styles.codeContainer} onPress={handleCopyLink}>
             <Text style={styles.codeLabel}>Your Challenge Code</Text>
             <Text style={styles.code}>{code}</Text>
             <View style={styles.copyHint}>
@@ -78,7 +79,7 @@ export default function ShareChallengeModal({
                 color={copied ? theme.colors.correct : theme.colors.mediumGray}
               />
               <Text style={[styles.copyHintText, copied && styles.copiedText]}>
-                {copied ? 'Copied!' : 'Tap to copy'}
+                {copied ? 'Link copied!' : 'Tap to copy link'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -87,7 +88,7 @@ export default function ShareChallengeModal({
           <View style={styles.buttons}>
             <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
               <Ionicons name="share-outline" size={20} color={theme.colors.white} />
-              <Text style={styles.shareButtonText}>Share with Friend</Text>
+              <Text style={styles.shareButtonText}>Share Link</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.playButton} onPress={onPlayNow}>

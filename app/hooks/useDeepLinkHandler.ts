@@ -1,103 +1,100 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as Linking from 'expo-linking';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { useAuthStore } from '../state/useAuthStore';
 import { acceptFriendLink } from '../services/api';
+import { useChallengeStore } from '../state/useChallengeStore';
+import { useLeaderboardStore } from '../state/useLeaderboardStore';
+import { getSharedCodeActionFromUrl, SharedCodeAction } from '../services/sharedCode';
 
-// Hook to handle deep links for friend invites
-// Listens for pundit-app://add-friend/{code} links
+interface DeepLinkHandlerOptions {
+  onChallengeJoined?: () => void;
+}
 
-export default function useDeepLinkHandler() {
+// Handles shared friend invite and challenge links across native and web.
+export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {}) {
+  const { onChallengeJoined } = options;
   const { user, isAuthenticated, isInitialized } = useAuthStore();
-  const [pendingFriendCode, setPendingFriendCode] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<SharedCodeAction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = useRef(false);
 
-  const processFriendCode = useCallback(async (code: string) => {
-    if (!user?.sub || isProcessing) return;
+  const processAction = useCallback(async (action: SharedCodeAction) => {
+    if (!user?.sub || isProcessingRef.current) return;
 
+    isProcessingRef.current = true;
     setIsProcessing(true);
     try {
-      const response = await acceptFriendLink(code, user.sub);
+      if (action.kind === 'friendInvite') {
+        const response = await acceptFriendLink(action.code, user.sub);
 
-      if (response.success) {
-        const friendName = response.friendDisplayName || response.friendUsername || 'your friend';
-        Alert.alert(
-          'Friend Added!',
-          `You and ${friendName} are now connected. Check your friends leaderboard!`,
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert('Could Not Add Friend', response.error || 'Please try again.');
+        if (response.success) {
+          await useLeaderboardStore.getState().invalidateFriends(user.sub);
+          const friendName = response.friendDisplayName || response.friendUsername || 'your friend';
+          Alert.alert(
+            'Friend Added',
+            `You and ${friendName} are now connected. Check your friends leaderboard.`,
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('Could Not Add Friend', response.error || 'Please try again.');
+        }
+        return;
+      }
+
+      if (action.kind === 'challenge') {
+        await useChallengeStore.getState().joinChallenge(action.code, user.sub, user.name);
+        onChallengeJoined?.();
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to add friend';
+      const message = error instanceof Error ? error.message : 'Failed to process code';
       Alert.alert('Error', message);
     } finally {
+      isProcessingRef.current = false;
       setIsProcessing(false);
-      setPendingFriendCode(null);
+      setPendingAction(null);
     }
-  }, [user?.sub, isProcessing]);
+  }, [onChallengeJoined, user?.name, user?.sub]);
 
   const handleUrl = useCallback((url: string) => {
-    // Parse the URL to extract the friend code
-    // Expected format: pundit-app://add-friend/{code}
-    const parsed = Linking.parse(url);
+    const action = getSharedCodeActionFromUrl(url);
+    if (!action) return;
 
-    if (parsed.hostname === 'add-friend' || parsed.path?.startsWith('add-friend')) {
-      // Extract code from path
-      let code: string | null = null;
-
-      if (parsed.path) {
-        const pathParts = parsed.path.split('/');
-        // Handle both 'add-friend/CODE' and 'add-friend' with code as last part
-        code = pathParts[pathParts.length - 1];
-        if (code === 'add-friend') {
-          code = null;
-        }
-      }
-
-      // Also check query params as fallback
-      if (!code && parsed.queryParams?.code) {
-        code = parsed.queryParams.code as string;
-      }
-
-      if (!code) return;
-
-      // If not initialized yet, store for later
-      if (!isInitialized) {
-        setPendingFriendCode(code);
-        return;
-      }
-
-      // If not authenticated, store code and show alert
-      if (!isAuthenticated) {
-        setPendingFriendCode(code);
-        Alert.alert(
-          'Sign In Required',
-          'Please sign in to add this friend to your leaderboard.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      // Process the code immediately
-      processFriendCode(code);
+    if (!isInitialized) {
+      setPendingAction(action);
+      return;
     }
-  }, [isInitialized, isAuthenticated, processFriendCode]);
 
-  // Handle initial URL when app opens
+    if (!isAuthenticated) {
+      setPendingAction(action);
+      Alert.alert(
+        'Sign In Required',
+        action.kind === 'friendInvite'
+          ? 'Please sign in to add this friend to your leaderboard.'
+          : 'Please sign in to join this challenge.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    processAction(action);
+  }, [isInitialized, isAuthenticated, processAction]);
+
   useEffect(() => {
     const getInitialUrl = async () => {
       const url = await Linking.getInitialURL();
       if (url) {
         handleUrl(url);
       }
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        handleUrl(window.location.href);
+      }
     };
 
     getInitialUrl();
   }, [handleUrl]);
 
-  // Listen for URL events while app is open
   useEffect(() => {
     const subscription = Linking.addEventListener('url', (event) => {
       handleUrl(event.url);
@@ -106,16 +103,15 @@ export default function useDeepLinkHandler() {
     return () => subscription.remove();
   }, [handleUrl]);
 
-  // Process pending code when auth state changes
   useEffect(() => {
-    if (pendingFriendCode && isAuthenticated && isInitialized && user?.sub) {
-      processFriendCode(pendingFriendCode);
+    if (pendingAction && isAuthenticated && isInitialized && user?.sub) {
+      processAction(pendingAction);
     }
-  }, [pendingFriendCode, isAuthenticated, isInitialized, user?.sub, processFriendCode]);
+  }, [pendingAction, isAuthenticated, isInitialized, user?.sub, processAction]);
 
   return {
-    pendingFriendCode,
+    pendingAction,
     isProcessing,
-    clearPendingCode: () => setPendingFriendCode(null),
+    clearPendingCode: () => setPendingAction(null),
   };
 }
