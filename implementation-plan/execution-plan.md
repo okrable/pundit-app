@@ -45,15 +45,16 @@
 - [x] Branded startup bootstrap and stale-first daily-loop hydration.
 - [x] Background prefetch for quiz, stats, and leaderboard warm loads.
 - [x] Persistent debug-log copy/clear controls.
+- [x] App-level React crash recovery around the navigation root.
+- [x] Transactional challenge submission completion and stat updates.
 - [x] Settings version display from app SemVer.
 - [x] Authenticated settings hide guest-only clear-cache controls.
 
 ## Active Hardening
 
-1. Add app-level error boundaries and crash-recovery UX.
-2. Add offline answer queue with retry-on-reconnect.
-3. Add endpoint-level rate limiting and abuse controls.
-4. Improve API observability, alerting, and error budgets.
+1. Extend offline retry beyond existing daily authenticated result retry.
+2. Add endpoint-level rate limiting and abuse controls.
+3. Improve API observability, alerting, and error budgets.
 
 ## Next Feature Wave
 

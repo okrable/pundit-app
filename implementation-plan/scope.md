@@ -34,7 +34,6 @@
 
 ## Hardening Work Remaining
 
-- App-level error boundaries.
-- Offline answer queue.
+- Broader offline retry beyond existing daily authenticated result retry.
 - Endpoint-level rate limiting and abuse controls.
 - API monitoring and incident visibility.

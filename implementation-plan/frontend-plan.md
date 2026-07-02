@@ -87,7 +87,7 @@ Important behaviors:
 
 ### Profile and Leaderboards
 
-`useProfileStore` and `useLeaderboardStore` render cached data first and revalidate in the background. Leaderboard caches are separated by daily/weekly period and friend scope. Profile revalidation discards stale responses if auth state changes mid-flight.
+`useProfileStore` and `useLeaderboardStore` render cached data first and revalidate in the background. Daily leaderboard caches are keyed by quiz date and friend scope. Profile revalidation discards stale responses if auth state changes mid-flight.
 
 ## Settings
 

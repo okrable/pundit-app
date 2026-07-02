@@ -46,12 +46,6 @@ interface ExistingResultWithStatsRow {
   best_score: number | null;
 }
 
-interface UserStatsRow {
-  streak: number;
-  best_score: number;
-  last_played: string | null;
-}
-
 // Calculate points based on time remaining (correct answers only)
 // Max 100 points per question, 500 total
 function calculatePoints(timeRemainingMs: number | undefined): number {
@@ -262,7 +256,6 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const asyncStatsEnabled = process.env.SUBMITQUIZ_ASYNC_STATS_ENABLED === 'true' && quizDate === getQuizDate();
     const correctCount = answersCorrect.filter(Boolean).length;
 
     const dbResult = await withTransaction(async (client) => {
@@ -321,23 +314,6 @@ export const handler: Handler = async (event) => {
         };
       }
 
-      if (asyncStatsEnabled) {
-        t = Date.now();
-        const currentStats = await queryWithClient<UserStatsRow>(
-          client,
-          `SELECT streak, best_score, last_played::TEXT as last_played FROM users WHERE id = $1`,
-          [userId]
-        );
-        dbMark('stats_read', t);
-
-        return {
-          kind: 'inserted_async' as const,
-          row: inserted[0],
-          currentStats: currentStats[0] || null,
-          timings: dbTimings,
-        };
-      }
-
       const previousQuizDate = getPreviousQuizDate(quizDate);
       t = Date.now();
       const updatedUser = await queryWithClient<{ streak: number; best_score: number }>(
@@ -392,20 +368,6 @@ export const handler: Handler = async (event) => {
         streak: dbResult.row?.streak ?? 0,
         bestScore: dbResult.row?.best_score ?? 0,
         statsPending: false,
-      };
-    } else if (dbResult.kind === 'inserted_async') {
-      const lastKnownStreak = dbResult.currentStats?.streak ?? 0;
-      const lastKnownBestScore = dbResult.currentStats?.best_score ?? 0;
-      responseBody = {
-        date: quizDate,
-        quizId,
-        score,
-        totalQuestions: answers.length,
-        answers: detailedAnswers,
-        streak: lastKnownStreak,
-        bestScore: Math.max(lastKnownBestScore, score),
-        statsPending: true,
-        statsRefreshAfterMs: 800,
       };
     } else {
       responseBody = {

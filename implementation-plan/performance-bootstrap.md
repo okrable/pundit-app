@@ -58,6 +58,7 @@ Screens do not process AuthSession responses directly, and normal Me/Leaderboard
 - Authenticated plays submit to the server and finalize stats.
 - Guest plays are not submitted while still guest.
 - Pending authenticated submissions can retry on later warm paths.
+- Challenge submissions are still direct network submits and are not queued offline yet.
 
 ## UX Rules
 

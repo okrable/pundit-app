@@ -1,10 +1,8 @@
 import { create } from 'zustand';
 import {
   ApiError,
-  finalizeQuizStats,
   getDailyQuiz,
   getTodayResult,
-  getUserStats,
   migrateGuestResult,
   submitQuiz,
 } from '../services/api';
@@ -318,6 +316,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         const cachedMigratedResult = await getTodayQuizResult(userId);
         await clearGuestCache();
         await useProfileStore.getState().markPlayedToday(migratedResult, userId);
+        void useLeaderboardStore.getState().prefetchDailyLoop(userId, true, { force: true });
         set({
           cachedResult: cachedMigratedResult ?? migratedResult,
           result: null,
@@ -452,7 +451,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       const serverResult = await submitQuiz(submittedQuizId, userId, answers, profile);
       const mergedResult: QuizResultImmediate = {
         ...serverResult,
-        syncState: serverResult.statsPending ? 'pending' : 'synced',
+        syncState: 'synced',
       };
 
       await saveDailyQuizResult(mergedResult, userId, mergedResult.syncState);
@@ -476,71 +475,10 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         submitError: null,
       });
 
-      if (!serverResult.statsPending) {
-        logInfo('quiz.submit.success', { userId, quizId: submittedQuizId, statsPending: false });
-        await useProfileStore.getState().markPlayedToday(mergedResult, userId);
-        if (!userId.startsWith('guest_')) {
-          void useLeaderboardStore.getState().prefetchDailyLoop(userId, true);
-        }
-        return;
-      }
-
+      logInfo('quiz.submit.success', { userId, quizId: submittedQuizId, statsPending: false });
+      await useProfileStore.getState().markPlayedToday(mergedResult, userId);
       if (!userId.startsWith('guest_')) {
-        logInfo('quiz.submit.success', { userId, quizId: submittedQuizId, statsPending: true });
-        const refreshDelay = serverResult.statsRefreshAfterMs ?? 800;
-        setTimeout(async () => {
-          let finalizeSucceeded = false;
-
-          try {
-            const finalizeResult = await finalizeQuizStats(submittedQuizId, userId, profile);
-            finalizeSucceeded = Boolean(finalizeResult.finalized || finalizeResult.skipped);
-          } catch (finalizeError) {
-            console.error('Failed to finalize quiz stats:', finalizeError);
-          }
-
-          if (!finalizeSucceeded) {
-            return;
-          }
-
-          try {
-            const latestStats = await getUserStats(userId);
-            await useProfileStore.getState().applyServerStats(latestStats);
-            await saveDailyQuizResult(
-              {
-                ...(get().result ?? result ?? mergedResult),
-                streak: latestStats.streak,
-                bestScore: latestStats.bestScore,
-                statsPending: false,
-                syncState: 'synced',
-              },
-              userId,
-              'synced'
-            );
-            set((state) => ({
-              result: state.result
-                ? {
-                    ...state.result,
-                    streak: latestStats.streak,
-                    bestScore: latestStats.bestScore,
-                    statsPending: false,
-                    syncState: 'synced',
-                  }
-                : state.result,
-              cachedResult: state.cachedResult
-                ? {
-                    ...state.cachedResult,
-                    streak: latestStats.streak,
-                    bestScore: latestStats.bestScore,
-                    syncState: 'synced',
-                    cachedAt: new Date().toISOString(),
-                  }
-                : state.cachedResult,
-            }));
-            void useLeaderboardStore.getState().prefetchDailyLoop(userId, true);
-          } catch (statsError) {
-            console.error('Failed to refresh user stats after quiz submit:', statsError);
-          }
-        }, refreshDelay);
+        void useLeaderboardStore.getState().prefetchDailyLoop(userId, true, { force: true });
       }
     } catch (error) {
       logError('quiz.submit.error', {
