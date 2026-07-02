@@ -7,6 +7,11 @@ interface CreateFriendLinkRequest {
   userId: string;
 }
 
+interface CreatedFriendLink {
+  created_at: string;
+  expires_at: string;
+}
+
 // Generate an 8-character alphanumeric code (uppercase, no ambiguous chars)
 function generateFriendCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No 0/O, 1/I/L
@@ -87,14 +92,14 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Create the friend link (expires in 7 days)
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    await query(
+    // Create the friend link using database time so expiry checks share the same clock.
+    const createdLinks = await query<CreatedFriendLink>(
       `INSERT INTO friend_links (code, user_id, expires_at)
-       VALUES ($1, $2, $3)`,
-      [code, userId, expiresAt.toISOString()]
+       VALUES ($1, $2, NOW() + INTERVAL '7 days')
+       RETURNING created_at, expires_at`,
+      [code, userId]
     );
+    const createdLink = createdLinks[0];
 
     // Build share URL using the API base URL domain
     const shareUrl = `${getSiteUrl()}/f/${code}`;
@@ -105,7 +110,8 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         code,
         shareUrl,
-        expiresAt: expiresAt.toISOString(),
+        createdAt: createdLink.created_at,
+        expiresAt: createdLink.expires_at,
       }),
     };
   } catch (error) {

@@ -242,6 +242,7 @@ export interface FriendsLeaderboardResponse {
 export interface CreateFriendLinkResponse {
   code: string;
   shareUrl: string;
+  createdAt?: string;
   expiresAt: string;
 }
 

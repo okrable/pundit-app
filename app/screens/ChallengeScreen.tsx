@@ -19,7 +19,7 @@ import { theme } from '../theme/theme';
 import ShareChallengeModal from '../components/ShareChallengeModal';
 import type { ChallengeHistoryItem } from '../types';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
-import { acceptFriendLink } from '../services/api';
+import { acceptFriendLink, ApiError } from '../services/api';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { buildShareUrl, normalizeSharedCode, resolveSharedCode } from '../services/sharedCode';
 
@@ -145,7 +145,10 @@ export default function ChallengeScreen() {
       navigation.navigate('ChallengeQuiz');
     } catch (err) {
       const message = err instanceof Error ? err.message : error || 'Failed to process code';
-      Alert.alert('Error', message);
+      const title = action.kind === 'friendInvite' && err instanceof ApiError
+        ? 'Could Not Add Friend'
+        : 'Error';
+      Alert.alert(title, message);
     } finally {
       setIsJoining(false);
     }
