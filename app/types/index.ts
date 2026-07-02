@@ -64,7 +64,7 @@ export interface QuizResult {
   syncState?: SyncState;
 }
 
-export type LeaderboardPeriod = 'daily' | 'weekly';
+export type LeaderboardPeriod = 'daily';
 
 export interface LeaderboardEntry {
   userId: string;
@@ -79,8 +79,6 @@ export interface LeaderboardEntry {
 export interface GlobalLeaderboardResponse {
   period: LeaderboardPeriod;
   quizDate: string;
-  weekStart: string;
-  weekEnd: string;
   leaderboard: LeaderboardEntry[];
 }
 
@@ -145,6 +143,7 @@ export interface ChallengeStats {
 export interface ActiveChallenge {
   challengeId: string;
   code: string;
+  shareUrl?: string;
   status: 'pending' | 'active';
   creatorDisplayName: string | null;
   creatorUsername: string | null;
@@ -230,18 +229,14 @@ export interface FriendsLeaderboardEntry {
   streak: number;
   rank: number | null;
   hasPlayedToday: boolean;
-  hasPlayedThisWeek?: boolean;
 }
 
 export interface FriendsLeaderboardResponse {
   period: LeaderboardPeriod;
   quizDate: string;
-  weekStart: string;
-  weekEnd: string;
   leaderboard: FriendsLeaderboardEntry[];
   totalFriends: number;
   friendsPlayedToday: number;
-  friendsPlayedThisWeek: number;
 }
 
 export interface CreateFriendLinkResponse {

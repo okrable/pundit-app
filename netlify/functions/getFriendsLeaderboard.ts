@@ -1,6 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { assertAuthorizedUser } from './lib/auth';
-import { getCurrentQuizWeekBounds, getPreviousQuizDate, getQuizDate } from './lib/quizDate';
+import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 import {
   getFriendsLeaderboardRows,
   parseLeaderboardPeriod,
@@ -37,18 +37,9 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    if (!period) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'period must be daily or weekly' }),
-      };
-    }
-
     const now = new Date();
     const today = getQuizDate(now);
     const previousQuizDate = getPreviousQuizDate(today);
-    const { weekStart, weekEnd } = getCurrentQuizWeekBounds(now);
 
     // Guest users don't have friends
     if (userId.startsWith('guest_')) {
@@ -58,12 +49,9 @@ export const handler: Handler = async (event) => {
         body: JSON.stringify({
           period,
           quizDate: today,
-          weekStart,
-          weekEnd,
           leaderboard: [],
           totalFriends: 0,
           friendsPlayedToday: 0,
-          friendsPlayedThisWeek: 0,
         }),
       };
     }
@@ -76,29 +64,22 @@ export const handler: Handler = async (event) => {
     const leaderboard = await getFriendsLeaderboardRows(
       userId,
       period,
-      { quizDate: today, weekStart, weekEnd, previousQuizDate }
+      { quizDate: today, previousQuizDate }
     );
 
     const totalFriends = leaderboard.length - 1; // Exclude self
     const friendsPlayedToday = leaderboard.filter(
       (entry) => entry.hasPlayedToday && entry.userId !== userId
     ).length;
-    const friendsPlayedThisWeek = leaderboard.filter(
-      (entry) => entry.hasPlayedThisWeek && entry.userId !== userId
-    ).length;
-
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         period,
         quizDate: today,
-        weekStart,
-        weekEnd,
         leaderboard,
         totalFriends,
         friendsPlayedToday,
-        friendsPlayedThisWeek,
       }),
     };
   } catch (error) {

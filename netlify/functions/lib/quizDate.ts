@@ -28,25 +28,3 @@ export function getPreviousQuizDate(date: string): string {
   utcDate.setUTCDate(utcDate.getUTCDate() - 1);
   return utcDate.toISOString().split('T')[0];
 }
-
-export function getCurrentQuizWeekBounds(referenceDate: Date = new Date()): {
-  weekStart: string;
-  weekEnd: string;
-} {
-  const quizDate = getQuizDate(referenceDate);
-  const [year, month, day] = quizDate.split('-').map(Number);
-  const utcDate = new Date(Date.UTC(year, month - 1, day));
-  const dayOfWeek = utcDate.getUTCDay();
-  const daysSinceMonday = (dayOfWeek + 6) % 7;
-
-  const weekStartDate = new Date(utcDate);
-  weekStartDate.setUTCDate(utcDate.getUTCDate() - daysSinceMonday);
-
-  const weekEndDate = new Date(weekStartDate);
-  weekEndDate.setUTCDate(weekStartDate.getUTCDate() + 6);
-
-  return {
-    weekStart: weekStartDate.toISOString().split('T')[0],
-    weekEnd: weekEndDate.toISOString().split('T')[0],
-  };
-}

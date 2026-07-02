@@ -9,10 +9,15 @@
 [functions]
   node_bundler = "esbuild"
 
-# Friend invite link redirects
+# Shared friend invite and challenge links render inside the Expo web app.
 [[redirects]]
   from = "/f/*"
-  to = "/.netlify/functions/f/:splat"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/c/*"
+  to = "/index.html"
   status = 200
 
 # Expo web app fallback

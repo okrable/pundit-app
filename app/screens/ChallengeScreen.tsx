@@ -8,6 +8,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -18,6 +19,9 @@ import { theme } from '../theme/theme';
 import ShareChallengeModal from '../components/ShareChallengeModal';
 import type { ChallengeHistoryItem } from '../types';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
+import { acceptFriendLink } from '../services/api';
+import { useLeaderboardStore } from '../state/useLeaderboardStore';
+import { buildShareUrl, normalizeSharedCode, resolveSharedCode } from '../services/sharedCode';
 
 export default function ChallengeScreen() {
   const centeredContentStyle = useCenteredWebStyle(webContentWidth.standard);
@@ -38,10 +42,19 @@ export default function ChallengeScreen() {
   const [joinCode, setJoinCode] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [createdShareUrl, setCreatedShareUrl] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
   const userId = isAuthenticated && user ? user.sub : null;
+
+  const getShareOrigin = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      return window.location.origin;
+    }
+
+    return 'https://pundit-app.netlify.app';
+  };
 
   // Fetch challenges when screen comes into focus (only for authenticated users)
   useFocusEffect(
@@ -58,11 +71,13 @@ export default function ChallengeScreen() {
     clearError();
     try {
       const displayName = user?.name;
-      const code = await createChallenge(userId, displayName);
+      const { code, shareUrl } = await createChallenge(userId, displayName);
       setCreatedCode(code);
+      setCreatedShareUrl(shareUrl);
       setShowShareModal(true);
     } catch (err) {
-      Alert.alert('Error', error || 'Failed to create challenge');
+      const message = err instanceof Error ? err.message : error || 'Failed to create challenge';
+      Alert.alert('Error', message);
     } finally {
       setIsCreating(false);
     }
@@ -91,24 +106,46 @@ export default function ChallengeScreen() {
     );
   };
 
-  const handleJoinChallenge = async () => {
+  const handleSubmitSharedCode = async () => {
     if (!userId || !joinCode.trim()) return;
+    const action = resolveSharedCode(joinCode);
 
-    // Prevent joining own challenge
-    if (activeChallenge && joinCode.toUpperCase().trim() === activeChallenge.code) {
-      Alert.alert('Error', 'You cannot join your own challenge');
+    if (action.kind === 'invalid') {
+      Alert.alert('Invalid Code', 'Enter a 6-character challenge code or an 8-character friend invite code.');
       return;
     }
 
     setIsJoining(true);
     clearError();
     try {
-      const displayName = user?.name;
-      await joinChallenge(joinCode.toUpperCase().trim(), userId, displayName);
+      if (action.kind === 'friendInvite') {
+        const response = await acceptFriendLink(action.code, userId);
+        if (response.success) {
+          await useLeaderboardStore.getState().invalidateFriends(userId);
+          const friendName = response.friendDisplayName || response.friendUsername || 'your friend';
+          Alert.alert(
+            'Friend Added',
+            `You and ${friendName} are now connected. Check your friends leaderboard.`,
+            [{ text: 'OK' }]
+          );
+          setJoinCode('');
+        } else {
+          Alert.alert('Could Not Add Friend', response.error || 'Please try again.');
+        }
+        return;
+      }
+
+      if (activeChallenge && action.code === activeChallenge.code) {
+        Alert.alert('Error', 'You cannot join your own challenge');
+        return;
+      }
+
+      await joinChallenge(action.code, userId, user?.name);
       setJoinCode('');
       navigation.navigate('ChallengeQuiz');
     } catch (err) {
-      Alert.alert('Error', error || 'Failed to join challenge');
+      const message = err instanceof Error ? err.message : error || 'Failed to process code';
+      Alert.alert('Error', message);
     } finally {
       setIsJoining(false);
     }
@@ -122,6 +159,7 @@ export default function ChallengeScreen() {
   const handleShareModalClose = () => {
     setShowShareModal(false);
     setCreatedCode(null);
+    setCreatedShareUrl(null);
     if (userId) {
       fetchUserChallenges(userId);
     }
@@ -279,6 +317,9 @@ export default function ChallengeScreen() {
                   style={styles.shareButton}
                   onPress={() => {
                     setCreatedCode(activeChallenge.code);
+                    setCreatedShareUrl(
+                      activeChallenge.shareUrl || buildShareUrl('c', activeChallenge.code, getShareOrigin())
+                    );
                     setShowShareModal(true);
                   }}
                 >
@@ -320,16 +361,19 @@ export default function ChallengeScreen() {
           <View style={styles.joinCard}>
             <View style={styles.joinHeader}>
               <Ionicons name="link-outline" size={24} color={theme.colors.primary} />
-              <Text style={styles.joinTitle}>Join a Challenge</Text>
+              <Text style={styles.joinTitle}>Enter a Code</Text>
             </View>
+            <Text style={styles.joinSubtitle}>
+              Use a challenge code or friend invite code
+            </Text>
             <View style={styles.joinInputRow}>
               <TextInput
                 style={styles.joinInput}
                 placeholder="Enter code"
                 placeholderTextColor={theme.colors.mediumGray}
                 value={joinCode}
-                onChangeText={(text) => setJoinCode(text.toUpperCase())}
-                maxLength={6}
+                onChangeText={(text) => setJoinCode(normalizeSharedCode(text))}
+                maxLength={8}
                 autoCapitalize="characters"
               />
               <TouchableOpacity
@@ -337,7 +381,7 @@ export default function ChallengeScreen() {
                   styles.joinButton,
                   (!joinCode.trim() || isJoining) && styles.joinButtonDisabled,
                 ]}
-                onPress={handleJoinChallenge}
+                onPress={handleSubmitSharedCode}
                 disabled={!joinCode.trim() || isJoining}
               >
                 {isJoining ? (
@@ -383,6 +427,7 @@ export default function ChallengeScreen() {
         <ShareChallengeModal
           visible={showShareModal}
           code={createdCode}
+          shareUrl={createdShareUrl || buildShareUrl('c', createdCode, getShareOrigin())}
           onClose={handleShareModalClose}
           onPlayNow={handlePlayNow}
         />
@@ -648,13 +693,20 @@ const styles = StyleSheet.create({
   joinHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
   joinTitle: {
     fontSize: 18,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
     marginLeft: theme.spacing.sm,
+  },
+  joinSubtitle: {
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    lineHeight: 18,
+    marginBottom: theme.spacing.md,
   },
   joinInputRow: {
     flexDirection: 'row',

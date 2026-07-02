@@ -20,6 +20,10 @@ function generateChallengeCode(): string {
   return code;
 }
 
+function getSiteUrl(): string {
+  return (process.env.URL || process.env.DEPLOY_PRIME_URL || 'https://pundit-app.netlify.app').replace(/\/$/, '');
+}
+
 export const handler: Handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -170,7 +174,7 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         challengeId,
         code,
-        shareUrl: `https://pundit.app/c/${code}`,
+        shareUrl: `${getSiteUrl()}/c/${code}`,
         quizId,
         expiresAt: expiresAt.toISOString(),
         questions: formattedQuestions,

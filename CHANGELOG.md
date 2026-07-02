@@ -2,6 +2,27 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v1.4.3 - Web shared code handling
+
+- Added web-first shared code handling for challenge links and friend invite links.
+- Allowed the code entry flow to accept both 6-character challenge codes and 8-character friend invite codes.
+- Updated challenge and friend sharing to use deployed web URLs.
+
+## v1.4.2 - Daily leaderboard simplification
+
+- Removed weekly leaderboard controls from the app surface.
+- Made daily leaderboard caches date-aware to avoid showing prior-day rankings.
+- Forced daily leaderboard refresh after authenticated quiz submission and guest-result migration.
+- Simplified leaderboard ranking to unique score-and-submission-time ordering.
+- Kept quiz stats and streak updates synchronous during normal daily submission.
+
+## v1.4.1 - Pre-polish hardening
+
+- Hardened challenge answer submission validation and duplicate-answer rejection.
+- Made challenge result completion and stat updates transactional to avoid duplicate stat increments.
+- Added app-level React crash recovery UI around the navigation tree.
+- Clarified remaining offline retry hardening docs.
+
 ## v1.4.0 - Mobile-first web app
 
 - Reworked the web app into a centered mobile shell that mirrors the native app layout.

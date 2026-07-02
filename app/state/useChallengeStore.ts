@@ -12,6 +12,7 @@ import type {
 interface CurrentChallenge {
   challengeId: string;
   code: string;
+  shareUrl?: string;
   questions: Question[];
   isCreator: boolean;
   opponentName: string | null;
@@ -31,7 +32,7 @@ interface ChallengeState {
   error: string | null;
 
   // Actions
-  createChallenge: (userId: string, displayName?: string) => Promise<string>;
+  createChallenge: (userId: string, displayName?: string) => Promise<{ code: string; shareUrl: string }>;
   joinChallenge: (code: string, userId: string, displayName?: string) => Promise<void>;
   submitAnswers: (userId: string, answers: AnswerWithTiming[]) => Promise<ChallengeSubmitResult>;
   revokeChallenge: (userId: string) => Promise<void>;
@@ -57,6 +58,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         currentChallenge: {
           challengeId: response.challengeId,
           code: response.code,
+          shareUrl: response.shareUrl,
           questions: response.questions,
           isCreator: true,
           opponentName: null,
@@ -64,6 +66,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         activeChallenge: {
           challengeId: response.challengeId,
           code: response.code,
+          shareUrl: response.shareUrl,
           status: 'pending',
           creatorDisplayName: displayName || null,
           creatorUsername: null,
@@ -77,7 +80,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         },
         isLoading: false,
       });
-      return response.code;
+      return { code: response.code, shareUrl: response.shareUrl };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create challenge';
       set({ error: message, isLoading: false });

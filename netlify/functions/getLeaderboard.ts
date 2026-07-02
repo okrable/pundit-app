@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { getCurrentQuizWeekBounds, getPreviousQuizDate, getQuizDate } from './lib/quizDate';
+import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 import {
   getGlobalLeaderboardRows,
   parseLeaderboardLimit,
@@ -33,29 +33,18 @@ export const handler: Handler = async (event) => {
     const period = parseLeaderboardPeriod(event.queryStringParameters?.period);
     const limit = parseLeaderboardLimit(event.queryStringParameters?.limit);
 
-    if (!period) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'period must be daily or weekly' }),
-      };
-    }
-
-    const { weekStart, weekEnd } = getCurrentQuizWeekBounds(now);
-    console.log('getLeaderboard.start', { today, period, limit, weekStart, weekEnd });
+    console.log('getLeaderboard.start', { today, period, limit });
 
     // Auth0 users only in persisted rankings; guests can view but do not persist rows.
     const leaderboard = await getGlobalLeaderboardRows(
       period,
-      { quizDate: today, weekStart, weekEnd, previousQuizDate },
+      { quizDate: today, previousQuizDate },
       limit
     );
 
     const response = {
       period,
       quizDate: today,
-      weekStart,
-      weekEnd,
       leaderboard,
     };
 

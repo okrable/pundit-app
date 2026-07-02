@@ -66,14 +66,14 @@ export const handler: Handler = async (event) => {
       return authError;
     }
 
-    // Atomic update: only succeeds if challenge exists, has no opponent, is pending, not expired, and user isn't creator
+    // Atomic update: only succeeds if challenge exists, has no opponent, is joinable, not expired, and user isn't creator
     // This prevents race conditions when multiple users try to join simultaneously
     const updateResult = await query<DbChallenge>(
       `UPDATE challenges
        SET opponent_id = $1, opponent_display_name = $2, opponent_username = $3, status = 'active'
        WHERE code = $4
        AND opponent_id IS NULL
-       AND status = 'pending'
+       AND status IN ('pending', 'active')
        AND expires_at > NOW()
        AND creator_id != $1
        RETURNING *`,
@@ -123,7 +123,7 @@ export const handler: Handler = async (event) => {
         };
       }
 
-      if (existingChallenge.status !== 'pending') {
+      if (existingChallenge.status !== 'pending' && existingChallenge.status !== 'active') {
         return {
           statusCode: 410,
           headers,

@@ -15,8 +15,8 @@
 
 ### High Priority
 
-- [ ] Add React error boundaries around core navigation/screen roots.
-- [ ] Add offline answer queue and background retry.
+- [x] Add React error boundary coverage around the app navigation root.
+- [ ] Extend offline retry beyond existing daily authenticated result retry, especially challenge submissions and final stat refresh paths.
 
 ### Medium Priority
 
@@ -31,8 +31,8 @@
 
 ## Known Limitations
 
-1. Fully offline play is partial until an answer queue exists.
-2. Error boundary coverage is incomplete.
+1. Fully offline play is partial until broader queued retry exists.
+2. Error boundary coverage exists at the app root; finer per-screen recovery can still be added later if needed.
 3. Rate limiting/throttling coverage is not comprehensive.
 4. Release history before v1.1.0 is milestone-based rather than tag/date-based.
 

@@ -44,7 +44,7 @@
 
 ## Known Architectural Gaps
 
-1. No full offline answer queue yet.
-2. Error-boundary coverage is incomplete.
-3. Endpoint-level abuse controls are limited.
-4. API observability is still basic.
+1. Broader offline retry is incomplete beyond daily authenticated result retry.
+2. Endpoint-level abuse controls are limited.
+3. API observability is still basic.
+4. Error-boundary coverage exists at the app root; finer per-screen recovery can still be added later if needed.

@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { query } from './lib/db';
+import { query, queryWithClient, withTransaction } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 
@@ -31,6 +31,18 @@ interface DbChallenge {
   winner_id: string | null;
 }
 
+interface CorrectAnswerRow {
+  question_id: string;
+  player_name: string;
+  player_0: string;
+  player_1: string;
+  player_2: string;
+  player_3: string;
+}
+
+type ChallengeResult = 'win' | 'loss' | 'draw';
+type WinnerRef = 'creator' | 'opponent' | null;
+
 // Calculate points based on time remaining (same as daily quiz)
 function calculatePoints(timeRemainingMs: number | undefined): number {
   if (timeRemainingMs === undefined) return 60;
@@ -40,6 +52,45 @@ function calculatePoints(timeRemainingMs: number | undefined): number {
   if (seconds >= 8) return 60;
   if (seconds >= 4) return 40;
   return 20;
+}
+
+function buildBadRequest(headers: Record<string, string>, error: string) {
+  return {
+    statusCode: 400,
+    headers,
+    body: JSON.stringify({ error }),
+  };
+}
+
+function getChallengeResults(
+  creatorScore: number,
+  opponentScore: number
+): {
+  winnerId: WinnerRef;
+  creatorResult: ChallengeResult;
+  opponentResult: ChallengeResult;
+} {
+  if (creatorScore > opponentScore) {
+    return {
+      winnerId: 'creator',
+      creatorResult: 'win',
+      opponentResult: 'loss',
+    };
+  }
+
+  if (opponentScore > creatorScore) {
+    return {
+      winnerId: 'opponent',
+      creatorResult: 'loss',
+      opponentResult: 'win',
+    };
+  }
+
+  return {
+    winnerId: null,
+    creatorResult: 'draw',
+    opponentResult: 'draw',
+  };
 }
 
 export const handler: Handler = async (event) => {
@@ -71,11 +122,39 @@ export const handler: Handler = async (event) => {
     logRequestStart({ endpoint: 'submitChallengeAnswers', requestId, userId });
 
     if (!challengeId || !userId || !answers || answers.length === 0) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing required fields' }),
-      };
+      return buildBadRequest(headers, 'Missing required fields');
+    }
+
+    if (!Array.isArray(answers)) {
+      return buildBadRequest(headers, 'answers must be an array');
+    }
+
+    if (answers.length > 5) {
+      return buildBadRequest(headers, 'Too many answers submitted');
+    }
+
+    const seenQuestionIds = new Set<string>();
+    for (const answer of answers) {
+      if (!answer?.questionId || typeof answer.selectedOptionIndex !== 'number') {
+        return buildBadRequest(headers, 'Each answer must include questionId and selectedOptionIndex');
+      }
+
+      if (!Number.isInteger(answer.selectedOptionIndex) || answer.selectedOptionIndex < 0 || answer.selectedOptionIndex > 3) {
+        return buildBadRequest(headers, 'selectedOptionIndex must be an integer between 0 and 3');
+      }
+
+      if (
+        answer.timeRemainingMs !== undefined &&
+        (!Number.isFinite(answer.timeRemainingMs) || answer.timeRemainingMs < 0 || answer.timeRemainingMs > 20_000)
+      ) {
+        return buildBadRequest(headers, 'timeRemainingMs must be between 0 and 20000');
+      }
+
+      if (seenQuestionIds.has(answer.questionId)) {
+        return buildBadRequest(headers, 'Duplicate questionId in answers');
+      }
+
+      seenQuestionIds.add(answer.questionId);
     }
 
     const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
@@ -83,65 +162,15 @@ export const handler: Handler = async (event) => {
       return authError;
     }
 
-    // Fetch challenge
-    const challenges = await query<DbChallenge>(
-      `SELECT * FROM challenges WHERE id = $1`,
-      [challengeId]
-    );
-
-    if (challenges.length === 0) {
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: 'Challenge not found' }),
-      };
-    }
-
-    const challenge = challenges[0];
-
-    // Determine if user is creator or opponent
-    const isCreator = challenge.creator_id === userId;
-    const isOpponent = challenge.opponent_id === userId;
-
-    if (!isCreator && !isOpponent) {
-      return {
-        statusCode: 403,
-        headers,
-        body: JSON.stringify({ error: 'You are not part of this challenge' }),
-      };
-    }
-
-    // Check if already submitted
-    if (isCreator && challenge.creator_score !== null) {
-      return {
-        statusCode: 409,
-        headers,
-        body: JSON.stringify({ error: 'You have already submitted answers' }),
-      };
-    }
-    if (isOpponent && challenge.opponent_score !== null) {
-      return {
-        statusCode: 409,
-        headers,
-        body: JSON.stringify({ error: 'You have already submitted answers' }),
-      };
-    }
-
     // Fetch correct answers from database
     const questionIds = answers.map((a) => a.questionId);
-    const correctAnswers = await query<{
-      question_id: string;
-      player_name: string;
-      player_0: string;
-      player_1: string;
-      player_2: string;
-      player_3: string;
-    }>(
+    const correctAnswers = await query<CorrectAnswerRow>(
       `SELECT question_id, player_name, player_0, player_1, player_2, player_3
        FROM public.pu_player_ques
        WHERE question_id = ANY($1)`,
       [questionIds]
     );
+    const correctAnswersById = new Map(correctAnswers.map((row) => [row.question_id, row]));
 
     // Calculate score
     let score = 0;
@@ -153,7 +182,7 @@ export const handler: Handler = async (event) => {
     }[] = [];
 
     for (const userAnswer of answers) {
-      const correct = correctAnswers.find((q) => q.question_id === userAnswer.questionId);
+      const correct = correctAnswersById.get(userAnswer.questionId);
       if (!correct) {
         detailedAnswers.push({
           questionId: userAnswer.questionId,
@@ -165,6 +194,10 @@ export const handler: Handler = async (event) => {
       }
 
       const options = [correct.player_0, correct.player_1, correct.player_2, correct.player_3].filter(Boolean);
+      if (userAnswer.selectedOptionIndex >= options.length) {
+        return buildBadRequest(headers, `selectedOptionIndex out of bounds for question ${userAnswer.questionId}`);
+      }
+
       const correctIndex = options.findIndex((opt) => opt === correct.player_name);
       const isCorrect = userAnswer.selectedOptionIndex === correctIndex;
 
@@ -180,86 +213,176 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    // Update challenge with answers
-    if (isCreator) {
-      await query(
-        `UPDATE challenges SET
-          creator_score = $1,
-          creator_answers = $2,
-          status = CASE WHEN opponent_score IS NOT NULL THEN 'completed' ELSE 'active' END
-        WHERE id = $3`,
-        [score, JSON.stringify(detailedAnswers), challengeId]
+    const transactionResult = await withTransaction(async (client) => {
+      const challenges = await queryWithClient<DbChallenge>(
+        client,
+        `SELECT * FROM challenges WHERE id = $1`,
+        [challengeId]
       );
-    } else {
-      await query(
-        `UPDATE challenges SET
-          opponent_score = $1,
-          opponent_answers = $2,
-          status = CASE WHEN creator_score IS NOT NULL THEN 'completed' ELSE status END
-        WHERE id = $3`,
-        [score, JSON.stringify(detailedAnswers), challengeId]
-      );
+
+      if (challenges.length === 0) {
+        return { kind: 'not_found' as const };
+      }
+
+      const challenge = challenges[0];
+      const isCreator = challenge.creator_id === userId;
+      const isOpponent = challenge.opponent_id === userId;
+
+      if (!isCreator && !isOpponent) {
+        return { kind: 'not_participant' as const };
+      }
+
+      if (challenge.status === 'revoked' || challenge.status === 'expired') {
+        return { kind: 'unavailable' as const, status: challenge.status };
+      }
+
+      if (new Date(challenge.expires_at) < new Date() && challenge.status !== 'completed') {
+        await queryWithClient(client, `UPDATE challenges SET status = 'expired' WHERE id = $1`, [challengeId]);
+        return { kind: 'unavailable' as const, status: 'expired' };
+      }
+
+      if ((isCreator && challenge.creator_score !== null) || (isOpponent && challenge.opponent_score !== null)) {
+        return { kind: 'already_submitted' as const };
+      }
+
+      const submittedChallenges = isCreator
+        ? await queryWithClient<DbChallenge>(
+            client,
+            `UPDATE challenges SET
+              creator_score = $1,
+              creator_answers = $2,
+              status = CASE
+                WHEN opponent_score IS NOT NULL THEN 'completed'
+                WHEN opponent_id IS NOT NULL THEN 'active'
+                ELSE status
+              END
+             WHERE id = $3
+             AND creator_id = $4
+             AND creator_score IS NULL
+             RETURNING *`,
+            [score, JSON.stringify(detailedAnswers), challengeId, userId]
+          )
+        : await queryWithClient<DbChallenge>(
+            client,
+            `UPDATE challenges SET
+              opponent_score = $1,
+              opponent_answers = $2,
+              status = CASE WHEN creator_score IS NOT NULL THEN 'completed' ELSE status END
+             WHERE id = $3
+             AND opponent_id = $4
+             AND opponent_score IS NULL
+             RETURNING *`,
+            [score, JSON.stringify(detailedAnswers), challengeId, userId]
+          );
+
+      if (submittedChallenges.length === 0) {
+        return { kind: 'already_submitted' as const };
+      }
+
+      let updatedChallenge = submittedChallenges[0];
+      if (updatedChallenge.creator_score !== null && updatedChallenge.opponent_score !== null) {
+        const result = getChallengeResults(updatedChallenge.creator_score, updatedChallenge.opponent_score);
+        const winnerId =
+          result.winnerId === 'creator'
+            ? updatedChallenge.creator_id
+            : result.winnerId === 'opponent'
+            ? updatedChallenge.opponent_id
+            : null;
+
+        const completedChallenges = await queryWithClient<DbChallenge>(
+          client,
+          `UPDATE challenges
+           SET winner_id = $1, completed_at = NOW(), status = 'completed'
+           WHERE id = $2
+           AND completed_at IS NULL
+           AND creator_score IS NOT NULL
+           AND opponent_score IS NOT NULL
+           RETURNING *`,
+          [winnerId, challengeId]
+        );
+
+        if (completedChallenges.length > 0) {
+          updatedChallenge = completedChallenges[0];
+
+          const creatorWins = result.creatorResult === 'win' ? 1 : 0;
+          const creatorLosses = result.creatorResult === 'loss' ? 1 : 0;
+          const creatorDraws = result.creatorResult === 'draw' ? 1 : 0;
+          await queryWithClient(
+            client,
+            `INSERT INTO users (id, challenge_wins, challenge_losses, challenge_draws)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (id) DO UPDATE SET
+               challenge_wins = users.challenge_wins + $2,
+               challenge_losses = users.challenge_losses + $3,
+               challenge_draws = users.challenge_draws + $4`,
+            [updatedChallenge.creator_id, creatorWins, creatorLosses, creatorDraws]
+          );
+
+          if (updatedChallenge.opponent_id) {
+            const opponentWins = result.opponentResult === 'win' ? 1 : 0;
+            const opponentLosses = result.opponentResult === 'loss' ? 1 : 0;
+            const opponentDraws = result.opponentResult === 'draw' ? 1 : 0;
+            await queryWithClient(
+              client,
+              `INSERT INTO users (id, challenge_wins, challenge_losses, challenge_draws)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (id) DO UPDATE SET
+                 challenge_wins = users.challenge_wins + $2,
+                 challenge_losses = users.challenge_losses + $3,
+                 challenge_draws = users.challenge_draws + $4`,
+              [updatedChallenge.opponent_id, opponentWins, opponentLosses, opponentDraws]
+            );
+          }
+        }
+      }
+
+      return {
+        kind: 'submitted' as const,
+        challenge: updatedChallenge,
+        isCreator,
+      };
+    });
+
+    if (transactionResult.kind === 'not_found') {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Challenge not found' }),
+      };
     }
 
-    // Fetch updated challenge to check if complete
-    const updatedChallenges = await query<DbChallenge>(
-      `SELECT * FROM challenges WHERE id = $1`,
-      [challengeId]
-    );
-    const updatedChallenge = updatedChallenges[0];
+    if (transactionResult.kind === 'not_participant') {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'You are not part of this challenge' }),
+      };
+    }
 
-    // If both have submitted, determine winner and update stats
+    if (transactionResult.kind === 'unavailable') {
+      return {
+        statusCode: 410,
+        headers,
+        body: JSON.stringify({ error: `Challenge is ${transactionResult.status}` }),
+      };
+    }
+
+    if (transactionResult.kind === 'already_submitted') {
+      return {
+        statusCode: 409,
+        headers,
+        body: JSON.stringify({ error: 'You have already submitted answers' }),
+      };
+    }
+
+    const updatedChallenge = transactionResult.challenge;
+    const isCreator = transactionResult.isCreator;
+
+    // If both have submitted, return the completed challenge result.
     if (updatedChallenge.creator_score !== null && updatedChallenge.opponent_score !== null) {
-      let winnerId: string | null = null;
-      let creatorResult: 'win' | 'loss' | 'draw' = 'draw';
-      let opponentResult: 'win' | 'loss' | 'draw' = 'draw';
-
-      if (updatedChallenge.creator_score > updatedChallenge.opponent_score) {
-        winnerId = updatedChallenge.creator_id;
-        creatorResult = 'win';
-        opponentResult = 'loss';
-      } else if (updatedChallenge.opponent_score > updatedChallenge.creator_score) {
-        winnerId = updatedChallenge.opponent_id;
-        creatorResult = 'loss';
-        opponentResult = 'win';
-      }
-
-      // Update challenge with winner and completion time
-      await query(
-        `UPDATE challenges SET winner_id = $1, completed_at = NOW(), status = 'completed' WHERE id = $2`,
-        [winnerId, challengeId]
-      );
-
-      // Update stats for Auth0 users only (use upsert in case user doesn't exist yet)
-      if (!updatedChallenge.creator_id.startsWith('guest_')) {
-        const creatorWins = creatorResult === 'win' ? 1 : 0;
-        const creatorLosses = creatorResult === 'loss' ? 1 : 0;
-        const creatorDraws = creatorResult === 'draw' ? 1 : 0;
-        await query(
-          `INSERT INTO users (id, challenge_wins, challenge_losses, challenge_draws)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (id) DO UPDATE SET
-             challenge_wins = users.challenge_wins + $2,
-             challenge_losses = users.challenge_losses + $3,
-             challenge_draws = users.challenge_draws + $4`,
-          [updatedChallenge.creator_id, creatorWins, creatorLosses, creatorDraws]
-        );
-      }
-
-      if (updatedChallenge.opponent_id && !updatedChallenge.opponent_id.startsWith('guest_')) {
-        const opponentWins = opponentResult === 'win' ? 1 : 0;
-        const opponentLosses = opponentResult === 'loss' ? 1 : 0;
-        const opponentDraws = opponentResult === 'draw' ? 1 : 0;
-        await query(
-          `INSERT INTO users (id, challenge_wins, challenge_losses, challenge_draws)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (id) DO UPDATE SET
-             challenge_wins = users.challenge_wins + $2,
-             challenge_losses = users.challenge_losses + $3,
-             challenge_draws = users.challenge_draws + $4`,
-          [updatedChallenge.opponent_id, opponentWins, opponentLosses, opponentDraws]
-        );
-      }
+      const result = getChallengeResults(updatedChallenge.creator_score, updatedChallenge.opponent_score);
+      const creatorResult = result.creatorResult;
+      const opponentResult = result.opponentResult;
 
       // Return complete result
       const myResult = isCreator ? creatorResult : opponentResult;
