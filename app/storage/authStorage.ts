@@ -16,6 +16,8 @@ export interface StoredUserInfo {
   name?: string;
   picture?: string;
   username?: string;
+  usernameRequired?: boolean;
+  onboardingStatus?: 'username_required' | 'complete';
 }
 
 export async function storeRefreshToken(token: string): Promise<void> {

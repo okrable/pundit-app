@@ -11,7 +11,6 @@ import {
   CheckUsernameResponse,
   SetUsernameResponse,
   SyncIdentityResponse,
-  UpdateProfileResponse,
   CreateFriendLinkResponse,
   AcceptFriendLinkResponse,
   GetFriendsResponse,
@@ -43,7 +42,11 @@ const LEADERBOARD_TIMEOUT_MS = 15000;
 const SOCIAL_MUTATION_TIMEOUT_MS = 15000;
 
 export class ApiError extends Error {
-  constructor(public statusCode: number, message: string) {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public code?: string
+  ) {
     super(message);
     this.name = 'ApiError';
   }
@@ -131,7 +134,11 @@ async function executeFetch<T>(
       attempt,
       error: error.error || error.message || 'Request failed',
     });
-    throw new ApiError(response.status, error.error || error.message || 'Request failed');
+    throw new ApiError(
+      response.status,
+      error.error || error.message || 'Request failed',
+      typeof error.code === 'string' ? error.code : undefined
+    );
   }
 
   try {
@@ -173,6 +180,10 @@ export async function fetchApi<T>(
     try {
       return await executeFetch<T>(endpoint, options, timeoutMs, token, 1);
     } catch (error) {
+      if (token && error instanceof ApiError && error.code === 'USERNAME_REQUIRED') {
+        useAuthStore.getState().requireUsernameOnboarding();
+      }
+
       if (token && error instanceof ApiError && error.statusCode === 401) {
         const authState = useAuthStore.getState();
         const isSameToken = authState.token === token;
@@ -393,16 +404,6 @@ export async function syncIdentity(
   return fetchApi<SyncIdentityResponse>('/syncIdentity', {
     method: 'POST',
     body: JSON.stringify({ userId, intent }),
-  });
-}
-
-export async function updateProfile(
-  userId: string,
-  displayName: string
-): Promise<UpdateProfileResponse> {
-  return fetchApi<UpdateProfileResponse>('/updateProfile', {
-    method: 'POST',
-    body: JSON.stringify({ userId, displayName }),
   });
 }
 

@@ -6,6 +6,7 @@ import { acceptFriendLink } from '../services/api';
 import { useChallengeStore } from '../state/useChallengeStore';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { getSharedCodeActionFromUrl, SharedCodeAction } from '../services/sharedCode';
+import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
 
 interface DeepLinkHandlerOptions {
   onChallengeJoined?: () => void;
@@ -14,7 +15,7 @@ interface DeepLinkHandlerOptions {
 // Handles shared friend invite and challenge links across native and web.
 export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {}) {
   const { onChallengeJoined } = options;
-  const { user, isAuthenticated, isInitialized } = useAuthStore();
+  const { user, isAuthenticated, isInitialized, identityStatus } = useAuthStore();
   const [pendingAction, setPendingAction] = useState<SharedCodeAction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const isProcessingRef = useRef(false);
@@ -30,7 +31,9 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
 
         if (response.success) {
           await useLeaderboardStore.getState().invalidateFriends(user.sub);
-          const friendName = response.friendDisplayName || response.friendUsername || 'your friend';
+          const friendName = response.friendUsername
+            ? `@${response.friendUsername}`
+            : 'your friend';
           Alert.alert(
             'Friend Added',
             `You and ${friendName} are now connected. Check your friends leaderboard.`,
@@ -43,7 +46,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
       }
 
       if (action.kind === 'challenge') {
-        await useChallengeStore.getState().joinChallenge(action.code, user.sub, user.name);
+        await useChallengeStore.getState().joinChallenge(action.code, user.sub);
         onChallengeJoined?.();
       }
     } catch (error) {
@@ -54,7 +57,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
       setIsProcessing(false);
       setPendingAction(null);
     }
-  }, [onChallengeJoined, user?.name, user?.sub]);
+  }, [onChallengeJoined, user?.sub]);
 
   const handleUrl = useCallback((url: string) => {
     const action = getSharedCodeActionFromUrl(url);
@@ -65,20 +68,22 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
       return;
     }
 
-    if (!isAuthenticated) {
+    if (!canProcessProtectedAction(isAuthenticated, identityStatus)) {
       setPendingAction(action);
-      Alert.alert(
-        'Sign In Required',
-        action.kind === 'friendInvite'
-          ? 'Please sign in to add this friend to your leaderboard.'
-          : 'Please sign in to join this challenge.',
-        [{ text: 'OK' }]
-      );
+      if (!isAuthenticated) {
+        Alert.alert(
+          'Sign In Required',
+          action.kind === 'friendInvite'
+            ? 'Please sign in to add this friend to your leaderboard.'
+            : 'Please sign in to join this challenge.',
+          [{ text: 'OK' }]
+        );
+      }
       return;
     }
 
     processAction(action);
-  }, [isInitialized, isAuthenticated, processAction]);
+  }, [identityStatus, isInitialized, isAuthenticated, processAction]);
 
   useEffect(() => {
     const getInitialUrl = async () => {
@@ -104,10 +109,22 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
   }, [handleUrl]);
 
   useEffect(() => {
-    if (pendingAction && isAuthenticated && isInitialized && user?.sub) {
+    if (
+      pendingAction &&
+      canProcessProtectedAction(isAuthenticated, identityStatus) &&
+      isInitialized &&
+      user?.sub
+    ) {
       processAction(pendingAction);
     }
-  }, [pendingAction, isAuthenticated, isInitialized, user?.sub, processAction]);
+  }, [
+    pendingAction,
+    identityStatus,
+    isAuthenticated,
+    isInitialized,
+    user?.sub,
+    processAction,
+  ]);
 
   return {
     pendingAction,

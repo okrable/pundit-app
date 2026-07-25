@@ -15,6 +15,11 @@ import {
   storeForceInteractiveAuth,
 } from '../storage/authStorage';
 import { logError, logInfo, logWarn } from '../services/debugLog';
+import type { SyncIdentityResponse } from '../types';
+import {
+  ClientIdentityStatus,
+  resolveStoredIdentityStatus,
+} from '../../shared/clientIdentityPolicy';
 
 interface User {
   sub: string;
@@ -23,6 +28,7 @@ interface User {
   picture?: string;
   username?: string;
   usernameRequired?: boolean;
+  onboardingStatus?: 'username_required' | 'complete';
 }
 
 interface AuthState {
@@ -34,6 +40,9 @@ interface AuthState {
   authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed';
   authSyncSource: 'login' | 'restore' | null;
   authSyncError: string | null;
+  identityStatus: ClientIdentityStatus;
+  identityError: string | null;
+  identitySource: 'login' | 'restore' | null;
   forceInteractiveAuth: boolean;
   authStateVersion: number;
   isInitialized: boolean;
@@ -41,9 +50,10 @@ interface AuthState {
   error: string | null;
   bootstrapFromStorage: () => Promise<string | null>;
   setAuthResult: (token: string, user: User, refreshToken?: string) => Promise<void>;
-  setUsername: (username: string) => void;
-  setDisplayName: (name: string) => void;
-  setUsernameRequired: (required: boolean) => void;
+  beginIdentitySync: (source: 'login' | 'restore') => void;
+  applyIdentity: (identity: SyncIdentityResponse) => Promise<void>;
+  failIdentitySync: (message: string) => void;
+  requireUsernameOnboarding: () => void;
   beginAuthSync: (source: 'login' | 'restore') => void;
   finishAuthSync: () => void;
   failAuthSync: (message: string) => void;
@@ -65,6 +75,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   authSyncStatus: 'idle',
   authSyncSource: null,
   authSyncError: null,
+  identityStatus: 'unknown',
+  identityError: null,
+  identitySource: null,
   forceInteractiveAuth: false,
   authStateVersion: 0,
   isInitialized: false,
@@ -108,6 +121,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             name: storedUserInfo.name,
             picture: storedUserInfo.picture,
             username: storedUserInfo.username,
+            usernameRequired: storedUserInfo.usernameRequired,
+            onboardingStatus: storedUserInfo.onboardingStatus,
           },
           token: null,
           isAuthenticated: true,
@@ -115,6 +130,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           authSyncStatus: 'idle',
           authSyncSource: null,
           authSyncError: null,
+          identityStatus: resolveStoredIdentityStatus(storedUserInfo),
+          identityError: null,
+          identitySource: 'restore',
           forceInteractiveAuth,
           isInitialized: true,
           isRestoring: false,
@@ -133,6 +151,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         authSyncStatus: 'idle',
         authSyncSource: null,
         authSyncError: null,
+        identityStatus: 'unknown',
+        identityError: null,
+        identitySource: null,
         forceInteractiveAuth,
         isInitialized: true,
         isRestoring: false,
@@ -151,6 +172,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         authSyncStatus: 'idle',
         authSyncSource: null,
         authSyncError: null,
+        identityStatus: 'unknown',
+        identityError: null,
+        identitySource: null,
         forceInteractiveAuth: false,
         isInitialized: true,
         isRestoring: false,
@@ -171,6 +195,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authSyncStatus: 'idle',
       authSyncSource: null,
       authSyncError: null,
+      identityStatus: 'unknown',
+      identityError: null,
+      identitySource: null,
       forceInteractiveAuth: false,
       authStateVersion: nextAuthStateVersion,
       error: null,
@@ -187,79 +214,64 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       name: user.name,
       picture: user.picture,
       username: user.username,
+      usernameRequired: user.usernameRequired,
+      onboardingStatus: user.onboardingStatus,
     });
   },
 
-  setUsername: (username: string) => {
-    set((state) => {
-      if (!state.user) {
-        return { user: null };
-      }
-
-      if (state.user.username === username && state.user.usernameRequired === false) {
-        return state;
-      }
-
-      const updatedUser = state.user
-        ? { ...state.user, username, usernameRequired: false }
-        : null;
-
-      // Persist updated user info
-      if (updatedUser) {
-        storeUserInfo({
-          sub: updatedUser.sub,
-          email: updatedUser.email,
-          name: updatedUser.name,
-          picture: updatedUser.picture,
-          username: updatedUser.username,
-        });
-      }
-
-      return { user: updatedUser };
+  beginIdentitySync: (source) => {
+    set({
+      identityStatus: 'syncing',
+      identityError: null,
+      identitySource: source,
     });
   },
 
-  setDisplayName: (name: string) => {
-    set((state) => {
-      if (!state.user) {
-        return { user: null };
-      }
+  applyIdentity: async (identity) => {
+    const currentUser = get().user;
+    if (!currentUser) return;
 
-      if (state.user.name === name) {
-        return state;
-      }
-
-      const updatedUser = state.user ? { ...state.user, name } : null;
-
-      // Persist updated user info
-      if (updatedUser) {
-        storeUserInfo({
-          sub: updatedUser.sub,
-          email: updatedUser.email,
-          name: updatedUser.name,
-          picture: updatedUser.picture,
-          username: updatedUser.username,
-        });
-      }
-
-      return { user: updatedUser };
+    const updatedUser: User = {
+      ...currentUser,
+      username: identity.username || undefined,
+      usernameRequired: identity.usernameRequired,
+      onboardingStatus: identity.onboardingStatus,
+    };
+    set({
+      user: updatedUser,
+      identityStatus: identity.usernameRequired ? 'username_required' : 'complete',
+      identityError: null,
+    });
+    await storeUserInfo({
+      sub: updatedUser.sub,
+      email: updatedUser.email,
+      name: updatedUser.name,
+      picture: updatedUser.picture,
+      username: updatedUser.username,
+      usernameRequired: updatedUser.usernameRequired,
+      onboardingStatus: updatedUser.onboardingStatus,
     });
   },
 
-  setUsernameRequired: (required: boolean) => {
-    set((state) => {
-      if (!state.user) {
-        return { user: null };
-      }
-
-      if (state.user.usernameRequired === required) {
-        return state;
-      }
-
-      return {
-        user: { ...state.user, usernameRequired: required },
-      };
+  failIdentitySync: (message) => {
+    set({
+      identityStatus: 'failed',
+      identityError: message,
     });
+  },
+
+  requireUsernameOnboarding: () => {
+    set((state) => ({
+      identityStatus: 'username_required',
+      identityError: null,
+      user: state.user
+        ? {
+            ...state.user,
+            usernameRequired: true,
+            onboardingStatus: 'username_required',
+          }
+        : null,
+    }));
   },
 
   beginAuthSync: (source: 'login' | 'restore') => {
@@ -308,6 +320,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authSyncStatus: 'idle',
       authSyncSource: null,
       authSyncError: null,
+      identityStatus: 'unknown',
+      identityError: null,
+      identitySource: null,
       forceInteractiveAuth: true,
       authStateVersion: nextAuthStateVersion,
       error: null,
@@ -346,6 +361,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           authSyncStatus: 'idle',
           authSyncSource: null,
           authSyncError: null,
+          identityStatus: 'unknown',
+          identityError: null,
+          identitySource: null,
           forceInteractiveAuth: false,
           isInitialized: true,
           isRestoring: false,
@@ -373,6 +391,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           authSyncStatus: 'idle',
           authSyncSource: null,
           authSyncError: null,
+          identityStatus: 'unknown',
+          identityError: null,
+          identitySource: null,
           forceInteractiveAuth: false,
           isInitialized: true,
           isRestoring: false,
@@ -404,6 +425,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           authSyncStatus: 'idle',
           authSyncSource: null,
           authSyncError: null,
+          identityStatus: 'unknown',
+          identityError: null,
+          identitySource: null,
           forceInteractiveAuth: false,
           isInitialized: true,
           isRestoring: false,
@@ -426,12 +450,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           name: userInfo.name,
           picture: userInfo.picture,
           username: storedUserInfo?.username,
+          usernameRequired: storedUserInfo?.usernameRequired,
+          onboardingStatus: storedUserInfo?.onboardingStatus,
         },
         isAuthenticated: true,
         authStatus: 'authenticated',
         authSyncStatus: 'idle',
         authSyncSource: null,
         authSyncError: null,
+        identityStatus: resolveStoredIdentityStatus(storedUserInfo || {}),
+        identityError: null,
+        identitySource: 'restore',
         forceInteractiveAuth: false,
         isInitialized: true,
         isRestoring: false,
@@ -451,6 +480,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         authSyncStatus: 'idle',
         authSyncSource: null,
         authSyncError: null,
+        identityStatus: 'unknown',
+        identityError: null,
+        identitySource: null,
         forceInteractiveAuth: false,
         isInitialized: true,
         isRestoring: false,

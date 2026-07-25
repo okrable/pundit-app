@@ -8,6 +8,8 @@ export type AnalyticsEventName =
   | 'quiz_started'
   | 'quiz_completed'
   | 'auth_completed'
+  | 'username_onboarding_shown'
+  | 'username_onboarding_completed'
   | 'challenge_created'
   | 'challenge_joined'
   | 'challenge_submitted';
