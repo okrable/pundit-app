@@ -46,6 +46,8 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 ## Database-Facing Model
 
 - `users` stores profile and aggregate stats.
+- `users.onboarding_status` is `username_required` or `complete`; persisted
+  social actions require a completed row with a username.
 - `results` stores daily quiz submissions.
 - Daily leaderboards rank a single `quiz_date` by score, then earliest submission time, then user id.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
@@ -54,3 +56,4 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - New `friend_links` rows are reusable for seven days; legacy rows remain single-use.
 - Challenge username columns are compatibility snapshots. API reads prefer the current `users.username`.
 - Deprecated display-name response fields contain usernames during the installed-client transition.
+- New client contracts use `PublicPlayer { userId, username, avatarUrl? }`.

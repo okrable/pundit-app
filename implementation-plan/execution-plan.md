@@ -30,15 +30,22 @@
 - [x] Server-side ownership checks on protected endpoints.
 - [x] Timezone-consistent quiz-day calculation.
 - [x] Cached-first auth restoration with defensive 401 refresh/retry.
+- [x] Verified Auth0 identity synchronization and persisted username-onboarding state.
+- [x] Deterministic username backfill for legacy authenticated accounts.
+- [ ] Blocking post-Auth0 username onboarding and username-only client UI (v2.0.0).
 
 ### Competition
 
 - [x] Global leaderboard and Me stats.
 - [x] Friends-first cached leaderboard warm loads.
 - [x] Friend links and friend list.
+- [x] Seven-day reusable invites with legacy single-use compatibility.
+- [x] One ordered mutual friendship row with idempotent accept/remove behavior.
+- [x] Friends refresh after mutations and League Tables focus.
 - [x] Challenge mode end-to-end.
 - [x] Challenge history and W/L/D stat updates.
 - [x] Shared refreshed quiz UI in challenge play.
+- [x] Canonical username leaderboard eligibility and server-resolved challenge identities.
 
 ### Operations and UX Polish
 
@@ -58,9 +65,10 @@
 
 ## Active Hardening
 
-1. Configure operational alerts and error-budget reporting from structured logs.
-2. Expand automated integration and UI coverage.
-3. Formalize designated test-account cleanup while previews share production services.
+1. Complete v2.0.0 username-only client activation and social cache-version upgrades.
+2. Configure operational alerts and error-budget reporting from structured logs.
+3. Expand automated integration and UI coverage.
+4. Formalize designated test-account cleanup while previews share production services.
 
 ## Next Feature Wave
 

@@ -16,8 +16,11 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 - Guest-to-auth daily result reconciliation after login.
 - Centralized auth flow with login, quiz reconciliation, and first data prefetch behind a loading interstitial.
 - Me profile page, username support, settings, debug-log export, and guest-only cache controls.
-- Daily global leaderboard, friends leaderboard, friend links, and async challenge mode.
+- Canonical server-side username identities, with legacy display-name fields retained temporarily for installed-client compatibility.
+- Daily global leaderboard, mutual friendships with reusable seven-day invite links, and async challenge mode.
+- Server-resolved challenge usernames and username-only persisted leaderboard ranking eligibility.
 - Stale-first cache hydration for quiz, result, profile, and leaderboard warm loads.
+- Forced friends-leaderboard refresh when League Tables gains focus or a friendship changes.
 - Mobile-first web layout that mirrors the native bottom-tab app shell.
 - Date-aware daily leaderboard caches with forced background refresh after authenticated submissions.
 
@@ -227,12 +230,16 @@ Netlify Functions live under `/.netlify/functions/`.
 Core groups:
 
 - Daily quiz: `getDailyQuiz`, `submitQuiz`, `getTodayResult`, `migrateGuestResult`
-- Profile: `getUserStats`, `updateProfile`, `checkUsername`, `setUsername`
+- Identity/profile: `syncIdentity`, `getUserStats`, `updateProfile`, `checkUsername`, `setUsername`
 - Leaderboards: `getLeaderboard`, `getFriendsLeaderboard`
 - Friends: `createFriendLink`, `acceptFriendLink`, `getFriends`, `removeFriend`
 - Challenges: `createChallenge`, `getChallenge`, `joinChallenge`, `submitChallengeAnswers`, `revokeChallenge`, `getUserChallenges`
+- Operations: `trackEvent`
 
 Protected endpoints validate Auth0 bearer tokens server-side and enforce `token.sub === userId`.
+Protected social actions also require a completed identity with a username. The
+blocking signup/onboarding client flow is planned for the v2.0.0 activation
+phase; current clients retain compatibility profile/display-name behavior.
 
 ## Debugging
 
@@ -246,6 +253,7 @@ The `implementation-plan/` folder is the current implementation source of truth.
 
 ## Future Work
 
+- Complete the v2.0.0 client activation: blocking username onboarding, username-only public UI, and social cache-version upgrades.
 - Operational alerts and error-budget reporting from structured API logs.
 - Push notifications.
 - Quiz archives and historical play.

@@ -2,6 +2,18 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## Unreleased - Username and social identity alignment
+
+- Added verified Auth0 identity synchronization, persisted username-onboarding state, and deterministic username backfill for legacy authenticated accounts.
+- Centralized authenticated user creation behind identity synchronization and protected incomplete identities from persisted social actions and rankings.
+- Made new friendship invites reusable for seven days while preserving legacy single-use codes.
+- Stored each friendship as one ordered mutual row, with transactional/idempotent acceptance and retry-safe removal.
+- Standardized friends, leaderboards, and challenges around canonical usernames while retaining deprecated display-name fields for installed-client compatibility.
+- Resolved challenge participants from verified server-side identities instead of trusting client-supplied names.
+- Refreshed friends data after mutations and whenever League Tables gains focus.
+- Added separate Auth0 web/native client configuration, the native `pundit-app://callback`, and iOS safe-area tab-bar fixes.
+- Added production migrations 012 and 013 plus pre/post-migration audit queries.
+
 ## v1.5.0 - Delivery confidence and reliability
 
 - Added pull-request CI for tests, TypeScript validation, and web exports on Node 20.19.4.

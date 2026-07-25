@@ -1,7 +1,7 @@
 # Feature: Challenge Mode
 
 > Status: Implemented with ongoing hardening opportunities
-> Last updated: v1.1.0 documentation refresh
+> Last updated: username and social identity alignment
 
 ## Delivered Behavior
 
@@ -12,6 +12,13 @@
 - Users can view active challenge and recent challenge history.
 - Challenge W/L/D counters are persisted for authenticated users.
 - Challenge play uses the same refreshed `QuestionCard` gameplay UI as the daily quiz.
+- Create/join/submit/history require a completed authenticated username
+  identity.
+- Clients do not choose participant names: the server verifies the bearer token,
+  resolves current usernames from `users`, and returns compatibility aliases for
+  older clients.
+- Pre-username guest history remains explicitly labelled as legacy guest
+  activity.
 
 ## Current Product Rules
 
@@ -31,4 +38,7 @@
 
 1. Improve deep-link UX reliability and attribution.
 2. Expand lifecycle observability.
-3. Add challenge-specific abuse throttling and anomaly detection.
+3. Add operational alerts and anomaly detection on top of the shipped
+   database-backed challenge rate limits and structured logs.
+4. Add notifications and richer historical challenge summaries when evidence
+   supports them.

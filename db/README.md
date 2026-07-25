@@ -31,6 +31,9 @@ db/
 
 ## Migrations
 
+Production status: migrations 012 and 013 were applied and aggregate-audited on
+25 July 2026. For another environment, apply every migration in numeric order.
+
 Run migrations in order against CockroachDB:
 
 ```bash
@@ -77,6 +80,7 @@ The `pu_player_ques` table is the existing daily quiz source table and is not ma
 - Challenge participant usernames are retained as compatibility snapshots while reads resolve current usernames from `users`.
 - New friend links are reusable by multiple players for seven days; links issued before migration 013 remain single-use.
 - `friendships` stores one ordered row per mutual relationship.
+- Friendship acceptance and removal are idempotent around that ordered row.
 - Analytics events contain no user IDs, email addresses, codes, answers, or free-form metadata.
 
 ## Dependencies

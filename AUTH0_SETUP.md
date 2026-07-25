@@ -15,6 +15,11 @@ The current mobile auth implementation uses Expo AuthSession with Authorization 
 - After login, the app reconciles guest/auth daily quiz state and prefetches first profile/leaderboard data behind `AuthSyncScreen`.
 - Logout clears local credentials without opening hosted Auth0 logout, avoiding the iOS browser sign-in popup.
 - The API client has a defensive one-time 401 retry through refresh-token handling.
+- Web and native builds use separate first-party Auth0 clients in the same
+  tenant, so the verified Auth0 `sub` remains the same account identity.
+- Protected identity guards synchronize the verified Auth0 account into
+  `users`, generate a deterministic username for eligible legacy accounts, and
+  return `USERNAME_REQUIRED` for incomplete signup identities.
 
 ## Packages Used
 
@@ -22,6 +27,7 @@ The current mobile auth implementation uses Expo AuthSession with Authorization 
 - `expo-crypto`
 - `expo-web-browser`
 - `expo-secure-store`
+- `react-native-auth0` (native project configuration and callback handling)
 
 ## Key Files
 
@@ -121,6 +127,10 @@ npm start
 8. Daily-loop profile/leaderboard data is prefetched.
 9. The UI leaves `AuthSyncScreen`.
 
+The server-side identity foundation is active. The dedicated non-dismissible
+post-signup username screen is part of the planned v2.0.0 client-activation
+phase, so do not describe current signup as fully blocking yet.
+
 ## Session Restoration
 
 On launch, the app attempts refresh-token restoration from SecureStore. If refresh or userinfo fails, the stored auth session is cleared and the app falls back to guest mode.
@@ -138,7 +148,10 @@ Guest daily plays do not submit to the server immediately. After login:
 
 ## Backend Verification
 
-Netlify Functions verify Auth0 access tokens for authenticated endpoints and enforce `token.sub === userId`.
+Netlify Functions verify Auth0 access tokens for authenticated endpoints and
+enforce `token.sub === userId`. Protected social endpoints additionally call
+the shared completed-identity guard in
+`netlify/functions/lib/identity.ts`.
 
 Required server variable:
 
@@ -147,6 +160,8 @@ Required server variable:
 Shared helper:
 
 - `netlify/functions/lib/auth.ts`
+- `netlify/functions/lib/identity.ts`
+- `netlify/functions/syncIdentity.ts`
 
 ## Troubleshooting
 

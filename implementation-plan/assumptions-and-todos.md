@@ -21,6 +21,10 @@
 - [x] Add React error boundary coverage around the app navigation root.
 - [x] Extend persistent retry to challenge submissions.
 - [x] Add pull-request CI and shared behavior tests.
+- [x] Add verified identity synchronization and canonical social username guards.
+- [x] Align mutual friendships, leaderboards, and challenges on server-resolved usernames.
+- [ ] Complete blocking username onboarding and username-only client activation for v2.0.0.
+- [ ] Bump social cache versions when the username-only client activates.
 
 ### Medium Priority
 
@@ -30,7 +34,7 @@
 
 ### Low Priority
 
-- [ ] Add pull-to-refresh parity across leaderboard/challenge views where missing.
+- [ ] Add pull-to-refresh parity to remaining challenge views where useful.
 - [x] Add anonymous aggregate analytics for key funnel events.
 - [ ] Add production release tags so changelog milestones can be dated authoritatively.
 
@@ -40,6 +44,8 @@
 2. Error boundary coverage exists at the app root; finer per-screen recovery can still be added later if needed.
 3. Rate-limit rows require routine expiry cleanup as traffic grows.
 4. Release history before v1.1.0 is milestone-based rather than tag/date-based.
+5. Display-name columns and response aliases remain until supported-client
+   analytics show no pre-v2.0.0 use for 30 consecutive days.
 
 ## Documentation Discipline
 
