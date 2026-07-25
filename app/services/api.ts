@@ -40,6 +40,7 @@ const API_TIMEOUT_MS = 8000;
 const QUIZ_TIMEOUT_MS = 15000;
 const SUBMIT_QUIZ_TIMEOUT_MS = 20000;
 const LEADERBOARD_TIMEOUT_MS = 15000;
+const SOCIAL_MUTATION_TIMEOUT_MS = 15000;
 
 export class ApiError extends Error {
   constructor(public statusCode: number, message: string) {
@@ -432,10 +433,14 @@ export async function removeFriend(
   userId: string,
   friendId: string
 ): Promise<RemoveFriendResponse> {
-  return fetchApi<RemoveFriendResponse>('/removeFriend', {
-    method: 'POST',
-    body: JSON.stringify({ userId, friendId }),
-  });
+  return fetchApi<RemoveFriendResponse>(
+    '/removeFriend',
+    {
+      method: 'POST',
+      body: JSON.stringify({ userId, friendId }),
+    },
+    { timeoutMs: SOCIAL_MUTATION_TIMEOUT_MS }
+  );
 }
 
 export async function getFriendsLeaderboard(

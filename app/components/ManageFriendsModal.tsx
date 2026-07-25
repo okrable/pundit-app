@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   Modal,
+  Platform,
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
@@ -86,9 +87,21 @@ export default function ManageFriendsModal({
   };
 
   const handleRemoveFriend = (friend: Friend) => {
+    const friendName = friend.displayName || friend.username || 'this friend';
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined'
+        && window.confirm(`Remove ${friendName} from your leaderboard?`);
+
+      if (confirmed) {
+        void confirmRemoveFriend(friend.id);
+      }
+      return;
+    }
+
     Alert.alert(
       'Remove Friend',
-      `Are you sure you want to remove ${friend.displayName || friend.username || 'this friend'} from your leaderboard?`,
+      `Are you sure you want to remove ${friendName} from your leaderboard?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {

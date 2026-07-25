@@ -9,6 +9,8 @@ All APIs are Netlify Functions under `/.netlify/functions/`.
 - Server validates Auth0 tokens through `/userinfo` and enforces `token.sub === userId`.
 - `POST /syncIdentity` creates or refreshes the authenticated user record from verified Auth0 claims and returns username onboarding state.
 - Protected identity guards return `USERNAME_REQUIRED` when signup username onboarding is incomplete.
+- Current protected social endpoints invoke the shared identity guard; wiring
+  `syncIdentity` into a blocking post-signup client screen remains phase 3.
 - Client API calls include a defensive one-time retry for refreshed or changed tokens.
 
 ## Daily Quiz APIs
@@ -26,6 +28,8 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `POST /updateProfile`
 - `GET /checkUsername`
 - `POST /setUsername`
+- `updateProfile` and display-name response fields remain compatibility
+  surfaces until the username-only v2.0.0 client is established.
 
 ## Leaderboard APIs
 
@@ -33,8 +37,9 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `GET /getFriendsLeaderboard?userId=...&period=daily`
 - Legacy `period=weekly` requests are tolerated and return daily leaderboard data.
 - Leaderboard responses include `period`, `quizDate`, and ranked entries.
-- Global leaderboards are public to guests and authenticated users; persisted rankings include authenticated results only.
-- Friends leaderboards require an authenticated user and include the current user plus friends, with unplayed users shown unranked.
+- Global leaderboards are public to guests and authenticated users; persisted rankings include completed authenticated username identities only.
+- Friends leaderboards require a completed username identity and include the current user plus friends, with unplayed users shown unranked.
+- `username` is the canonical name. Deprecated `displayName` fields temporarily contain the username for installed-client compatibility.
 
 ## Challenge APIs
 
@@ -44,6 +49,9 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `POST /submitChallengeAnswers`
 - `POST /revokeChallenge`
 - `GET /getUserChallenges`
+- Create/join ignore client-supplied names and resolve the player from the verified bearer token.
+- Create, join, submit, revoke, and history require a completed username identity.
+- Active, join, history, lookup, and result payloads return current usernames. Legacy guest rows return a legacy-activity label instead of an invented username.
 
 ## Friends APIs
 
@@ -51,6 +59,13 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `POST /acceptFriendLink`
 - `GET /getFriends`
 - `POST /removeFriend`
+- New invite codes are reusable for seven days and are returned again while active.
+- Previously issued codes retain single-use behavior.
+- Acceptance transactionally inserts one ordered mutual friendship row and is idempotent when the relationship already exists.
+- Removal deletes that one ordered row, returns idempotent success when an
+  earlier slow request already completed, and uses the longer social-mutation
+  client timeout.
+- Friend responses use `PublicPlayer { userId, username, avatarUrl? }`; deprecated name/id aliases remain during the compatibility window.
 
 ## Operational Instrumentation
 

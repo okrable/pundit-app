@@ -1,12 +1,18 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
-import { assertAuthorizedUser } from './lib/auth';
 import { enforceRateLimit } from './lib/rateLimit';
+import { requireCompletedIdentity } from './lib/identity';
+import {
+  getCompatibilityPlayerName,
+  resolveChallengeIdentity,
+} from './lib/challengeIdentity';
 
 interface JoinChallengeRequest {
   code: string;
   userId: string;
+  /** @deprecated The server resolves public identity from the bearer token. */
   displayName?: string;
+  /** @deprecated The server resolves public identity from the bearer token. */
   username?: string;
 }
 
@@ -17,7 +23,9 @@ interface DbChallenge {
   quiz_date: string;
   creator_id: string;
   creator_display_name: string | null;
+  creator_username: string | null;
   opponent_id: string | null;
+  opponent_username: string | null;
   status: string;
   expires_at: string;
 }
@@ -43,7 +51,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const body: JoinChallengeRequest = JSON.parse(event.body || '{}');
-    const { code, userId, displayName, username } = body;
+    const { code, userId } = body;
 
     if (!code || !userId) {
       return {
@@ -62,9 +70,9 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
     const rateLimitError = await enforceRateLimit(event, headers, {
@@ -88,7 +96,7 @@ export const handler: Handler = async (event) => {
        AND expires_at > NOW()
        AND creator_id != $1
        RETURNING *`,
-      [userId, displayName || null, username || null, code.toUpperCase()]
+      [userId, identity.identity.username, identity.identity.username, code.toUpperCase()]
     );
 
     let challenge: DbChallenge;
@@ -183,14 +191,33 @@ export const handler: Handler = async (event) => {
       };
     });
 
+    const creatorUsers = await query<{ username: string | null }>(
+      `SELECT username
+       FROM users
+       WHERE id = $1 AND onboarding_status = 'complete'`,
+      [challenge.creator_id]
+    );
+    const creatorIdentity = resolveChallengeIdentity(
+      challenge.creator_id,
+      creatorUsers[0]?.username || null,
+      challenge.creator_username
+    );
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         challengeId: challenge.id,
         creator: {
-          displayName: challenge.creator_display_name,
+          userId: challenge.creator_id,
+          username: creatorIdentity?.username || null,
+          legacyLabel: creatorIdentity?.legacyLabel || null,
+          isLegacyGuest: creatorIdentity?.isLegacyGuest || false,
+          // Deprecated compatibility field for installed clients.
+          displayName: getCompatibilityPlayerName(creatorIdentity),
         },
+        creatorUsername: creatorIdentity?.username || null,
+        opponentUsername: identity.identity.username,
         questions: formattedQuestions,
       }),
     };

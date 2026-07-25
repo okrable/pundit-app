@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DailyQuizScreen from '../screens/DailyQuizScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import MeScreen from '../screens/MeScreen';
@@ -9,8 +10,12 @@ import ChallengeScreen from '../screens/ChallengeScreen';
 import { theme } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
+const NATIVE_TAB_BAR_CONTENT_HEIGHT = 50;
 
 export default function BottomTabNavigator() {
+  const insets = useSafeAreaInsets();
+  const isWeb = Platform.OS === 'web';
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -29,9 +34,9 @@ export default function BottomTabNavigator() {
         tabBarStyle: {
           backgroundColor: theme.colors.white,
           borderTopColor: theme.colors.lightGray,
-          height: Platform.OS === 'web' ? 66 : undefined,
-          paddingBottom: Platform.OS === 'web' ? 8 : undefined,
-          paddingTop: Platform.OS === 'web' ? 6 : undefined,
+          height: isWeb ? 66 : NATIVE_TAB_BAR_CONTENT_HEIGHT + insets.bottom,
+          paddingBottom: isWeb ? 8 : insets.bottom,
+          paddingTop: isWeb ? 6 : 4,
         },
         tabBarPosition: 'bottom',
         tabBarLabelStyle: {

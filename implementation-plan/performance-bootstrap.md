@@ -28,7 +28,9 @@ Login and cached-session restore both run the same authenticated sync path befor
 5. Prefetch profile, quiz, global leaderboard, and friends leaderboard data.
 6. Release the UI from `AuthSyncScreen`.
 
-Screens do not process AuthSession responses directly, and normal Me/Leaderboard navigation should not trigger protected refreshes after this transaction has completed.
+Screens do not process AuthSession responses directly. Me/profile stays
+cached-first with explicit refresh, while League Tables deliberately forces a
+friends refresh whenever the screen gains navigation focus.
 
 ## Cache Strategy
 
@@ -50,7 +52,10 @@ Screens do not process AuthSession responses directly, and normal Me/Leaderboard
 - Profile stats are cached per authenticated user.
 - Friends and global leaderboards are cached separately.
 - Me and League Tables render cached or placeholder content before background refresh.
-- Protected profile and friends leaderboard refreshes happen during authenticated session sync or explicit pull-to-refresh, not on tab focus.
+- Protected profile refreshes happen during authenticated session sync or
+  explicit pull-to-refresh.
+- Friends leaderboard refreshes happen during authenticated sync,
+  pull-to-refresh, friendship mutations, and League Tables focus.
 
 ## Result Submission Model
 
@@ -67,4 +72,6 @@ Screens do not process AuthSession responses directly, and normal Me/Leaderboard
 - `AuthSyncScreen` is used for login/reconciliation handoff.
 - Daily quiz must not render stale `QuestionCard` state while identity reconciliation is active.
 - Generic full-screen spinners are reserved for true cold-miss fallback states.
-- App foreground events use public warm refresh only; protected data refresh remains authenticated-sync or manual.
+- App foreground events use public warm refresh only; protected profile data
+  remains authenticated-sync/manual, while friends refresh is additionally
+  navigation-focus driven.

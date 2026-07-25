@@ -10,14 +10,48 @@
 
 ## Delivery sequence
 
-1. Identity foundation: additive schema, verified identity synchronization, legacy backfill, and quiz persistence ownership.
-2. Social backend alignment: reusable mutual friendship invites and server-resolved usernames in leaderboards and challenges.
-3. Client activation: blocking signup onboarding and username-only UI, released as v2.0.0.
+1. Identity foundation: additive schema, verified identity synchronization,
+   legacy backfill, and quiz persistence ownership. **Merged in PR #12;
+   migration 012 applied and audited.**
+2. Social backend alignment: reusable mutual friendship invites, ordered mutual
+   relationships, username-only persisted rankings, server-resolved challenge
+   identities, focus refresh, and retry-safe removal. **Implemented in PR #13
+   and ready for review; migration 013 applied and audited.**
+3. Client activation: blocking signup onboarding, username-only public UI, and
+   social cache-version upgrades. **Planned as the v2.0.0 release.**
 
 The first two phases preserve legacy response fields for installed-client compatibility. Physical display-name cleanup waits until supported-client usage no longer includes a pre-v2.0.0 app for 30 consecutive days.
 
-## Runtime gate
+Friendship removal deletes the single ordered mutual row and is idempotent. A
+retry reports success when an earlier slow request already completed, preventing
+stale clients from becoming stuck after a timeout.
 
-Run `db/audits/identity_onboarding_pre.sql` immediately before migration 012,
-then run `db/audits/identity_onboarding.sql` after it. The migration is additive
-and must be applied before preview Functions exercise the new identity contract.
+## Runtime migration status
+
+Migrations 012 and 013 were applied to production CockroachDB on 25 July 2026.
+Their aggregate pre/post audit queries completed successfully.
+
+For a new environment, run migrations in order and use:
+
+- `db/audits/identity_onboarding_pre.sql` before migration 012 and
+  `db/audits/identity_onboarding.sql` after it;
+- `db/audits/social_backend_pre.sql` before migration 013 and
+  `db/audits/social_backend.sql` after it.
+
+Both migrations are additive. Existing friend links remain single-use; only
+links created after migration 013 are reusable.
+
+## Verified phase-2 behavior
+
+- Reopening Invite Friends reuses the same active seven-day code.
+- Different signed-in players can accept the same code.
+- Acceptance creates one ordered friendship row and repeat acceptance succeeds.
+- Both players see the relationship; League Tables forces a refresh on focus.
+- Removal updates the list and leaderboard, deletes the one mutual row, and is
+  safe to retry after a slow response.
+- Persisted leaderboards include only completed authenticated username
+  identities.
+- Challenge create/join/read/history resolve current usernames through `users`;
+  legacy guest activity keeps an explicit legacy label.
+- Deprecated display-name response fields contain usernames for old-client
+  compatibility.

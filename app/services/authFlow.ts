@@ -1,5 +1,5 @@
 import * as AuthSession from 'expo-auth-session';
-import { auth0Config, fetchUserInfo } from './auth0';
+import { auth0Config, fetchUserInfo, getAuthRedirectUri } from './auth0';
 import { syncAuthenticatedSession } from './dailyLoop';
 import { logError, logInfo, logWarn } from './debugLog';
 import { useAuthStore } from '../state/useAuthStore';
@@ -62,7 +62,7 @@ export async function loginWithAuth0({
       throw new Error('Authentication request is missing its code verifier.');
     }
 
-    const redirectUri = request.redirectUri ?? AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
+    const redirectUri = request.redirectUri ?? getAuthRedirectUri();
     const tokenResponse = await AuthSession.exchangeCodeAsync(
       {
         code,

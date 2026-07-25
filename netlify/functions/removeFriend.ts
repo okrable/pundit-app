@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
-import { assertAuthorizedUser } from './lib/auth';
+import { requireCompletedIdentity } from './lib/identity';
+import { orderFriendshipPair } from '../../shared/socialPolicy';
 
 interface RemoveFriendRequest {
   userId: string;
@@ -47,13 +48,20 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
-    // Sort user IDs to match the database constraint (user_a < user_b)
-    const [userA, userB] = [userId, friendId].sort();
+    if (userId === friendId) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'You cannot remove yourself as a friend' }),
+      };
+    }
+
+    const [userA, userB] = orderFriendshipPair(userId, friendId);
 
     // Delete the friendship
     const result = await query<{ id: string }>(
@@ -61,18 +69,14 @@ export const handler: Handler = async (event) => {
       [userA, userB]
     );
 
-    if (result.length === 0) {
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: 'Friendship not found' }),
-      };
-    }
-
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true }),
+      body: JSON.stringify({
+        success: true,
+        friendId,
+        alreadyRemoved: result.length === 0,
+      }),
     };
   } catch (error) {
     console.error('Error removing friend:', error);

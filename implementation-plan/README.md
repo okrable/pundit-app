@@ -1,8 +1,31 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v1.5.0 delivery confidence and reliability
-> Status: Active product with Daily Quiz, Challenge Mode, Friends, Auth0, and refreshed gameplay shipped
+> Last updated: v1.5.0 plus unreleased identity and social alignment
+> Status: Active product; identity foundation is merged and social backend alignment is ready for review
 > Source of truth: This folder documents current behavior and near-term hardening.
+
+## Recent Delivery Summary
+
+In plain English, this thread delivered three connected changes:
+
+1. **PR #11 — safer delivery:** `main` became the only production-significant
+   branch. Every purpose-named branch receives the same Netlify preview
+   behavior, CI checks the app before merge, and reliability work added
+   submission retry, rate limits, structured logs, and anonymous funnel events.
+2. **PR #12 — identity foundation:** the server can synchronize a verified Auth0
+   account into `users`, track whether a username is still required, and
+   deterministically repair legacy authenticated accounts without usernames.
+   Migration 012 was applied and audited.
+3. **PR #13 — social backend alignment:** friendships, leaderboards, and
+   challenges now resolve public identity from `users.username`. New invites
+   are reusable for seven days, one ordered friendship row connects both
+   players, slow removal retries are safe, remote acceptances refresh on League
+   Tables focus, and web/iOS share verified Auth0 identities. Migration 013 was
+   applied and audited; the PR is ready for review.
+
+The remaining v2.0.0 client-activation phase will make username selection a
+blocking signup step, remove display-name UI, and invalidate legacy social
+caches. Those client changes are not yet shipped.
 
 ## Product Status Snapshot
 
@@ -16,14 +39,17 @@
 - Immediate daily summary screen with final score, answer recap, and native text sharing.
 - Cached completed screen for already-played daily state.
 - Guest mode with local-only daily results.
-- Auth0 accounts, Me profile, username/display-name support, and settings.
-- Social identity rework is staged through the canonical username and onboarding contract in `social-identity-rework.md`.
+- Auth0 accounts, Me profile, transitional username/display-name UI, and settings.
+- Verified identity synchronization and canonical server-side usernames.
+- Mutual ordered friendships with reusable seven-day invite links and retry-safe removal.
+- Server-resolved username identities across friends, persisted leaderboards, and challenges.
 - Centralized auth flow with post-login quiz reconciliation and first data prefetch behind `AuthSyncScreen`.
 - Guest-to-auth daily result migration/adoption where applicable.
 - Daily global leaderboard, friends leaderboard, friend links, and async challenge mode.
 - Branded bootstrap, stale-first cache hydration, and debug-log export.
 - Mobile-first web shell aligned with the native bottom-tab layout.
 - Date-aware daily leaderboard caches with forced refresh after authenticated submissions.
+- Friends-leaderboard refresh after friendship mutations and League Tables focus.
 - Pull-request CI, uniform Netlify previews, and same-commit web/iOS validation gates.
 - Persistent retry for daily and challenge submissions.
 - Shared database-backed rate limiting on sensitive endpoints.
@@ -31,6 +57,7 @@
 
 ### Hardening Remaining
 
+- Complete v2.0.0 username-only client activation and social cache-version upgrades.
 - Operational alert configuration and error-budget reporting.
 - Broader automated integration and UI coverage.
 - Test-account data governance while previews share production services.

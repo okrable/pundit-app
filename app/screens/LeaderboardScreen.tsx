@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -71,6 +72,22 @@ export default function LeaderboardScreen() {
       setViewMode('global');
     }
   }, [isAuthenticated, user?.sub, viewMode]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (viewMode === 'friends' && isAuthenticated && user?.sub) {
+        void revalidateFriends(user.sub, { force: true });
+      } else {
+        void revalidateGlobal({ force: true });
+      }
+    }, [
+      isAuthenticated,
+      revalidateFriends,
+      revalidateGlobal,
+      user?.sub,
+      viewMode,
+    ])
+  );
 
   const handleCreateAccount = async () => {
     setIsAuthLoading(true);

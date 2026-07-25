@@ -1,5 +1,9 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import {
+  getCompatibilityPlayerName,
+  resolveChallengeIdentity,
+} from './lib/challengeIdentity';
 
 interface DbChallenge {
   id: string;
@@ -7,10 +11,12 @@ interface DbChallenge {
   quiz_id: string;
   quiz_date: string;
   creator_id: string;
-  creator_display_name: string | null;
+  creator_username: string | null;
+  creator_current_username: string | null;
   creator_score: number | null;
   opponent_id: string | null;
-  opponent_display_name: string | null;
+  opponent_username: string | null;
+  opponent_current_username: string | null;
   opponent_score: number | null;
   status: string;
   expires_at: string;
@@ -50,7 +56,31 @@ export const handler: Handler = async (event) => {
 
     // Fetch challenge by code
     const challenges = await query<DbChallenge>(
-      `SELECT * FROM challenges WHERE code = $1`,
+      `SELECT
+         c.id,
+         c.code,
+         c.quiz_id,
+         c.quiz_date,
+         c.creator_id,
+         c.creator_username,
+         creator.username AS creator_current_username,
+         c.creator_score,
+         c.opponent_id,
+         c.opponent_username,
+         opponent.username AS opponent_current_username,
+         c.opponent_score,
+         c.status,
+         c.expires_at,
+         c.completed_at,
+         c.winner_id
+       FROM challenges c
+       LEFT JOIN users creator
+         ON creator.id = c.creator_id
+        AND creator.onboarding_status = 'complete'
+       LEFT JOIN users opponent
+         ON opponent.id = c.opponent_id
+        AND opponent.onboarding_status = 'complete'
+       WHERE c.code = $1`,
       [code.toUpperCase()]
     );
 
@@ -85,6 +115,16 @@ export const handler: Handler = async (event) => {
       challenge.status !== 'revoked' &&
       challenge.status !== 'expired' &&
       challenge.opponent_id === null;
+    const creatorIdentity = resolveChallengeIdentity(
+      challenge.creator_id,
+      challenge.creator_current_username,
+      challenge.creator_username
+    );
+    const opponentIdentity = resolveChallengeIdentity(
+      challenge.opponent_id,
+      challenge.opponent_current_username,
+      challenge.opponent_username
+    );
 
     return {
       statusCode: 200,
@@ -95,14 +135,24 @@ export const handler: Handler = async (event) => {
         status: challenge.status,
         creator: {
           userId: challenge.creator_id,
-          displayName: challenge.creator_display_name,
+          username: creatorIdentity?.username || null,
+          legacyLabel: creatorIdentity?.legacyLabel || null,
+          isLegacyGuest: creatorIdentity?.isLegacyGuest || false,
+          // Deprecated compatibility field for installed clients.
+          displayName: getCompatibilityPlayerName(creatorIdentity),
         },
         opponent: challenge.opponent_id
           ? {
               userId: challenge.opponent_id,
-              displayName: challenge.opponent_display_name,
+              username: opponentIdentity?.username || null,
+              legacyLabel: opponentIdentity?.legacyLabel || null,
+              isLegacyGuest: opponentIdentity?.isLegacyGuest || false,
+              // Deprecated compatibility field for installed clients.
+              displayName: getCompatibilityPlayerName(opponentIdentity),
             }
           : null,
+        creatorUsername: creatorIdentity?.username || null,
+        opponentUsername: opponentIdentity?.username || null,
         quizDate: challenge.quiz_date,
         expiresAt: challenge.expires_at,
         canJoin,

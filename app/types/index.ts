@@ -66,8 +66,15 @@ export interface QuizResult {
 
 export type LeaderboardPeriod = 'daily';
 
+export interface PublicPlayer {
+  userId: string;
+  username: string;
+  avatarUrl?: string | null;
+}
+
 export interface LeaderboardEntry {
   userId: string;
+  /** @deprecated Compatibility alias containing the username. */
   displayName: string | null;
   username: string | null;
   score: number;
@@ -134,8 +141,11 @@ export interface UpdateProfileResponse {
 // Challenge Mode Types
 export interface ChallengeHistoryItem {
   challengeId: string;
+  /** @deprecated Compatibility alias containing username or a legacy label. */
   opponentDisplayName: string | null;
   opponentUsername: string | null;
+  opponentLegacyLabel?: string | null;
+  opponentIsLegacyGuest?: boolean;
   yourScore: number;
   opponentScore: number;
   result: 'win' | 'loss' | 'draw';
@@ -153,10 +163,16 @@ export interface ActiveChallenge {
   code: string;
   shareUrl?: string;
   status: 'pending' | 'active';
+  /** @deprecated Compatibility alias containing username or a legacy label. */
   creatorDisplayName: string | null;
   creatorUsername: string | null;
+  /** @deprecated Compatibility alias containing username or a legacy label. */
   opponentDisplayName: string | null;
   opponentUsername: string | null;
+  creatorLegacyLabel?: string | null;
+  opponentLegacyLabel?: string | null;
+  creatorIsLegacyGuest?: boolean;
+  opponentIsLegacyGuest?: boolean;
   isCreator: boolean;
   createdAt: string;
   expiresAt: string;
@@ -183,7 +199,11 @@ export interface ChallengeSubmitResult {
   yourAnswers: ChallengeAnswer[];
   result?: 'win' | 'loss' | 'draw';
   opponentScore?: number;
+  /** @deprecated Compatibility alias containing username or a legacy label. */
   opponentDisplayName?: string;
+  opponentUsername?: string | null;
+  opponentLegacyLabel?: string | null;
+  opponentIsLegacyGuest?: boolean;
   opponentAnswers?: ChallengeAnswer[];
   syncState?: SyncState;
 }
@@ -195,13 +215,23 @@ export interface CreateChallengeResponse {
   quizId: string;
   expiresAt: string;
   questions: Question[];
+  creatorUsername: string;
+  /** @deprecated Compatibility alias containing the username. */
+  creatorDisplayName: string;
 }
 
 export interface JoinChallengeResponse {
   challengeId: string;
   creator: {
+    userId: string;
+    username: string | null;
+    legacyLabel?: string | null;
+    isLegacyGuest?: boolean;
+    /** @deprecated Compatibility alias containing username or a legacy label. */
     displayName: string | null;
   };
+  creatorUsername: string | null;
+  opponentUsername: string;
   questions: Question[];
 }
 
@@ -210,20 +240,35 @@ export interface GetChallengeResponse {
   code: string;
   status: 'pending' | 'active' | 'completed' | 'expired' | 'revoked';
   creator: {
+    userId: string;
+    username: string | null;
+    legacyLabel?: string | null;
+    isLegacyGuest?: boolean;
+    /** @deprecated Compatibility alias containing username or a legacy label. */
     displayName: string | null;
   };
   opponent: {
+    userId: string;
+    username: string | null;
+    legacyLabel?: string | null;
+    isLegacyGuest?: boolean;
+    /** @deprecated Compatibility alias containing username or a legacy label. */
     displayName: string | null;
   } | null;
+  creatorUsername: string | null;
+  opponentUsername: string | null;
   canJoin: boolean;
   expiresAt: string;
 }
 
 // Friends & Personal Leaderboard Types
 export interface Friend {
+  userId: string;
+  /** @deprecated Compatibility alias for userId. */
   id: string;
+  /** @deprecated Compatibility alias containing the username. */
   displayName: string | null;
-  username: string | null;
+  username: string;
   avatarUrl: string | null;
   streak: number;
   friendSince: string;
@@ -231,6 +276,7 @@ export interface Friend {
 
 export interface FriendsLeaderboardEntry {
   userId: string;
+  /** @deprecated Compatibility alias containing the username. */
   displayName: string | null;
   username: string | null;
   score: number;
@@ -252,11 +298,16 @@ export interface CreateFriendLinkResponse {
   code: string;
   shareUrl: string;
   expiresAt: string;
+  reused: boolean;
+  username: string;
 }
 
 export interface AcceptFriendLinkResponse {
   success: boolean;
+  alreadyFriends?: boolean;
+  friend?: PublicPlayer;
   friendId?: string;
+  /** @deprecated Compatibility alias containing the username. */
   friendDisplayName?: string | null;
   friendUsername?: string | null;
   error?: string;
@@ -268,6 +319,8 @@ export interface GetFriendsResponse {
 
 export interface RemoveFriendResponse {
   success: boolean;
+  friendId?: string;
+  alreadyRemoved?: boolean;
   error?: string;
 }
 

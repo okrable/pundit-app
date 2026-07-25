@@ -64,7 +64,10 @@ Current behavior:
 
 ### Auth
 
-`useAuthStore` owns user/token/session state, refresh-token restore, auth-state versioning, and username/display-name mutations.
+`useAuthStore` owns user/token/session state, refresh-token restore, auth-state
+versioning, and the transitional username/display-name profile state. Canonical
+public identity comes from the server-side `users.username`; removing editable
+display-name UI belongs to the v2.0.0 client-activation phase.
 
 Login/logout orchestration lives in `app/services/authFlow.ts`:
 
@@ -87,7 +90,15 @@ Important behaviors:
 
 ### Profile and Leaderboards
 
-`useProfileStore` and `useLeaderboardStore` render cached data first and revalidate in the background. Daily leaderboard caches are keyed by quiz date and friend scope. Profile revalidation discards stale responses if auth state changes mid-flight.
+`useProfileStore` and `useLeaderboardStore` render cached data first and
+revalidate in the background. Daily leaderboard caches are keyed by quiz date
+and friend scope. Profile revalidation discards stale responses if auth state
+changes mid-flight. Friends data is forcibly revalidated after accept/remove
+mutations and whenever League Tables gains navigation focus, so remote
+acceptances do not wait for cache expiry.
+
+The social cache-version bump that removes old display-name payloads is part of
+the v2.0.0 client-activation phase and has not yet shipped.
 
 ## Settings
 

@@ -8,10 +8,13 @@
 - Speed-based scoring with post-zero minimum score for correct answers.
 - Daily summary immediately after play and completed state on return.
 - Guest play with local-only daily result storage.
-- Auth0 sign-in, profile stats, username/display-name support, and settings.
+- Auth0 sign-in, profile stats, canonical server usernames, transitional
+  display-name compatibility, and settings.
 - Guest-to-auth result migration/adoption after login.
-- Global leaderboard, friends leaderboard, friend links, and friend list.
-- Async 1v1 challenge mode with create/join/play/reveal/history.
+- Global leaderboard plus a mutual friends leaderboard backed by one ordered
+  relationship row and reusable seven-day invite links.
+- Async 1v1 challenge mode with create/join/play/reveal/history and
+  server-resolved participant usernames.
 - Stale-first cache hydration and background refresh.
 - Debug-log export from Settings.
 - Uniform pull-request web previews and same-commit iOS validation.
@@ -25,6 +28,9 @@
 - Guest users do not get full profile/social persistence until login.
 - One active created challenge per user at a time.
 - Authenticated protected endpoints require token ownership checks.
+- Persisted social actions/rankings require a completed username identity.
+- Preview and production runtimes currently share configured Auth0/CockroachDB
+  services, so previews use designated test accounts and additive schemas.
 
 ## Out of Scope
 
@@ -37,6 +43,7 @@
 
 ## Hardening Work Remaining
 
+- Blocking username signup, username-only public UI, and social cache invalidation for v2.0.0.
 - API alerting and incident visibility.
 - Broader automated integration and UI coverage.
 - Test-account cleanup while preview and production deployments share services.
