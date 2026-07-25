@@ -35,33 +35,45 @@ The current mobile auth implementation uses Expo AuthSession with Authorization 
 
 ## Auth0 Application Setup
 
-Create an Auth0 `Native` application.
+Use two first-party Auth0 applications in the same tenant:
 
-Recommended settings:
+| Surface | Auth0 application type | Client environment |
+|---------|------------------------|--------------------|
+| Responsive web | Single Page Application | Netlify |
+| iOS and Android | Native | EAS |
 
-| Setting | Value |
-|---------|-------|
-| Application Type | Native |
-| Token Endpoint Authentication Method | None |
-| Grant Types | Authorization Code, Refresh Token |
-| Refresh Token Rotation | Enabled |
+Both clients use Authorization Code + PKCE, enable the Refresh Token grant, and
+use refresh-token rotation. The native client's Token Endpoint Authentication
+Method must be `None`.
 
-Allowed callback URLs:
-
-```text
-pundit-app://*
-exp://YOUR-LAN-IP:8081/--/*
-```
-
-Allowed logout URLs can include the same values for future compatibility, but the app currently performs local logout only.
-
-Allowed web origins:
+Configure the web client's allowed callback URLs:
 
 ```text
-exp://YOUR-LAN-IP:8081
+https://pundittrivia.com/
+https://deploy-preview-*--effervescent-tiramisu-8a2849.netlify.app/
 ```
 
-Use the exact LAN IP and port shown by Expo when testing on a physical device.
+Configure the native client's allowed callback and logout URL:
+
+```text
+pundit-app://callback
+```
+
+The app currently performs local logout only, but retaining the native logout
+URL keeps the client ready for a future hosted logout flow.
+
+Configure the web client's allowed web origins:
+
+```text
+https://pundittrivia.com
+https://deploy-preview-*--effervescent-tiramisu-8a2849.netlify.app
+```
+
+The constrained Netlify wildcard is for non-production Deploy Previews only.
+Production uses the exact custom-domain URL.
+
+For Expo Go testing, also add the exact `exp://` callback and origin printed by
+the local Expo server. Do not use `localhost` for a physical device.
 
 ## Environment Variables
 
@@ -77,6 +89,11 @@ Client-side:
 EXPO_PUBLIC_AUTH0_DOMAIN=your-tenant.auth0.com
 EXPO_PUBLIC_AUTH0_CLIENT_ID=your-client-id
 ```
+
+Netlify must receive the Single Page Application client ID. EAS preview and
+production environments must receive the Native client ID under the same
+`EXPO_PUBLIC_AUTH0_CLIENT_ID` variable name. Both use the same tenant domain, so
+an account keeps the same Auth0 subject across web and mobile.
 
 Server-side:
 
@@ -144,10 +161,12 @@ Confirm these are set and restart Expo:
 
 Confirm Auth0 callback URLs include:
 
-- `pundit-app://*`
-- `exp://YOUR-LAN-IP:8081/--/*`
+- Web client: `https://pundittrivia.com/`
+- Web client: `https://deploy-preview-*--effervescent-tiramisu-8a2849.netlify.app/`
+- Native client: `pundit-app://callback`
 
-For phone testing, do not use `localhost`; use Expo's LAN URL.
+For Expo Go testing, add the exact LAN callback printed by Expo. For phone
+testing, do not use `localhost`; use Expo's LAN URL.
 
 ### Invalid Authorization Code
 

@@ -36,6 +36,15 @@ interface AuthRequestOptions {
   forceInteractive?: boolean;
 }
 
+export const NATIVE_AUTH_REDIRECT_URI = 'pundit-app://callback';
+
+export function getAuthRedirectUri(): string {
+  return AuthSession.makeRedirectUri({
+    scheme: 'pundit-app',
+    native: NATIVE_AUTH_REDIRECT_URI,
+  });
+}
+
 function getAuthPrompt(intent: AuthIntent | undefined, forceInteractive: boolean) {
   if (intent === 'login') {
     return Prompt.Login;
@@ -52,7 +61,7 @@ export const useAuthRequest = ({ intent, forceInteractive = false }: AuthRequest
     revocationEndpoint: auth0Config.revocationEndpoint,
   };
 
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
+  const redirectUri = getAuthRedirectUri();
   const prompt = getAuthPrompt(intent, forceInteractive);
   const extraParams: Record<string, string> = {};
 
@@ -81,7 +90,7 @@ export async function logoutFromAuth0(): Promise<void> {
     return;
   }
 
-  const returnTo = AuthSession.makeRedirectUri({ scheme: 'pundit-app' });
+  const returnTo = getAuthRedirectUri();
   const logoutUrl =
     `${auth0Config.logoutEndpoint}?client_id=${encodeURIComponent(auth0Config.clientId)}` +
     `&returnTo=${encodeURIComponent(returnTo)}`;
