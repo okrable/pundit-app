@@ -115,8 +115,11 @@ export async function getFriendsLeaderboardRows(
         r.user_id,
         ROW_NUMBER() OVER (ORDER BY r.score DESC, r.created_at ASC, r.user_id ASC) as rank
       FROM results r
+      JOIN users ranked_user ON ranked_user.id = r.user_id
       WHERE r.quiz_date = $2
         AND r.user_id IN (SELECT friend_id FROM friend_ids)
+        AND ranked_user.onboarding_status = 'complete'
+        AND ranked_user.username IS NOT NULL
     )
     SELECT
       u.id as user_id,
