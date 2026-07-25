@@ -1,8 +1,8 @@
 import { Handler } from '@netlify/functions';
 import { queryWithClient, withTransaction } from './lib/db';
-import { assertAuthorizedUser } from './lib/auth';
 import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 import type { PoolClient } from 'pg';
+import { requireCompletedIdentity } from './lib/identity';
 
 interface MigrateGuestResultRequest {
   userId: string; // Auth0 user ID
@@ -122,7 +122,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const body: MigrateGuestResultRequest = JSON.parse(event.body || '{}');
-    const { userId, quizId, score, totalQuestions, answers, userProfile } = body;
+    const { userId, quizId, score, totalQuestions, answers } = body;
 
     // Validate request
     if (!userId || !quizId || score === undefined || !answers || answers.length === 0) {
@@ -142,25 +142,14 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
     const quizDate = quizId.replace('quiz-', '');
 
     const migration = await withTransaction(async (client) => {
-      // Upsert user record
-      await queryWithClient(
-        client,
-        `INSERT INTO users (id, display_name, email, avatar_url, created_at)
-         VALUES ($1, $2, $3, $4, now())
-         ON CONFLICT (id) DO UPDATE SET
-           email = COALESCE(EXCLUDED.email, users.email),
-           avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url)`,
-        [userId, userProfile?.displayName || null, userProfile?.email || null, userProfile?.avatarUrl || null]
-      );
-
       // Insert result with boolean array. If it already exists, this is an idempotent retry.
       const inserted = await queryWithClient<{ id: string }>(
         client,

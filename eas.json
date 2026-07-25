@@ -6,6 +6,7 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "preview"
       },
@@ -16,8 +17,19 @@
         "buildType": "apk"
       }
     },
+    "ios-simulator": {
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "preview"
+      },
+      "ios": {
+        "simulator": true,
+        "resourceClass": "m-medium"
+      }
+    },
     "production": {
       "autoIncrement": true,
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "production"
       },

@@ -20,6 +20,7 @@
     "inspect:leaderboard-performance": "node scripts/inspect-leaderboard-performance.js",
     "repair:total-correct": "node scripts/repair-total-correct.js",
     "eas:login": "npx eas-cli@latest login",
+    "build:ios:simulator": "npx eas-cli@latest build --platform ios --profile ios-simulator",
     "build:ios:device": "npx eas-cli@latest build --platform ios --profile preview",
     "build:ios:testflight": "npx eas-cli@latest build --platform ios --profile production --auto-submit",
     "submit:ios": "npx eas-cli@latest submit --platform ios --profile production",

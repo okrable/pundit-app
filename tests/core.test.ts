@@ -10,6 +10,12 @@ import {
 } from '../app/services/sharedCode';
 import { getSiteUrl } from '../netlify/functions/lib/siteUrl';
 import { getQuizDate } from '../app/utils/quizDate';
+import {
+  buildGeneratedUsername,
+  chooseAvailableGeneratedUsername,
+  normalizeGeneratedUsernameBase,
+} from '../shared/username';
+import { chooseIdentityProvisioningAction } from '../shared/identityPolicy';
 
 test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(undefined), 60);
@@ -117,5 +123,53 @@ test('formats quiz dates in the configured timezone', () => {
   assert.equal(
     getQuizDate(new Date('2026-07-24T23:30:00.000Z')),
     '2026-07-25'
+  );
+});
+
+test('generates deterministic valid usernames from verified email prefixes', () => {
+  assert.equal(normalizeGeneratedUsernameBase('Liam.Barker+test@example.com'), 'liam_barker_test');
+  assert.equal(normalizeGeneratedUsernameBase('é@example.com'), 'player');
+  assert.equal(
+    buildGeneratedUsername('Very.Long.Email.Prefix@example.com', 'ABCDEF123456'),
+    'very_long_e_abcdef12'
+  );
+});
+
+test('uses the next deterministic generated username after a collision', async () => {
+  const first = buildGeneratedUsername('player@example.com', '11111111');
+  const selected = await chooseAvailableGeneratedUsername(
+    'player@example.com',
+    ['11111111', '22222222'],
+    async (candidate) => candidate === first
+  );
+
+  assert.equal(selected, 'player_22222222');
+});
+
+test('keeps incomplete signup onboarding blocking across later restores', () => {
+  assert.equal(
+    chooseIdentityProvisioningAction({
+      hasUserRow: false,
+      hasUsername: false,
+      intent: 'signup',
+    }),
+    'require_username'
+  );
+  assert.equal(
+    chooseIdentityProvisioningAction({
+      hasUserRow: true,
+      hasUsername: false,
+      onboardingStatus: 'username_required',
+      intent: 'restore',
+    }),
+    'require_username'
+  );
+  assert.equal(
+    chooseIdentityProvisioningAction({
+      hasUserRow: false,
+      hasUsername: false,
+      intent: 'login',
+    }),
+    'generate_username'
   );
 });

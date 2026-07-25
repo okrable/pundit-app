@@ -7,6 +7,8 @@ All APIs are Netlify Functions under `/.netlify/functions/`.
 - Guest-compatible endpoints allow unauthenticated `guest_*` identities only where explicitly supported.
 - Protected flows require `Authorization: Bearer <access-token>`.
 - Server validates Auth0 tokens through `/userinfo` and enforces `token.sub === userId`.
+- `POST /syncIdentity` creates or refreshes the authenticated user record from verified Auth0 claims and returns username onboarding state.
+- Protected identity guards return `USERNAME_REQUIRED` when signup username onboarding is incomplete.
 - Client API calls include a defensive one-time retry for refreshed or changed tokens.
 
 ## Daily Quiz APIs
