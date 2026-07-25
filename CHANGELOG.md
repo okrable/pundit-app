@@ -2,6 +2,16 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.1.0 - Profile and streak redesign
+
+- Refreshed the authenticated Me page with a compact username header,
+  segmented stats, and a responsive inline football streak indicator.
+- Made daily result dates authoritative for streaks and added a historical
+  projection backfill.
+- Added date-aware streak status to profile responses and prevented prior-day
+  profile caches from presenting stale status.
+- Removed the decorative `@` prefix from usernames across public app surfaces.
+
 ## v2.0.0 - Username-only identity and social alignment
 
 - Added blocking, resumable username onboarding before authenticated navigation, reconciliation, prefetching, and deep-link actions.

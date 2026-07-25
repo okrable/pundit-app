@@ -45,12 +45,14 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 
 ## Database-Facing Model
 
-- `users` stores profile and aggregate stats.
+- `users` stores profile and aggregate stats. Its `streak` and `last_played`
+  fields are projections retained for compatible, efficient reads.
 - `users.onboarding_status` is `username_required` or `complete`; persisted
   social actions require a completed row with a username.
 - Username assignment is creation-only. Repeating the same value is idempotent;
   a different value returns `USERNAME_IMMUTABLE`.
-- `results` stores daily quiz submissions.
+- `results` stores daily quiz submissions and is authoritative for streak
+  reconstruction.
 - Daily leaderboards rank a single `quiz_date` by score, then earliest submission time, then user id.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
 - `users.username` is the canonical public identity for persisted social data.
@@ -61,3 +63,11 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - New client contracts use `PublicPlayer { userId, username, avatarUrl? }`.
 - Auth storage persists `username`, `usernameRequired`, and `onboardingStatus`;
   missing legacy metadata is resynchronized before navigation.
+
+## Streak Status
+
+`UserStats` keeps the scalar `streak` for compatibility and adds
+`streakStatus` with the current count, `not_started`, `active_today`,
+`at_risk`, or `inactive` state, last played date, and quiz date used to
+evaluate the status. A run ending yesterday remains active but at risk; older
+runs expose a current value of zero.

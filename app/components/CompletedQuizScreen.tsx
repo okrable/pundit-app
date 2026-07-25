@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme/theme';
 import { CachedQuizResult } from '../storage/quizStorage';
 import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
+import { formatStreakLabel } from '../../shared/streak';
 
 interface CompletedQuizScreenProps {
   result: CachedQuizResult;
@@ -25,7 +26,7 @@ export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps
 
   const handleShare = async () => {
     try {
-      const shareText = `Pundit - ${result.date}\n${emojis}\n${result.score} points (${correctCount}/${result.totalQuestions} correct)\n🔥 Streak: ${result.streak}\n\nPlay at: [app link]`;
+      const shareText = `Pundit - ${result.date}\n${emojis}\n${result.score} points (${correctCount}/${result.totalQuestions} correct)\n🔥 ${formatStreakLabel(result.streak)}\n\nPlay at: [app link]`;
 
       await Share.share({
         message: shareText,

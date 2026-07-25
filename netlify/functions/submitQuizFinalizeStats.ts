@@ -1,7 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { queryWithClient, withTransaction } from './lib/db';
-import { getPreviousQuizDate } from './lib/quizDate';
 import { requireCompletedIdentity } from './lib/identity';
+import { recomputeUserStreak } from './lib/streaks';
 
 interface FinalizeStatsRequest {
   quizId: string;
@@ -58,7 +58,6 @@ export const handler: Handler = async (event) => {
     }
 
     const quizDate = quizId.replace('quiz-', '');
-    const previousQuizDate = getPreviousQuizDate(quizDate);
 
     const updated = await withTransaction(async (client) => {
       const resultRows = await queryWithClient<{
@@ -78,34 +77,33 @@ export const handler: Handler = async (event) => {
 
       const correctCount = (resultRows[0].answers || []).filter(Boolean).length;
 
-      const updatedUsers = await queryWithClient<{ streak: number; best_score: number }>(
+      const updatedUsers = await queryWithClient<{ best_score: number }>(
         client,
         `UPDATE users
          SET
-           streak = CASE
-             WHEN last_played = $2::DATE THEN streak
-             WHEN last_played = $3::DATE THEN streak + 1
-             ELSE 1
-           END,
-           best_score = GREATEST(best_score, $4),
+           best_score = GREATEST(best_score, $3),
            total_quizzes = CASE
              WHEN last_played = $2::DATE THEN total_quizzes
              ELSE total_quizzes + 1
            END,
            total_correct = CASE
              WHEN last_played = $2::DATE THEN total_correct
-             ELSE total_correct + $5
-           END,
-           last_played = CASE
-             WHEN last_played = $2::DATE THEN last_played
-             ELSE $2::DATE
+             ELSE total_correct + $4
            END
          WHERE id = $1
-         RETURNING streak, best_score`,
-        [userId, quizDate, previousQuizDate, resultRows[0].score, correctCount]
+         RETURNING best_score`,
+        [userId, quizDate, resultRows[0].score, correctCount]
       );
 
-      return updatedUsers[0] || null;
+      if (!updatedUsers[0]) {
+        return null;
+      }
+
+      const streakStatus = await recomputeUserStreak(client, userId, quizDate);
+      return {
+        bestScore: updatedUsers[0].best_score,
+        streak: streakStatus.current,
+      };
     });
 
     if (!updated) {
@@ -122,7 +120,7 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         finalized: true,
         streak: updated.streak,
-        bestScore: updated.best_score,
+        bestScore: updated.bestScore,
       }),
     };
   } catch (error) {

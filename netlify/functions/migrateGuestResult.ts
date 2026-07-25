@@ -1,8 +1,9 @@
 import { Handler } from '@netlify/functions';
 import { queryWithClient, withTransaction } from './lib/db';
-import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
+import { getQuizDate } from './lib/quizDate';
 import type { PoolClient } from 'pg';
 import { requireCompletedIdentity } from './lib/identity';
+import { recomputeUserStreak } from './lib/streaks';
 
 interface MigrateGuestResultRequest {
   userId: string; // Auth0 user ID
@@ -36,31 +37,6 @@ function countCorrectAnswers(answers: boolean[] | string): number {
   }
 }
 
-function calculateCurrentStreak(results: ResultStatsRow[]): number {
-  if (results.length === 0) return 0;
-
-  const today = getQuizDate();
-
-  if (results[0].quiz_date !== today) {
-    return 0;
-  }
-
-  let streak = 1;
-  let expectedDate = today;
-
-  for (let i = 1; i < results.length; i++) {
-    expectedDate = getPreviousQuizDate(expectedDate);
-
-    if (results[i].quiz_date === expectedDate) {
-      streak++;
-    } else {
-      break;
-    }
-  }
-
-  return streak;
-}
-
 async function recomputeUserQuizStats(
   client: PoolClient,
   userId: string
@@ -74,7 +50,6 @@ async function recomputeUserQuizStats(
     [userId]
   );
 
-  const streak = calculateCurrentStreak(results);
   const bestScore = results.reduce(
     (best, result) => Math.max(best, Number(result.score || 0)),
     0
@@ -83,22 +58,19 @@ async function recomputeUserQuizStats(
     (sum, result) => sum + countCorrectAnswers(result.answers),
     0
   );
-  const lastPlayed = results[0]?.quiz_date ?? null;
-
   await queryWithClient(
     client,
     `UPDATE users
      SET
-       streak = $2,
-       best_score = $3,
-       total_quizzes = $4,
-       total_correct = $5,
-       last_played = $6::DATE
+       best_score = $2,
+       total_quizzes = $3,
+       total_correct = $4
      WHERE id = $1`,
-    [userId, streak, bestScore, results.length, totalCorrect, lastPlayed]
+    [userId, bestScore, results.length, totalCorrect]
   );
 
-  return { streak, bestScore };
+  const streakStatus = await recomputeUserStreak(client, userId, getQuizDate());
+  return { streak: streakStatus.current, bestScore };
 }
 
 export const handler: Handler = async (event) => {

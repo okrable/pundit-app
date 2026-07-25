@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.0.0 username-only client activation
+> Last updated: v2.1.0 profile and streak redesign
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -80,7 +80,9 @@ Read in this order:
 ## Maintenance Rules
 
 - Update these docs in the same change as any meaningful behavior change.
-- Keep `CHANGELOG.md`, `package.json`, `app.json`, and `app/constants/version.ts` aligned for release/version changes.
+- Keep `CHANGELOG.md`, `package.json`, `package-lock.json`, `app.json`,
+  `app/constants/version.ts`, and native iOS/Android marketing versions aligned
+  for release/version changes.
 - Agents should classify completed work before handoff and increment SemVer only when the work warrants a release checkpoint: patch for fixes, minor for user-visible features/meaningful UX changes, major for breaking product, scoring, storage, auth, or compatibility changes.
 - Settings must display the version from `APP_VERSION`; do not hard-code version text in UI components.
 - Prefer current-state documentation over historical planning notes.

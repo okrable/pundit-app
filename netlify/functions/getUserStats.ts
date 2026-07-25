@@ -1,7 +1,8 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
-import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
+import { getQuizDate } from './lib/quizDate';
+import { buildStreakStatus } from '../../shared/streak';
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -35,11 +36,16 @@ export const handler: Handler = async (event) => {
 
     // Guest users: return placeholder zeros
     if (userId.startsWith('guest_')) {
+      const asOfQuizDate = getQuizDate();
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           streak: 0,
+          streakStatus: buildStreakStatus(
+            { runLength: 0, lastPlayedDate: null },
+            asOfQuizDate
+          ),
           bestScore: 0,
           totalQuizzes: 0,
           challengeWins: 0,
@@ -90,11 +96,16 @@ export const handler: Handler = async (event) => {
 
     // Return zeros if user doesn't exist
     if (stats.length === 0) {
+      const asOfQuizDate = getQuizDate();
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           streak: 0,
+          streakStatus: buildStreakStatus(
+            { runLength: 0, lastPlayedDate: null },
+            asOfQuizDate
+          ),
           bestScore: 0,
           totalQuizzes: 0,
           challengeWins: 0,
@@ -111,17 +122,20 @@ export const handler: Handler = async (event) => {
 
     const userStats = stats[0];
     const today = getQuizDate();
-    const yesterday = getPreviousQuizDate(today);
-    const currentStreak =
-      userStats.last_played === today || userStats.last_played === yesterday
-        ? Number(userStats.streak || 0)
-        : 0;
+    const streakStatus = buildStreakStatus(
+      {
+        runLength: Number(userStats.streak || 0),
+        lastPlayedDate: userStats.last_played,
+      },
+      today
+    );
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        streak: currentStreak,
+        streak: streakStatus.current,
+        streakStatus,
         bestScore: userStats.best_score || 0,
         totalQuizzes: userStats.total_quizzes || 0,
         challengeWins: userStats.challenge_wins || 0,

@@ -5,9 +5,15 @@ import { getCachedUserStats, setCachedUserStats } from '../storage/profileCache'
 import { getTodayQuizResult } from '../storage/quizStorage';
 import { useAuthStore } from './useAuthStore';
 import { logError, logInfo } from '../services/debugLog';
+import { getQuizDate } from '../utils/quizDate';
+import { buildStreakStatus } from '../../shared/streak';
 
 const GUEST_STATS: UserStats = {
   streak: 0,
+  streakStatus: buildStreakStatus(
+    { runLength: 0, lastPlayedDate: null },
+    getQuizDate()
+  ),
   bestScore: 0,
   totalQuizzes: 0,
   challengeWins: 0,
@@ -126,7 +132,9 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         statsUserId: userId,
         stats,
         statsCache: refreshedCache,
-        playedToday: Boolean(remoteTodayResult || todayResult),
+        playedToday:
+          stats.streakStatus.state === 'active_today' ||
+          Boolean(remoteTodayResult || todayResult),
         loading: false,
         error: null,
       });
@@ -180,6 +188,14 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       const nextStats: UserStats = {
         ...GUEST_STATS,
         streak: isGuest || isServerConfirmed ? result.streak : 0,
+        streakStatus: isGuest || isServerConfirmed
+          ? {
+              current: result.streak,
+              state: 'active_today',
+              lastPlayedDate: result.date,
+              asOfQuizDate: result.date,
+            }
+          : GUEST_STATS.streakStatus,
         bestScore: Math.max(result.bestScore, result.score),
         totalQuizzes: isGuest || isServerConfirmed ? 1 : 0,
       };
@@ -201,6 +217,14 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     const nextStats: UserStats = {
       ...currentStats,
       streak: isGuest || isServerConfirmed ? result.streak : currentStats.streak,
+      streakStatus: isGuest || isServerConfirmed
+        ? {
+            current: result.streak,
+            state: 'active_today',
+            lastPlayedDate: result.date,
+            asOfQuizDate: result.date,
+          }
+        : currentStats.streakStatus,
       bestScore: Math.max(currentStats.bestScore, result.bestScore, result.score),
       totalQuizzes: isGuest && !alreadyPlayedToday
         ? currentStats.totalQuizzes + 1

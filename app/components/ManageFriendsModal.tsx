@@ -20,6 +20,7 @@ import { useAuthStore } from '../state/useAuthStore';
 import Avatar from './Avatar';
 import ShareFriendLinkModal from './ShareFriendLinkModal';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
+import { formatStreakLabel } from '../../shared/streak';
 
 interface ManageFriendsModalProps {
   visible: boolean;
@@ -142,7 +143,7 @@ export default function ManageFriendsModal({
         <Text style={styles.friendName}>
           {formatPublicPlayerName(item.username)}
         </Text>
-        <Text style={styles.friendStats}>Streak: {item.streak}</Text>
+        <Text style={styles.friendStats}>{formatStreakLabel(item.streak)}</Text>
       </View>
       <TouchableOpacity
         style={styles.removeButton}

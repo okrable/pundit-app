@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Quiz, QuizResultImmediate } from '../types';
 import { theme } from '../theme/theme';
 import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
+import { formatStreakLabel } from '../../shared/streak';
 
 const logoImage = require('../../assets/logo/dark/pundit-black.png');
 const celebrationImage = require('../../assets/images/Asset 9.png');
@@ -54,7 +55,8 @@ export default function ResultsScreen({ result, quiz }: ResultsScreenProps) {
         : null;
 
   const handleShare = async () => {
-    const streakLine = typeof result.streak === 'number' ? `Streak: ${result.streak}` : '';
+    const streakLine =
+      typeof result.streak === 'number' ? formatStreakLabel(result.streak) : '';
     const shareText = [
       `Pundit Daily Quiz - ${result.date}`,
       `Final score: ${result.score}`,

@@ -166,7 +166,6 @@ export default function UsernameOnboardingScreen() {
           {showUsernameForm ? (
             <>
               <View style={styles.inputContainer}>
-                <Text style={styles.prefix}>@</Text>
                 <TextInput
                   style={styles.input}
                   value={input}
@@ -283,11 +282,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: theme.spacing.md,
-  },
-  prefix: {
-    fontFamily: theme.fonts.gothamMedium,
-    fontSize: 18,
-    color: theme.colors.mediumGray,
   },
   input: {
     flex: 1,

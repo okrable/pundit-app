@@ -110,7 +110,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           questions: response.questions,
           isCreator: false,
           opponentName: response.creator.username
-            ? `@${response.creator.username}`
+            ? response.creator.username
             : response.creator.legacyLabel || null,
         },
         isLoading: false,

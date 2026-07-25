@@ -37,6 +37,10 @@ import {
   LEGACY_GUEST_LABEL,
   resolveChallengeIdentity,
 } from '../netlify/functions/lib/challengeIdentity';
+import {
+  buildStreakStatus,
+  calculateStreakProjection,
+} from '../shared/streak';
 
 test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(undefined), 60);
@@ -244,7 +248,7 @@ test('restores and gates authenticated identity before protected work', () => {
 });
 
 test('formats only canonical usernames or explicit legacy labels', () => {
-  assert.equal(formatPublicPlayerName('liam', null), '@liam');
+  assert.equal(formatPublicPlayerName('liam', null), 'liam');
   assert.equal(formatPublicPlayerName(null, 'Legacy guest'), 'Legacy guest');
   assert.equal(formatPublicPlayerName(null, null, 'Opponent'), 'Opponent');
 });
@@ -346,4 +350,81 @@ test('uses current challenge usernames and labels legacy guest history', () => {
   assert.equal(legacyGuest?.isLegacyGuest, true);
   assert.equal(legacyGuest?.legacyLabel, LEGACY_GUEST_LABEL);
   assert.equal(getCompatibilityPlayerName(legacyGuest), LEGACY_GUEST_LABEL);
+});
+
+test('calculates current streak projections from distinct result dates', () => {
+  assert.deepEqual(calculateStreakProjection([]), {
+    runLength: 0,
+    lastPlayedDate: null,
+  });
+  assert.deepEqual(calculateStreakProjection(['2026-07-25']), {
+    runLength: 1,
+    lastPlayedDate: '2026-07-25',
+  });
+  assert.deepEqual(
+    calculateStreakProjection([
+      '2026-07-23',
+      '2026-07-25',
+      '2026-07-24',
+      '2026-07-25',
+      '2026-07-20',
+    ]),
+    {
+      runLength: 3,
+      lastPlayedDate: '2026-07-25',
+    }
+  );
+  assert.deepEqual(
+    calculateStreakProjection(['2026-01-01', '2025-12-31', '2025-12-30']),
+    {
+      runLength: 3,
+      lastPlayedDate: '2026-01-01',
+    }
+  );
+});
+
+test('classifies active, at-risk, inactive, and not-started streaks', () => {
+  assert.deepEqual(
+    buildStreakStatus(
+      { runLength: 0, lastPlayedDate: null },
+      '2026-07-25'
+    ),
+    {
+      current: 0,
+      state: 'not_started',
+      lastPlayedDate: null,
+      asOfQuizDate: '2026-07-25',
+    }
+  );
+  assert.equal(
+    buildStreakStatus(
+      { runLength: 4, lastPlayedDate: '2026-07-25' },
+      '2026-07-25'
+    ).state,
+    'active_today'
+  );
+  assert.deepEqual(
+    buildStreakStatus(
+      { runLength: 4, lastPlayedDate: '2026-07-24' },
+      '2026-07-25'
+    ),
+    {
+      current: 4,
+      state: 'at_risk',
+      lastPlayedDate: '2026-07-24',
+      asOfQuizDate: '2026-07-25',
+    }
+  );
+  assert.deepEqual(
+    buildStreakStatus(
+      { runLength: 8, lastPlayedDate: '2026-07-23' },
+      '2026-07-25'
+    ),
+    {
+      current: 0,
+      state: 'inactive',
+      lastPlayedDate: '2026-07-23',
+      asOfQuizDate: '2026-07-25',
+    }
+  );
 });

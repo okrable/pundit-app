@@ -1,16 +1,19 @@
 # Feature: Me Profile Page
 
 > Status: Implemented
-> Last updated: identity foundation and social backend alignment
+> Last updated: v2.1.0 profile and streak redesign
 
 ## Delivered
 
 - Me tab supports authenticated and guest states.
-- Authenticated users see cached-first profile stats and account actions.
+- Authenticated users see a compact username header with an inline football
+  streak indicator, a Best Score and challenge W-L-D row, and account actions.
 - Guest users see conversion prompts and limited settings actions.
 - Settings modal is accessible from the Me header.
-- Authenticated profiles display the canonical `@username` without editable
+- Authenticated profiles display the canonical username without editable
   display-name or username controls.
+- The inline streak indicator uses a coloured integrated football-flame for
+  active and at-risk streaks, and a greyscale football when no streak is active.
 - Required username selection is an app-level gate before the Me screen or
   other authenticated navigation can render.
 - Guest-only options, including clear daily quiz cache, are hidden for authenticated users.

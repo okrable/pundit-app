@@ -38,6 +38,8 @@
   players.
 - New friend invites are reusable for seven days; legacy invite rows retain
   single-use semantics.
+- Daily result dates are authoritative for streaks. The user-row streak fields
+  are recomputed projections, while profile responses expose date-aware status.
 
 ## Cross-Cutting Decisions
 

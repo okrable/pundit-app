@@ -20,11 +20,22 @@ import Avatar from '../components/Avatar';
 import { useProfileStore } from '../state/useProfileStore';
 import AuthSyncScreen from '../components/AuthSyncScreen';
 import { loginWithAuth0 } from '../services/authFlow';
-import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
+import {
+  useCenteredWebStyle,
+  useMobileLayoutMetrics,
+  webContentWidth,
+} from '../components/ResponsiveLayout';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
+import { buildStreakStatus } from '../../shared/streak';
+import { getQuizDate } from '../utils/quizDate';
+import StreakFootballIcon from '../components/StreakFootballIcon';
 
 const EMPTY_STATS: UserStats = {
   streak: 0,
+  streakStatus: buildStreakStatus(
+    { runLength: 0, lastPlayedDate: null },
+    getQuizDate()
+  ),
   bestScore: 0,
   totalQuizzes: 0,
   challengeWins: 0,
@@ -39,7 +50,8 @@ const EMPTY_STATS: UserStats = {
 
 export default function MeScreen() {
   const centeredProfileStyle = useCenteredWebStyle(webContentWidth.standard);
-  const { stats, playedToday, revalidate } = useProfileStore();
+  const { isCompactWidth } = useMobileLayoutMetrics();
+  const { stats, revalidate } = useProfileStore();
   const {
     user,
     isAuthenticated,
@@ -104,31 +116,27 @@ export default function MeScreen() {
     }
   };
 
-  const getStreakMessage = (streak: number): string => {
-    if (streak === 0) return 'Start your streak today!';
-    if (streak === 1) return '1 day - keep it going!';
-    if (streak < 5) return `${streak} days - nice work!`;
-    if (streak < 10) return `${streak} days - you're on fire!`;
-    return `${streak} days - legendary!`;
-  };
-
-  const getStreakCta = (hasPlayedToday: boolean): string => {
-    return hasPlayedToday
-      ? 'Come back tomorrow to keep your streak!'
-      : 'Play today to keep your streak!';
-  };
-
-  const formatMemberSince = (dateStr: string | null): string => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  };
-
   const formatChallengeRecord = (wins: number, losses: number, draws: number): string => {
     return `${wins}-${losses}-${draws}`;
   };
 
   const localStats = stats ?? EMPTY_STATS;
+  const currentQuizDate = getQuizDate();
+  const streakStatus =
+    localStats.streakStatus.asOfQuizDate === currentQuizDate
+      ? localStats.streakStatus
+      : buildStreakStatus(
+          {
+            runLength: localStats.streak,
+            lastPlayedDate: localStats.streakStatus.lastPlayedDate,
+          },
+          currentQuizDate
+        );
+  const hasActiveStreak =
+    streakStatus.state === 'active_today' || streakStatus.state === 'at_risk';
+  const streakAccessibilityLabel = hasActiveStreak
+    ? `${streakStatus.current} ${streakStatus.current === 1 ? 'day' : 'days'} streak, active`
+    : 'No active streak';
 
   if (authLoadingIntent !== null) {
     return <AuthSyncScreen />;
@@ -198,7 +206,11 @@ export default function MeScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, centeredProfileStyle]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isCompactWidth && styles.scrollContentCompact,
+          centeredProfileStyle,
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -208,43 +220,64 @@ export default function MeScreen() {
           />
         }
       >
-        <View style={styles.profileSection}>
+        <View
+          style={[
+            styles.profileSection,
+            isCompactWidth && styles.profileSectionCompact,
+          ]}
+        >
           <Avatar
             userId={user?.sub || ''}
             username={localStats.username || user?.username}
             imageUrl={user?.picture}
-            size="xl"
+            size="lg"
           />
-          <Text style={styles.username}>
-            {formatPublicPlayerName(localStats.username || user?.username)}
-          </Text>
+          <View style={styles.profileIdentity}>
+            <Text
+              style={[styles.username, isCompactWidth && styles.usernameCompact]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {formatPublicPlayerName(localStats.username || user?.username)}
+            </Text>
+            <Text style={styles.profileCaption}>Player profile</Text>
+          </View>
+          <View
+            style={[
+              styles.streakIndicator,
+              isCompactWidth && styles.streakIndicatorCompact,
+            ]}
+            accessible
+            accessibilityLabel={streakAccessibilityLabel}
+          >
+            <StreakFootballIcon
+              active={hasActiveStreak}
+              size={isCompactWidth ? 26 : 32}
+            />
+            <Text
+              style={[
+                styles.streakValue,
+                isCompactWidth && styles.streakValueCompact,
+              ]}
+            >
+              {streakStatus.current}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.statsSection}>
           <Text style={styles.sectionTitle}>STATS</Text>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>🔥</Text>
-              <Text style={styles.statValue}>{localStats.streak}</Text>
-              <Text style={styles.statLabel}>Streak</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>⭐</Text>
+          <View style={styles.statsCard}>
+            <View style={styles.statCell}>
+              <Ionicons name="star" size={20} color={theme.colors.accent} />
               <Text style={styles.statValue}>{localStats.bestScore}</Text>
               <Text style={styles.statLabel}>Best Score</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>📊</Text>
-              <Text style={styles.statValue}>{localStats.totalQuizzes}</Text>
-              <Text style={styles.statLabel}>Quizzes</Text>
-            </View>
-          </View>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>🏆</Text>
-              <Text style={styles.statValueSmall}>
+            <View style={styles.statDivider} />
+            <View style={styles.statCell}>
+              <Ionicons name="trophy" size={20} color={theme.colors.primary} />
+              <Text style={styles.statValue}>
                 {formatChallengeRecord(
                   localStats.challengeWins,
                   localStats.challengeLosses,
@@ -253,22 +286,9 @@ export default function MeScreen() {
               </Text>
               <Text style={styles.statLabel}>W-L-D</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statEmoji}>📅</Text>
-              <Text style={styles.statValueSmall}>
-                {formatMemberSince(localStats.createdAt)}
-              </Text>
-              <Text style={styles.statLabel}>Joined</Text>
-            </View>
           </View>
         </View>
 
-        <View style={styles.streakSection}>
-          <View style={styles.divider} />
-          <Text style={styles.streakTitle}>Streak Status</Text>
-          <Text style={styles.streakMessage}>{getStreakMessage(localStats.streak)}</Text>
-          <Text style={styles.streakCta}>{getStreakCta(playedToday)}</Text>
-        </View>
       </ScrollView>
 
       <SettingsModal
@@ -297,8 +317,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xxl,
+    paddingTop: 56,
     paddingBottom: theme.spacing.xxl,
+  },
+  scrollContentCompact: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: 52,
   },
   loggedOutContent: {
     flex: 1,
@@ -344,14 +368,51 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.gothamBook,
   },
   profileSection: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
   },
+  profileSectionCompact: {
+    gap: theme.spacing.md,
+  },
+  profileIdentity: {
+    flex: 1,
+    minWidth: 0,
+  },
   username: {
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
-    marginTop: theme.spacing.md,
+  },
+  usernameCompact: {
+    fontSize: 18,
+  },
+  profileCaption: {
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    marginTop: theme.spacing.xs,
+  },
+  streakIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    gap: theme.spacing.sm,
+  },
+  streakIndicatorCompact: {
+    gap: theme.spacing.xs,
+  },
+  streakValue: {
+    minWidth: 20,
+    fontSize: 26,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+    fontVariant: ['tabular-nums'],
+  },
+  streakValueCompact: {
+    minWidth: 16,
+    fontSize: 22,
   },
   statsSection: {
     marginBottom: theme.spacing.xl,
@@ -363,67 +424,33 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
     letterSpacing: 1,
   },
-  statsRow: {
+  statsCard: {
     flexDirection: 'row',
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-  },
-  statCard: {
-    flex: 1,
     backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: theme.spacing.md,
+  },
+  statCell: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 108,
+    minHeight: 76,
+    gap: theme.spacing.xs,
   },
-  statEmoji: {
-    fontSize: 24,
-    marginBottom: theme.spacing.sm,
+  statDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: theme.colors.lightGray,
+    marginVertical: theme.spacing.xs,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
-  },
-  statValueSmall: {
-    fontSize: 18,
-    fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.textDark,
-    textAlign: 'center',
   },
   statLabel: {
     fontSize: 12,
     fontFamily: theme.fonts.gothamBook,
     color: theme.colors.mediumGray,
-    marginTop: theme.spacing.xs,
-  },
-  streakSection: {
-    alignItems: 'center',
-  },
-  divider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: theme.colors.lightGray,
-    marginBottom: theme.spacing.lg,
-  },
-  streakTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.textDark,
-    marginBottom: theme.spacing.sm,
-  },
-  streakMessage: {
-    fontSize: 16,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.textDark,
-    textAlign: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  streakCta: {
-    fontSize: 14,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.mediumGray,
-    textAlign: 'center',
   },
 });

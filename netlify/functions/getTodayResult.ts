@@ -2,6 +2,7 @@ import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { getQuizDate } from './lib/quizDate';
+import { buildStreakStatus } from '../../shared/streak';
 
 interface DbResult {
   quiz_date: string;
@@ -14,6 +15,7 @@ interface DbResult {
 interface DbUser {
   streak: number;
   best_score: number;
+  last_played: string | null;
 }
 
 export const handler: Handler = async (event) => {
@@ -80,18 +82,25 @@ export const handler: Handler = async (event) => {
 
     // Get user stats
     const userStats = await query<DbUser>(
-      `SELECT streak, best_score FROM users WHERE id = $1`,
+      `SELECT streak, best_score, last_played::TEXT as last_played FROM users WHERE id = $1`,
       [userId]
     );
 
     const dbResult = results[0];
+    const streakStatus = buildStreakStatus(
+      {
+        runLength: Number(userStats[0]?.streak || 0),
+        lastPlayedDate: userStats[0]?.last_played ?? null,
+      },
+      today
+    );
     const result = {
       date: dbResult.quiz_date,
       quizId: dbResult.quiz_id,
       score: dbResult.score,
       totalQuestions: dbResult.total_questions,
       answers: dbResult.answers ?? [],
-      streak: userStats[0]?.streak || 0,
+      streak: streakStatus.current,
       bestScore: userStats[0]?.best_score || 0,
     };
 

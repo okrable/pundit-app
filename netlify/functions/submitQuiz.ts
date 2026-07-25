@@ -1,11 +1,11 @@
 import { Handler } from '@netlify/functions';
 import { query, queryWithClient, withTransaction } from './lib/db';
-import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 import { calculateQuizPoints } from '../../shared/scoring';
 import { validateSubmittedAnswers } from '../../shared/submissionValidation';
 import { enforceRateLimit } from './lib/rateLimit';
 import { requireCompletedIdentity } from './lib/identity';
+import { recomputeUserStreak } from './lib/streaks';
 
 interface SubmitQuizRequest {
   quizId: string;
@@ -45,7 +45,6 @@ interface ExistingResultWithStatsRow {
   score: number;
   total_questions: number;
   answers: boolean[];
-  streak: number | null;
   best_score: number | null;
 }
 
@@ -246,7 +245,6 @@ export const handler: Handler = async (event) => {
              r.score,
              r.total_questions,
              r.answers,
-             u.streak,
              u.best_score
            FROM results r
            LEFT JOIN users u ON u.id = r.user_id
@@ -254,48 +252,40 @@ export const handler: Handler = async (event) => {
           [userId, quizId]
         );
         dbMark('existing_fetch', t);
+        t = Date.now();
+        const streakStatus = await recomputeUserStreak(client, userId, quizDate);
+        dbMark('streak_recompute', t);
 
         return {
           kind: 'existing' as const,
           row: existing[0],
+          streakStatus,
           timings: dbTimings,
         };
       }
 
-      const previousQuizDate = getPreviousQuizDate(quizDate);
       t = Date.now();
-      const updatedUser = await queryWithClient<{ streak: number; best_score: number }>(
+      const updatedUser = await queryWithClient<{ best_score: number }>(
         client,
         `UPDATE users
          SET
-           streak = CASE
-             WHEN last_played = $2::DATE THEN streak
-             WHEN last_played = $3::DATE THEN streak + 1
-             ELSE 1
-           END,
-           best_score = GREATEST(best_score, $4),
-           total_quizzes = CASE
-             WHEN last_played = $2::DATE THEN total_quizzes
-             ELSE total_quizzes + 1
-           END,
-           total_correct = CASE
-             WHEN last_played = $2::DATE THEN total_correct
-             ELSE total_correct + $5
-           END,
-           last_played = CASE
-             WHEN last_played = $2::DATE THEN last_played
-             ELSE $2::DATE
-           END
+           best_score = GREATEST(best_score, $2),
+           total_quizzes = total_quizzes + 1,
+           total_correct = total_correct + $3
          WHERE id = $1
-         RETURNING streak, best_score`,
-        [userId, quizDate, previousQuizDate, score, correctCount]
+         RETURNING best_score`,
+        [userId, score, correctCount]
       );
       dbMark('stats_update', t);
+      t = Date.now();
+      const streakStatus = await recomputeUserStreak(client, userId, quizDate);
+      dbMark('streak_recompute', t);
 
       return {
         kind: 'inserted_sync' as const,
         row: inserted[0],
         userStats: updatedUser[0],
+        streakStatus,
         timings: dbTimings,
       };
     });
@@ -313,7 +303,7 @@ export const handler: Handler = async (event) => {
         score: dbResult.row?.score ?? score,
         totalQuestions: dbResult.row?.total_questions ?? answers.length,
         answers: dbResult.row?.answers ?? detailedAnswers,
-        streak: dbResult.row?.streak ?? 0,
+        streak: dbResult.streakStatus.current,
         bestScore: dbResult.row?.best_score ?? 0,
         statsPending: false,
       };
@@ -324,7 +314,7 @@ export const handler: Handler = async (event) => {
         score,
         totalQuestions: answers.length,
         answers: detailedAnswers,
-        streak: dbResult.userStats?.streak ?? 0,
+        streak: dbResult.streakStatus.current,
         bestScore: dbResult.userStats?.best_score ?? score,
         statsPending: false,
       };

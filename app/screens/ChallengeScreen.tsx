@@ -123,7 +123,7 @@ export default function ChallengeScreen() {
         if (response.success) {
           await useLeaderboardStore.getState().invalidateFriends(userId);
           const friendName = response.friendUsername
-            ? `@${response.friendUsername}`
+            ? response.friendUsername
             : 'your friend';
           Alert.alert(
             'Friend Added',

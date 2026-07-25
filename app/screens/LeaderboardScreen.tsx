@@ -22,6 +22,7 @@ import AuthSyncScreen from '../components/AuthSyncScreen';
 import { loginWithAuth0 } from '../services/authFlow';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
+import { formatStreakLabel } from '../../shared/streak';
 
 type ViewMode = 'friends' | 'global';
 
@@ -154,7 +155,7 @@ export default function LeaderboardScreen() {
   const renderFriendsItem = ({ item }: { item: FriendsLeaderboardEntry }) => {
     const isCurrentUser = item.userId === user?.sub;
     const hasPlayed = item.hasPlayedToday;
-    const scoreText = `${item.score} pts • Streak: ${item.streak}`;
+    const scoreText = `${item.score} pts • ${formatStreakLabel(item.streak)}`;
 
     return (
       <View style={[styles.leaderboardItem, isCurrentUser && styles.currentUserItem]}>
@@ -204,7 +205,7 @@ export default function LeaderboardScreen() {
           {formatPublicPlayerName(item.username)}
         </Text>
         <Text style={styles.playerStats}>
-          {`${item.score} pts • Streak: ${item.streak}`}
+          {`${item.score} pts • ${formatStreakLabel(item.streak)}`}
         </Text>
       </View>
     </View>

@@ -1,3 +1,5 @@
+import type { StreakStatus } from '../../shared/streak';
+
 export interface Question {
   id: string;
   prompt: string;
@@ -91,6 +93,7 @@ export interface GlobalLeaderboardResponse {
 
 export interface UserStats {
   streak: number;
+  streakStatus: StreakStatus;
   bestScore: number;
   totalQuizzes: number;
   challengeWins: number;

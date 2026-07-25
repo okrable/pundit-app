@@ -9,7 +9,9 @@
 - The typewriter prompt effect is intentional gameplay identity.
 - The timer must not start before the prompt and options are visible.
 - Local logout should avoid hosted Auth0 browser logout because it triggers unwanted iOS sign-in UI.
-- App SemVer is canonical across `package.json`, `app.json`, `app/constants/version.ts`, and Settings.
+- App SemVer is canonical across `package.json`, `package-lock.json`,
+  `app.json`, `app/constants/version.ts`, native marketing versions, and
+  Settings.
 - `main` is the only permanent and production-significant branch; all other branches receive identical preview behavior.
 - Web and iOS changes are validated from the same source commit.
 - Preview builds use designated test accounts against the configured production CockroachDB/Auth0 services.

@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { requireCompletedIdentity } from './lib/identity';
+import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -46,6 +47,9 @@ export const handler: Handler = async (event) => {
       return identity.response;
     }
 
+    const today = getQuizDate();
+    const previousQuizDate = getPreviousQuizDate(today);
+
     // Get all friends for this user
     // Since friendships are stored with user_a < user_b, we need to check both columns
     const friends = await query<{
@@ -59,7 +63,10 @@ export const handler: Handler = async (event) => {
         u.id,
         u.username,
         u.avatar_url,
-        u.streak,
+        CASE
+          WHEN u.last_played IN ($2::DATE, $3::DATE) THEN u.streak
+          ELSE 0
+        END as streak,
         f.created_at as friend_since
       FROM friendships f
       JOIN users u ON (
@@ -69,7 +76,7 @@ export const handler: Handler = async (event) => {
         AND u.onboarding_status = 'complete'
         AND u.username IS NOT NULL
       ORDER BY u.username ASC`,
-      [userId]
+      [userId, today, previousQuizDate]
     );
 
     // Format response

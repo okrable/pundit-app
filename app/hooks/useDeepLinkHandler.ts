@@ -32,7 +32,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
         if (response.success) {
           await useLeaderboardStore.getState().invalidateFriends(user.sub);
           const friendName = response.friendUsername
-            ? `@${response.friendUsername}`
+            ? response.friendUsername
             : 'your friend';
           Alert.alert(
             'Friend Added',
