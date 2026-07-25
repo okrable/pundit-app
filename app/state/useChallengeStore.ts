@@ -77,8 +77,9 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           code: response.code,
           shareUrl: response.shareUrl,
           status: 'pending',
-          creatorDisplayName: displayName || null,
-          creatorUsername: null,
+          // Compatibility display field is server-resolved username.
+          creatorDisplayName: response.creatorDisplayName,
+          creatorUsername: response.creatorUsername,
           opponentUsername: null,
           isCreator: true,
           createdAt: new Date().toISOString(),

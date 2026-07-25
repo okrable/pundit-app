@@ -2,8 +2,8 @@ import { Handler } from '@netlify/functions';
 import { randomInt } from 'node:crypto';
 import { getSiteUrl } from './lib/siteUrl';
 import { enforceRateLimit } from './lib/rateLimit';
-import { query } from './lib/db';
-import { assertAuthorizedUser } from './lib/auth';
+import { queryWithClient, withTransaction } from './lib/db';
+import { requireCompletedIdentity } from './lib/identity';
 
 interface CreateFriendLinkRequest {
   userId: string;
@@ -59,9 +59,9 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
     const rateLimitError = await enforceRateLimit(event, headers, {
@@ -74,46 +74,73 @@ export const handler: Handler = async (event) => {
       return rateLimitError;
     }
 
-    // Generate unique code (retry if collision)
-    let code = generateFriendCode();
-    let attempts = 0;
-    while (attempts < 10) {
-      const existing = await query<{ id: string }>(
-        `SELECT id FROM friend_links WHERE code = $1`,
-        [code]
+    const linkResult = await withTransaction(async (client) => {
+      // Serialize link creation for this user so concurrent requests cannot
+      // mint multiple active reusable codes.
+      await queryWithClient(
+        client,
+        `SELECT id FROM users WHERE id = $1 FOR UPDATE`,
+        [userId]
       );
-      if (existing.length === 0) break;
-      code = generateFriendCode();
-      attempts++;
-    }
 
-    if (attempts >= 10) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'Failed to generate unique code' }),
-      };
-    }
+      const existingLinks = await queryWithClient<{
+        code: string;
+        expires_at: string;
+      }>(
+        client,
+        `SELECT code, expires_at
+         FROM friend_links
+         WHERE user_id = $1
+           AND is_reusable = true
+           AND expires_at > NOW()
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [userId]
+      );
 
-    // Create the friend link (expires in 7 days)
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      if (existingLinks.length > 0) {
+        return {
+          code: existingLinks[0].code,
+          expiresAt: existingLinks[0].expires_at,
+          reused: true,
+        };
+      }
 
-    await query(
-      `INSERT INTO friend_links (code, user_id, expires_at)
-       VALUES ($1, $2, $3)`,
-      [code, userId, expiresAt.toISOString()]
-    );
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const candidate = generateFriendCode();
+        const inserted = await queryWithClient<{ code: string }>(
+          client,
+          `INSERT INTO friend_links (code, user_id, expires_at, is_reusable)
+           VALUES ($1, $2, $3, true)
+           ON CONFLICT (code) DO NOTHING
+           RETURNING code`,
+          [candidate, userId, expiresAt.toISOString()]
+        );
+        if (inserted.length > 0) {
+          return {
+            code: inserted[0].code,
+            expiresAt: expiresAt.toISOString(),
+            reused: false,
+          };
+        }
+      }
+
+      throw new Error('Failed to generate unique code');
+    });
 
     // Build share URL using the API base URL domain
-    const shareUrl = `${getSiteUrl()}/f/${code}`;
+    const shareUrl = `${getSiteUrl()}/f/${linkResult.code}`;
 
     return {
-      statusCode: 201,
+      statusCode: linkResult.reused ? 200 : 201,
       headers,
       body: JSON.stringify({
-        code,
+        code: linkResult.code,
         shareUrl,
-        expiresAt: expiresAt.toISOString(),
+        expiresAt: linkResult.expiresAt,
+        reused: linkResult.reused,
+        username: identity.identity.username,
       }),
     };
   } catch (error) {

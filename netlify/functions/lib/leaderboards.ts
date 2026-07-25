@@ -9,8 +9,9 @@ export interface LeaderboardDateWindow {
 
 export interface LeaderboardEntry {
   userId: string;
+  /** @deprecated Installed-client compatibility; contains the username. */
   displayName: string | null;
-  username: string | null;
+  username: string;
   score: number;
   gamesPlayed: number;
   streak: number;
@@ -20,8 +21,7 @@ export interface LeaderboardEntry {
 
 interface LeaderboardRow {
   user_id: string;
-  display_name: string | null;
-  username: string | null;
+  username: string;
   score: number | string | null;
   games_played: number | string | null;
   streak: number;
@@ -45,7 +45,8 @@ export function parseLeaderboardLimit(value: string | undefined): number {
 function mapLeaderboardRow(row: LeaderboardRow): LeaderboardEntry {
   return {
     userId: row.user_id,
-    displayName: row.display_name,
+    // Older clients still render this field, so keep it aligned to username.
+    displayName: row.username,
     username: row.username,
     score: Number(row.score ?? 0),
     gamesPlayed: Number(row.games_played ?? 0),
@@ -64,7 +65,6 @@ export async function getGlobalLeaderboardRows(
     `WITH ranked AS (
       SELECT
         r.user_id,
-        u.display_name,
         u.username,
         r.score,
         1::INT as games_played,
@@ -77,10 +77,11 @@ export async function getGlobalLeaderboardRows(
       FROM results r
       JOIN users u ON r.user_id = u.id
       WHERE r.quiz_date = $1
+        AND u.onboarding_status = 'complete'
+        AND u.username IS NOT NULL
     )
     SELECT
       user_id,
-      display_name,
       username,
       score,
       games_played,
@@ -119,7 +120,6 @@ export async function getFriendsLeaderboardRows(
     )
     SELECT
       u.id as user_id,
-      u.display_name,
       u.username,
       r.score,
       CASE WHEN r.score IS NULL THEN 0 ELSE 1 END as games_played,
@@ -133,10 +133,12 @@ export async function getFriendsLeaderboardRows(
     JOIN users u ON u.id = fi.friend_id
     LEFT JOIN results r ON r.user_id = u.id AND r.quiz_date = $2
     LEFT JOIN ranked ON ranked.user_id = u.id
+    WHERE u.onboarding_status = 'complete'
+      AND u.username IS NOT NULL
     ORDER BY
       CASE WHEN r.score IS NULL THEN 1 ELSE 0 END,
       ranked.rank ASC NULLS LAST,
-      u.display_name ASC NULLS LAST,
+      u.username ASC,
       u.id ASC`,
     [userId, dates.quizDate, dates.previousQuizDate]
   );

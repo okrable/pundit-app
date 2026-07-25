@@ -1,6 +1,10 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
-import { assertAuthorizedUser } from './lib/auth';
+import { requireCompletedIdentity } from './lib/identity';
+import {
+  getCompatibilityPlayerName,
+  resolveChallengeIdentity,
+} from './lib/challengeIdentity';
 
 interface DbChallenge {
   id: string;
@@ -9,10 +13,12 @@ interface DbChallenge {
   creator_id: string;
   creator_display_name: string | null;
   creator_username: string | null;
+  creator_current_username: string | null;
   creator_score: number | null;
   opponent_id: string | null;
   opponent_display_name: string | null;
   opponent_username: string | null;
+  opponent_current_username: string | null;
   opponent_score: number | null;
   status: string;
   created_at: string;
@@ -70,28 +76,48 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
     // Find active challenge (pending or active, not expired)
     const activeChallenges = await query<DbChallenge>(
-      `SELECT * FROM challenges
-       WHERE (creator_id = $1 OR opponent_id = $1)
-       AND status IN ('pending', 'active')
-       AND expires_at > NOW()
-       ORDER BY created_at DESC
+      `SELECT
+         c.*,
+         creator.username AS creator_current_username,
+         opponent.username AS opponent_current_username
+       FROM challenges c
+       LEFT JOIN users creator
+         ON creator.id = c.creator_id
+        AND creator.onboarding_status = 'complete'
+       LEFT JOIN users opponent
+         ON opponent.id = c.opponent_id
+        AND opponent.onboarding_status = 'complete'
+       WHERE (c.creator_id = $1 OR c.opponent_id = $1)
+       AND c.status IN ('pending', 'active')
+       AND c.expires_at > NOW()
+       ORDER BY c.created_at DESC
        LIMIT 1`,
       [userId]
     );
 
     // Find completed challenges (last 10)
     const completedChallenges = await query<DbChallenge>(
-      `SELECT * FROM challenges
-       WHERE (creator_id = $1 OR opponent_id = $1)
-       AND status = 'completed'
-       ORDER BY completed_at DESC
+      `SELECT
+         c.*,
+         creator.username AS creator_current_username,
+         opponent.username AS opponent_current_username
+       FROM challenges c
+       LEFT JOIN users creator
+         ON creator.id = c.creator_id
+        AND creator.onboarding_status = 'complete'
+       LEFT JOIN users opponent
+         ON opponent.id = c.opponent_id
+        AND opponent.onboarding_status = 'complete'
+       WHERE (c.creator_id = $1 OR c.opponent_id = $1)
+       AND c.status = 'completed'
+       ORDER BY c.completed_at DESC
        LIMIT 10`,
       [userId]
     );
@@ -107,14 +133,29 @@ export const handler: Handler = async (event) => {
     if (activeChallenges.length > 0) {
       const c = activeChallenges[0];
       const isCreator = c.creator_id === userId;
+      const creatorIdentity = resolveChallengeIdentity(
+        c.creator_id,
+        c.creator_current_username,
+        c.creator_username
+      );
+      const opponentIdentity = resolveChallengeIdentity(
+        c.opponent_id,
+        c.opponent_current_username,
+        c.opponent_username
+      );
       active = {
         challengeId: c.id,
         code: c.code,
         status: c.status,
-        creatorDisplayName: c.creator_display_name,
-        creatorUsername: c.creator_username,
-        opponentDisplayName: c.opponent_display_name,
-        opponentUsername: c.opponent_username,
+        creatorUsername: creatorIdentity?.username || null,
+        opponentUsername: opponentIdentity?.username || null,
+        creatorLegacyLabel: creatorIdentity?.legacyLabel || null,
+        opponentLegacyLabel: opponentIdentity?.legacyLabel || null,
+        creatorIsLegacyGuest: creatorIdentity?.isLegacyGuest || false,
+        opponentIsLegacyGuest: opponentIdentity?.isLegacyGuest || false,
+        // Deprecated compatibility fields for installed clients.
+        creatorDisplayName: getCompatibilityPlayerName(creatorIdentity),
+        opponentDisplayName: getCompatibilityPlayerName(opponentIdentity),
         isCreator,
         createdAt: c.created_at,
         expiresAt: c.expires_at,
@@ -129,8 +170,17 @@ export const handler: Handler = async (event) => {
       const isCreator = c.creator_id === userId;
       const yourScore = isCreator ? c.creator_score : c.opponent_score;
       const opponentScore = isCreator ? c.opponent_score : c.creator_score;
-      const opponentDisplayName = isCreator ? c.opponent_display_name : c.creator_display_name;
-      const opponentUsername = isCreator ? c.opponent_username : c.creator_username;
+      const opponentIdentity = isCreator
+        ? resolveChallengeIdentity(
+            c.opponent_id,
+            c.opponent_current_username,
+            c.opponent_username
+          )
+        : resolveChallengeIdentity(
+            c.creator_id,
+            c.creator_current_username,
+            c.creator_username
+          );
 
       let result: 'win' | 'loss' | 'draw' = 'draw';
       if (c.winner_id === userId) {
@@ -141,8 +191,11 @@ export const handler: Handler = async (event) => {
 
       return {
         challengeId: c.id,
-        opponentDisplayName,
-        opponentUsername,
+        opponentUsername: opponentIdentity?.username || null,
+        opponentLegacyLabel: opponentIdentity?.legacyLabel || null,
+        opponentIsLegacyGuest: opponentIdentity?.isLegacyGuest || false,
+        // Deprecated compatibility field for installed clients.
+        opponentDisplayName: getCompatibilityPlayerName(opponentIdentity),
         yourScore,
         opponentScore,
         result,

@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { assertAuthorizedUser } from './lib/auth';
+import { requireCompletedIdentity } from './lib/identity';
 import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 import {
   getFriendsLeaderboardRows,
@@ -56,9 +56,9 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
     const leaderboard = await getFriendsLeaderboardRows(

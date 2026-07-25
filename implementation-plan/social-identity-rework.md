@@ -10,8 +10,8 @@
 
 ## Delivery sequence
 
-1. Identity foundation: additive schema, verified identity synchronization, legacy backfill, and quiz persistence ownership.
-2. Social backend alignment: reusable mutual friendship invites and server-resolved usernames in leaderboards and challenges.
+1. Identity foundation: additive schema, verified identity synchronization, legacy backfill, and quiz persistence ownership. **Merged in PR #12.**
+2. Social backend alignment: reusable mutual friendship invites and server-resolved usernames in leaderboards and challenges. **In implementation.**
 3. Client activation: blocking signup onboarding and username-only UI, released as v2.0.0.
 
 The first two phases preserve legacy response fields for installed-client compatibility. Physical display-name cleanup waits until supported-client usage no longer includes a pre-v2.0.0 app for 30 consecutive days.
@@ -21,3 +21,7 @@ The first two phases preserve legacy response fields for installed-client compat
 Run `db/audits/identity_onboarding_pre.sql` immediately before migration 012,
 then run `db/audits/identity_onboarding.sql` after it. The migration is additive
 and must be applied before preview Functions exercise the new identity contract.
+
+Before phase 2 preview testing, run `db/audits/social_backend_pre.sql`, apply
+migration 013, then run `db/audits/social_backend.sql`. Existing friend links
+remain single-use; only links created after migration 013 are reusable.

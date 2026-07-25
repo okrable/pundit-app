@@ -1,6 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
-import { assertAuthorizedUser } from './lib/auth';
+import { requireCompletedIdentity } from './lib/identity';
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -41,24 +41,22 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
     // Get all friends for this user
     // Since friendships are stored with user_a < user_b, we need to check both columns
     const friends = await query<{
       id: string;
-      display_name: string | null;
-      username: string | null;
+      username: string;
       avatar_url: string | null;
       streak: number;
       friend_since: string;
     }>(
       `SELECT
         u.id,
-        u.display_name,
         u.username,
         u.avatar_url,
         u.streak,
@@ -67,19 +65,23 @@ export const handler: Handler = async (event) => {
       JOIN users u ON (
         CASE WHEN f.user_a = $1 THEN f.user_b ELSE f.user_a END = u.id
       )
-      WHERE f.user_a = $1 OR f.user_b = $1
-      ORDER BY u.username ASC NULLS LAST, u.display_name ASC NULLS LAST`,
+      WHERE (f.user_a = $1 OR f.user_b = $1)
+        AND u.onboarding_status = 'complete'
+        AND u.username IS NOT NULL
+      ORDER BY u.username ASC`,
       [userId]
     );
 
     // Format response
     const formattedFriends = friends.map((f) => ({
+      userId: f.id,
       id: f.id,
-      displayName: f.display_name,
       username: f.username,
       avatarUrl: f.avatar_url,
       streak: f.streak,
       friendSince: f.friend_since,
+      // Deprecated compatibility field for installed clients.
+      displayName: f.username,
     }));
 
     return {

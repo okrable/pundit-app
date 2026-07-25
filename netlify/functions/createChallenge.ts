@@ -1,14 +1,16 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
-import { assertAuthorizedUser } from './lib/auth';
 import { getQuizDate } from './lib/quizDate';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 import { getSiteUrl } from './lib/siteUrl';
 import { enforceRateLimit } from './lib/rateLimit';
+import { requireCompletedIdentity } from './lib/identity';
 
 interface CreateChallengeRequest {
   userId: string;
+  /** @deprecated The server resolves public identity from the bearer token. */
   displayName?: string;
+  /** @deprecated The server resolves public identity from the bearer token. */
   username?: string;
 }
 
@@ -46,7 +48,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const body: CreateChallengeRequest = JSON.parse(event.body || '{}');
-    const { userId, displayName, username } = body;
+    const { userId } = body;
 
     logRequestStart({ endpoint: 'createChallenge', requestId, userId });
 
@@ -67,9 +69,9 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
     const rateLimitError = await enforceRateLimit(event, headers, {
@@ -158,7 +160,15 @@ export const handler: Handler = async (event) => {
       `INSERT INTO challenges (code, quiz_id, quiz_date, creator_id, creator_display_name, creator_username, expires_at, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
        RETURNING id`,
-      [code, quizId, today, userId, displayName || null, username || null, expiresAt.toISOString()]
+      [
+        code,
+        quizId,
+        today,
+        userId,
+        identity.identity.username,
+        identity.identity.username,
+        expiresAt.toISOString(),
+      ]
     );
 
     const challengeId = result[0].id;
@@ -186,6 +196,9 @@ export const handler: Handler = async (event) => {
         quizId,
         expiresAt: expiresAt.toISOString(),
         questions: formattedQuestions,
+        creatorUsername: identity.identity.username,
+        // Deprecated compatibility field for installed clients.
+        creatorDisplayName: identity.identity.username,
       }),
     };
   } catch (error) {

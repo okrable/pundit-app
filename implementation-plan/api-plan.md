@@ -33,8 +33,9 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `GET /getFriendsLeaderboard?userId=...&period=daily`
 - Legacy `period=weekly` requests are tolerated and return daily leaderboard data.
 - Leaderboard responses include `period`, `quizDate`, and ranked entries.
-- Global leaderboards are public to guests and authenticated users; persisted rankings include authenticated results only.
-- Friends leaderboards require an authenticated user and include the current user plus friends, with unplayed users shown unranked.
+- Global leaderboards are public to guests and authenticated users; persisted rankings include completed authenticated username identities only.
+- Friends leaderboards require a completed username identity and include the current user plus friends, with unplayed users shown unranked.
+- `username` is the canonical name. Deprecated `displayName` fields temporarily contain the username for installed-client compatibility.
 
 ## Challenge APIs
 
@@ -44,6 +45,9 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `POST /submitChallengeAnswers`
 - `POST /revokeChallenge`
 - `GET /getUserChallenges`
+- Create/join ignore client-supplied names and resolve the player from the verified bearer token.
+- Create, join, submit, revoke, and history require a completed username identity.
+- Active, join, history, lookup, and result payloads return current usernames. Legacy guest rows return a legacy-activity label instead of an invented username.
 
 ## Friends APIs
 
@@ -51,6 +55,10 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `POST /acceptFriendLink`
 - `GET /getFriends`
 - `POST /removeFriend`
+- New invite codes are reusable for seven days and are returned again while active.
+- Previously issued codes retain single-use behavior.
+- Acceptance transactionally inserts one ordered mutual friendship row and is idempotent when the relationship already exists.
+- Friend responses use `PublicPlayer { userId, username, avatarUrl? }`; deprecated name/id aliases remain during the compatibility window.
 
 ## Operational Instrumentation
 

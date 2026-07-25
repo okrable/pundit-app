@@ -16,6 +16,17 @@ import {
   normalizeGeneratedUsernameBase,
 } from '../shared/username';
 import { chooseIdentityProvisioningAction } from '../shared/identityPolicy';
+import {
+  canReuseFriendLink,
+  decideFriendLinkAcceptance,
+  normalizeSocialCode,
+  orderFriendshipPair,
+} from '../shared/socialPolicy';
+import {
+  getCompatibilityPlayerName,
+  LEGACY_GUEST_LABEL,
+  resolveChallengeIdentity,
+} from '../netlify/functions/lib/challengeIdentity';
 
 test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(undefined), 60);
@@ -172,4 +183,97 @@ test('keeps incomplete signup onboarding blocking across later restores', () => 
     }),
     'generate_username'
   );
+});
+
+test('orders mutual friendships and reuses only active reusable links', () => {
+  assert.deepEqual(orderFriendshipPair('auth0|z', 'auth0|a'), [
+    'auth0|a',
+    'auth0|z',
+  ]);
+  assert.equal(normalizeSocialCode(' abcd2345 '), 'ABCD2345');
+  assert.equal(
+    canReuseFriendLink({
+      isReusable: true,
+      expiresAt: '2026-07-26T12:00:00.000Z',
+      now: new Date('2026-07-25T12:00:00.000Z'),
+    }),
+    true
+  );
+  assert.equal(
+    canReuseFriendLink({
+      isReusable: false,
+      expiresAt: '2026-07-26T12:00:00.000Z',
+      now: new Date('2026-07-25T12:00:00.000Z'),
+    }),
+    false
+  );
+  assert.equal(
+    canReuseFriendLink({
+      isReusable: true,
+      expiresAt: '2026-07-24T12:00:00.000Z',
+      now: new Date('2026-07-25T12:00:00.000Z'),
+    }),
+    false
+  );
+
+  assert.equal(
+    decideFriendLinkAcceptance({
+      isExpired: false,
+      isSelf: false,
+      alreadyFriends: false,
+      isReusable: true,
+      usedBy: null,
+    }),
+    'create_friendship'
+  );
+  assert.equal(
+    decideFriendLinkAcceptance({
+      isExpired: false,
+      isSelf: false,
+      alreadyFriends: true,
+      isReusable: false,
+      usedBy: 'auth0|someone-else',
+    }),
+    'already_friends'
+  );
+  assert.equal(
+    decideFriendLinkAcceptance({
+      isExpired: false,
+      isSelf: false,
+      alreadyFriends: false,
+      isReusable: false,
+      usedBy: 'auth0|first-user',
+    }),
+    'used_legacy'
+  );
+  assert.equal(
+    decideFriendLinkAcceptance({
+      isExpired: true,
+      isSelf: false,
+      alreadyFriends: false,
+      isReusable: true,
+      usedBy: null,
+    }),
+    'expired'
+  );
+});
+
+test('uses current challenge usernames and labels legacy guest history', () => {
+  const current = resolveChallengeIdentity(
+    'auth0|player',
+    'current_name',
+    'old_name'
+  );
+  assert.equal(current?.username, 'current_name');
+  assert.equal(getCompatibilityPlayerName(current), 'current_name');
+
+  const legacyGuest = resolveChallengeIdentity(
+    'guest_123',
+    null,
+    null
+  );
+  assert.equal(legacyGuest?.username, null);
+  assert.equal(legacyGuest?.isLegacyGuest, true);
+  assert.equal(legacyGuest?.legacyLabel, LEGACY_GUEST_LABEL);
+  assert.equal(getCompatibilityPlayerName(legacyGuest), LEGACY_GUEST_LABEL);
 });
