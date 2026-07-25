@@ -114,6 +114,14 @@ export interface SetUsernameResponse {
   error?: string;
 }
 
+export type IdentityOnboardingStatus = 'username_required' | 'complete';
+
+export interface SyncIdentityResponse {
+  username: string | null;
+  usernameRequired: boolean;
+  onboardingStatus: IdentityOnboardingStatus;
+}
+
 export interface UpdateProfileResponse {
   success: boolean;
   profile?: {

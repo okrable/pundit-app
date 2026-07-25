@@ -17,7 +17,11 @@ db/
 │   ├── 008_friendships.sql
 │   ├── 009_leaderboard_indexes.sql
 │   ├── 010_api_rate_limits.sql
-│   └── 011_anonymous_analytics.sql
+│   ├── 011_anonymous_analytics.sql
+│   └── 012_identity_onboarding.sql
+├── audits/
+│   ├── identity_onboarding_pre.sql
+│   └── identity_onboarding.sql
 ├── queries/
 └── README.md
 ```
@@ -38,6 +42,7 @@ cockroach sql --url "$DATABASE_URL" < db/migrations/008_friendships.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/009_leaderboard_indexes.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/010_api_rate_limits.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/011_anonymous_analytics.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/012_identity_onboarding.sql
 ```
 
 ## Tables Overview
@@ -62,6 +67,8 @@ The `pu_player_ques` table is the existing daily quiz source table and is not ma
 - Authenticated daily quiz results persist in `results`.
 - Guest daily results are local-only until login migration/adoption.
 - User aggregate stats are server-authoritative for authenticated users.
+- Authenticated identity synchronization owns user-row creation and username onboarding.
+- `onboarding_status = 'complete'` requires a canonical public username.
 - Challenge W/L/D counters live on `users`.
 - Challenge participant usernames are copied onto challenge rows for stable history display.
 - Analytics events contain no user IDs, email addresses, codes, answers, or free-form metadata.

@@ -1,7 +1,7 @@
 import { Handler } from '@netlify/functions';
-import { assertAuthorizedUser } from './lib/auth';
 import { queryWithClient, withTransaction } from './lib/db';
 import { getPreviousQuizDate } from './lib/quizDate';
+import { requireCompletedIdentity } from './lib/identity';
 
 interface FinalizeStatsRequest {
   quizId: string;
@@ -34,7 +34,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const body: FinalizeStatsRequest = JSON.parse(event.body || '{}');
-    const { quizId, userId, userProfile } = body;
+    const { quizId, userId } = body;
 
     if (!quizId || !userId) {
       return {
@@ -52,25 +52,15 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: true });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
     const quizDate = quizId.replace('quiz-', '');
     const previousQuizDate = getPreviousQuizDate(quizDate);
 
     const updated = await withTransaction(async (client) => {
-      await queryWithClient(
-        client,
-        `INSERT INTO users (id, display_name, email, avatar_url, created_at)
-         VALUES ($1, $2, $3, $4, now())
-         ON CONFLICT (id) DO UPDATE SET
-           email = COALESCE(EXCLUDED.email, users.email),
-           avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url)`,
-        [userId, userProfile?.displayName || null, userProfile?.email || null, userProfile?.avatarUrl || null]
-      );
-
       const resultRows = await queryWithClient<{
         score: number;
         answers: boolean[];

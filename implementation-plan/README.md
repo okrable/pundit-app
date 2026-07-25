@@ -17,6 +17,7 @@
 - Cached completed screen for already-played daily state.
 - Guest mode with local-only daily results.
 - Auth0 accounts, Me profile, username/display-name support, and settings.
+- Social identity rework is staged through the canonical username and onboarding contract in `social-identity-rework.md`.
 - Centralized auth flow with post-login quiz reconciliation and first data prefetch behind `AuthSyncScreen`.
 - Guest-to-auth daily result migration/adoption where applicable.
 - Daily global leaderboard, friends leaderboard, friend links, and async challenge mode.

@@ -1,7 +1,8 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
-import { assertAuthorizedUser } from './lib/auth';
+import { authorizeUser } from './lib/auth';
 import { enforceRateLimit } from './lib/rateLimit';
+import { syncIdentityRecord } from './lib/identity';
 
 // Username validation rules (same as checkUsername)
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$/;
@@ -48,9 +49,9 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const authorization = await authorizeUser(event, userId, headers);
+    if (authorization.response) {
+      return authorization.response;
     }
 
     const rateLimitError = await enforceRateLimit(event, headers, {
@@ -62,6 +63,10 @@ export const handler: Handler = async (event) => {
     if (rateLimitError) {
       return rateLimitError;
     }
+
+    // Identity synchronization owns user-row creation. Calling this with signup
+    // intent also keeps direct/older setUsername clients compatible.
+    await syncIdentityRecord(authorization.user, 'signup');
 
     // Normalize for validation and storage
     const normalized = username.toLowerCase().trim();
@@ -143,17 +148,17 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Atomic update with uniqueness check
-    // Use upsert to handle both new and existing users
+    // Atomic update with uniqueness check. Identity synchronization above
+    // guarantees the user row exists.
     try {
       await query(
-        `INSERT INTO users (id, username, username_normalized, username_last_changed_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (id) DO UPDATE SET
+        `UPDATE users SET
            username = $2,
-           username_normalized = $3,
-           username_last_changed_at = NOW()`,
-        [userId, username, normalized]
+           username_normalized = $2,
+           username_last_changed_at = NOW(),
+           onboarding_status = 'complete'
+         WHERE id = $1`,
+        [userId, normalized]
       );
 
       return {
@@ -161,7 +166,7 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({
           success: true,
-          username: username,
+          username: normalized,
         }),
       };
     } catch (err: any) {

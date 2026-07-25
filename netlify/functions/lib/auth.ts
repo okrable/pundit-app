@@ -1,7 +1,14 @@
 import type { HandlerEvent, HandlerResponse } from '@netlify/functions';
 
-interface Auth0UserInfo {
+export interface Auth0UserInfo {
   sub: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+}
+
+interface Auth0UserInfoPayload extends Partial<Auth0UserInfo> {
+  email_verified?: boolean;
 }
 
 interface AuthorizeOptions {
@@ -34,16 +41,75 @@ async function fetchAuth0UserInfo(accessToken: string): Promise<Auth0UserInfo | 
       return null;
     }
 
-    const data = (await response.json()) as Partial<Auth0UserInfo>;
+    const data = (await response.json()) as Auth0UserInfoPayload;
     if (!data.sub || typeof data.sub !== 'string') {
       return null;
     }
 
-    return { sub: data.sub };
+    const verifiedEmail =
+      data.email_verified === true && typeof data.email === 'string'
+        ? data.email
+        : undefined;
+
+    return {
+      sub: data.sub,
+      email: verifiedEmail,
+      name: typeof data.name === 'string' ? data.name : undefined,
+      picture: typeof data.picture === 'string' ? data.picture : undefined,
+    };
   } catch (error) {
     console.error('Auth0 token verification failed:', error);
     return null;
   }
+}
+
+export type AuthorizedUserResult =
+  | { user: Auth0UserInfo; response: null }
+  | { user: null; response: HandlerResponse };
+
+export async function authorizeUser(
+  event: HandlerEvent,
+  expectedUserId: string,
+  headers: Record<string, string>
+): Promise<AuthorizedUserResult> {
+  const token = getBearerToken(event);
+  if (!token) {
+    return {
+      user: null,
+      response: {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Missing or invalid Authorization header' }),
+      },
+    };
+  }
+
+  const userInfo = await fetchAuth0UserInfo(token);
+  if (!userInfo) {
+    return {
+      user: null,
+      response: {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid or expired access token' }),
+      },
+    };
+  }
+
+  if (userInfo.sub !== expectedUserId) {
+    return {
+      user: null,
+      response: {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({
+          error: 'Authenticated user does not match requested userId',
+        }),
+      },
+    };
+  }
+
+  return { user: userInfo, response: null };
 }
 
 export async function assertAuthorizedUser(
@@ -58,31 +124,6 @@ export async function assertAuthorizedUser(
     return null;
   }
 
-  const token = getBearerToken(event);
-  if (!token) {
-    return {
-      statusCode: 401,
-      headers,
-      body: JSON.stringify({ error: 'Missing or invalid Authorization header' }),
-    };
-  }
-
-  const userInfo = await fetchAuth0UserInfo(token);
-  if (!userInfo) {
-    return {
-      statusCode: 401,
-      headers,
-      body: JSON.stringify({ error: 'Invalid or expired access token' }),
-    };
-  }
-
-  if (userInfo.sub !== expectedUserId) {
-    return {
-      statusCode: 403,
-      headers,
-      body: JSON.stringify({ error: 'Authenticated user does not match requested userId' }),
-    };
-  }
-
-  return null;
+  const authorization = await authorizeUser(event, expectedUserId, headers);
+  return authorization.response;
 }

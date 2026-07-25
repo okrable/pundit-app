@@ -1,10 +1,10 @@
 import { Handler } from '@netlify/functions';
 import { query, queryWithClient, withTransaction } from './lib/db';
-import { assertAuthorizedUser } from './lib/auth';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 import { calculateQuizPoints } from '../../shared/scoring';
 import { validateSubmittedAnswers } from '../../shared/submissionValidation';
 import { enforceRateLimit } from './lib/rateLimit';
+import { requireCompletedIdentity } from './lib/identity';
 
 interface SubmitChallengeRequest {
   challengeId: string;
@@ -122,9 +122,9 @@ export const handler: Handler = async (event) => {
       return buildBadRequest(headers, validationError);
     }
 
-    const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
-    if (authError) {
-      return authError;
+    const identity = await requireCompletedIdentity(event, userId, headers);
+    if (identity.response) {
+      return identity.response;
     }
 
     const rateLimitError = await enforceRateLimit(event, headers, {
@@ -299,12 +299,11 @@ export const handler: Handler = async (event) => {
           const creatorDraws = result.creatorResult === 'draw' ? 1 : 0;
           await queryWithClient(
             client,
-            `INSERT INTO users (id, challenge_wins, challenge_losses, challenge_draws)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (id) DO UPDATE SET
-               challenge_wins = users.challenge_wins + $2,
-               challenge_losses = users.challenge_losses + $3,
-               challenge_draws = users.challenge_draws + $4`,
+            `UPDATE users SET
+               challenge_wins = COALESCE(challenge_wins, 0) + $2,
+               challenge_losses = COALESCE(challenge_losses, 0) + $3,
+               challenge_draws = COALESCE(challenge_draws, 0) + $4
+             WHERE id = $1`,
             [updatedChallenge.creator_id, creatorWins, creatorLosses, creatorDraws]
           );
 
@@ -314,12 +313,11 @@ export const handler: Handler = async (event) => {
             const opponentDraws = result.opponentResult === 'draw' ? 1 : 0;
             await queryWithClient(
               client,
-              `INSERT INTO users (id, challenge_wins, challenge_losses, challenge_draws)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT (id) DO UPDATE SET
-                 challenge_wins = users.challenge_wins + $2,
-                 challenge_losses = users.challenge_losses + $3,
-                 challenge_draws = users.challenge_draws + $4`,
+              `UPDATE users SET
+                 challenge_wins = COALESCE(challenge_wins, 0) + $2,
+                 challenge_losses = COALESCE(challenge_losses, 0) + $3,
+                 challenge_draws = COALESCE(challenge_draws, 0) + $4
+               WHERE id = $1`,
               [updatedChallenge.opponent_id, opponentWins, opponentLosses, opponentDraws]
             );
           }

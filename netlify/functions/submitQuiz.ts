@@ -1,11 +1,11 @@
 import { Handler } from '@netlify/functions';
-import { assertAuthorizedUser } from './lib/auth';
 import { query, queryWithClient, withTransaction } from './lib/db';
 import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 import { calculateQuizPoints } from '../../shared/scoring';
 import { validateSubmittedAnswers } from '../../shared/submissionValidation';
 import { enforceRateLimit } from './lib/rateLimit';
+import { requireCompletedIdentity } from './lib/identity';
 
 interface SubmitQuizRequest {
   quizId: string;
@@ -91,7 +91,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const body: SubmitQuizRequest = JSON.parse(event.body || '{}');
-    const { quizId, userId, answers, userProfile } = body;
+    const { quizId, userId, answers } = body;
     logRequestStart({ endpoint: 'submitQuiz', requestId, userId });
 
     if (!quizId || !userId) {
@@ -112,9 +112,15 @@ export const handler: Handler = async (event) => {
     }
     mark('validate');
 
-    const authError = await assertAuthorizedUser(event, userId, baseHeaders, { allowGuest: true });
-    if (authError) {
-      return authError;
+    if (!userId.startsWith('guest_')) {
+      const identity = await requireCompletedIdentity(
+        event,
+        userId,
+        baseHeaders
+      );
+      if (identity.response) {
+        return identity.response;
+      }
     }
     mark('auth');
 
@@ -219,20 +225,7 @@ export const handler: Handler = async (event) => {
         dbTimings[name] = (dbTimings[name] || 0) + (Date.now() - startedAt);
       };
 
-      // Required for FK on results.user_id and keeps profile fields fresh.
       let t = Date.now();
-      await queryWithClient(
-        client,
-        `INSERT INTO users (id, display_name, email, avatar_url, created_at)
-         VALUES ($1, $2, $3, $4, now())
-         ON CONFLICT (id) DO UPDATE SET
-           email = COALESCE(EXCLUDED.email, users.email),
-           avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url)`,
-        [userId, userProfile?.displayName || null, userProfile?.email || null, userProfile?.avatarUrl || null]
-      );
-      dbMark('user_upsert', t);
-
-      t = Date.now();
       const inserted = await queryWithClient<InsertedResultRow>(
         client,
         `INSERT INTO results (user_id, quiz_id, quiz_date, score, total_questions, answers)

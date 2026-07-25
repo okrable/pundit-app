@@ -10,6 +10,7 @@ import {
   AnswerWithTiming,
   CheckUsernameResponse,
   SetUsernameResponse,
+  SyncIdentityResponse,
   UpdateProfileResponse,
   CreateFriendLinkResponse,
   AcceptFriendLinkResponse,
@@ -381,6 +382,16 @@ export async function setUsername(userId: string, username: string): Promise<Set
   return fetchApi<SetUsernameResponse>('/setUsername', {
     method: 'POST',
     body: JSON.stringify({ userId, username }),
+  });
+}
+
+export async function syncIdentity(
+  userId: string,
+  intent: 'signup' | 'login' | 'restore'
+): Promise<SyncIdentityResponse> {
+  return fetchApi<SyncIdentityResponse>('/syncIdentity', {
+    method: 'POST',
+    body: JSON.stringify({ userId, intent }),
   });
 }
 
