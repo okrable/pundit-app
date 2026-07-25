@@ -69,18 +69,14 @@ export const handler: Handler = async (event) => {
       [userA, userB]
     );
 
-    if (result.length === 0) {
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: 'Friendship not found' }),
-      };
-    }
-
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true, friendId }),
+      body: JSON.stringify({
+        success: true,
+        friendId,
+        alreadyRemoved: result.length === 0,
+      }),
     };
   } catch (error) {
     console.error('Error removing friend:', error);

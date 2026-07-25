@@ -16,6 +16,10 @@
 
 The first two phases preserve legacy response fields for installed-client compatibility. Physical display-name cleanup waits until supported-client usage no longer includes a pre-v2.0.0 app for 30 consecutive days.
 
+Friendship removal deletes the single ordered mutual row and is idempotent. A
+retry reports success when an earlier slow request already completed, preventing
+stale clients from becoming stuck after a timeout.
+
 ## Runtime gate
 
 Run `db/audits/identity_onboarding_pre.sql` immediately before migration 012,

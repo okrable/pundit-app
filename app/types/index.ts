@@ -319,6 +319,8 @@ export interface GetFriendsResponse {
 
 export interface RemoveFriendResponse {
   success: boolean;
+  friendId?: string;
+  alreadyRemoved?: boolean;
   error?: string;
 }
 
