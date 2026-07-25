@@ -140,13 +140,26 @@ Log in to Expo:
 npm run eas:login
 ```
 
+Build for the iOS Simulator without an Apple Developer membership:
+
+```bash
+npm run build:ios:simulator
+```
+
+Simulator builds provide the native-app build gate when no paid Apple Developer
+team is available. Full Xcode is required to install and run the resulting app
+locally.
+
 Install a build on your own iPhone first:
 
 ```bash
 npm run build:ios:device
 ```
 
-The EAS dashboard build page will provide an install link/QR code. For iOS internal distribution, EAS may ask to register your device UDID and create ad hoc signing credentials.
+The EAS dashboard build page will provide an install link/QR code. iOS device
+and TestFlight builds require a paid Apple Developer membership. For internal
+distribution, EAS may ask to register your device UDID and create ad hoc signing
+credentials.
 
 Send a build to TestFlight:
 
