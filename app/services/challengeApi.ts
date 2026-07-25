@@ -12,7 +12,7 @@ const CHALLENGE_TIMEOUT_MS = 15000;
 const CHALLENGE_SUBMIT_TIMEOUT_MS = 20000;
 
 export const challengeApi = {
-  async createChallenge(userId: string, _displayName?: string): Promise<CreateChallengeResponse> {
+  async createChallenge(userId: string): Promise<CreateChallengeResponse> {
     return fetchApi<CreateChallengeResponse>(
       '/createChallenge',
       {
@@ -31,7 +31,7 @@ export const challengeApi = {
     );
   },
 
-  async joinChallenge(code: string, userId: string, _displayName?: string): Promise<JoinChallengeResponse> {
+  async joinChallenge(code: string, userId: string): Promise<JoinChallengeResponse> {
     return fetchApi<JoinChallengeResponse>(
       '/joinChallenge',
       {

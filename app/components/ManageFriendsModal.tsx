@@ -19,6 +19,7 @@ import { getFriends, removeFriend, createFriendLink } from '../services/api';
 import { useAuthStore } from '../state/useAuthStore';
 import Avatar from './Avatar';
 import ShareFriendLinkModal from './ShareFriendLinkModal';
+import { formatPublicPlayerName } from '../utils/publicIdentity';
 
 interface ManageFriendsModalProps {
   visible: boolean;
@@ -87,7 +88,7 @@ export default function ManageFriendsModal({
   };
 
   const handleRemoveFriend = (friend: Friend) => {
-    const friendName = friend.displayName || friend.username || 'this friend';
+    const friendName = formatPublicPlayerName(friend.username, null, 'this friend');
 
     if (Platform.OS === 'web') {
       const confirmed = typeof window !== 'undefined'
@@ -133,14 +134,13 @@ export default function ManageFriendsModal({
     <View style={styles.friendItem}>
       <Avatar
         userId={item.id}
-        displayName={item.displayName}
         username={item.username}
         imageUrl={item.avatarUrl}
         size="md"
       />
       <View style={styles.friendInfo}>
         <Text style={styles.friendName}>
-          {item.username ? `@${item.username}` : item.displayName || 'Anonymous'}
+          {formatPublicPlayerName(item.username)}
         </Text>
         <Text style={styles.friendStats}>Streak: {item.streak}</Text>
       </View>

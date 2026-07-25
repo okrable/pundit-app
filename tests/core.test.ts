@@ -15,7 +15,17 @@ import {
   chooseAvailableGeneratedUsername,
   normalizeGeneratedUsernameBase,
 } from '../shared/username';
-import { chooseIdentityProvisioningAction } from '../shared/identityPolicy';
+import {
+  chooseIdentityProvisioningAction,
+  chooseUsernameAssignmentAction,
+} from '../shared/identityPolicy';
+import { isCacheSchemaCurrent } from '../shared/cachePolicy';
+import { formatPublicPlayerName } from '../app/utils/publicIdentity';
+import {
+  canProcessProtectedAction,
+  resolveStoredIdentityStatus,
+  shouldBlockAuthenticatedNavigation,
+} from '../shared/clientIdentityPolicy';
 import {
   canReuseFriendLink,
   decideFriendLinkAcceptance,
@@ -181,8 +191,68 @@ test('keeps incomplete signup onboarding blocking across later restores', () => 
       hasUsername: false,
       intent: 'login',
     }),
-    'generate_username'
+    'require_username'
   );
+});
+
+test('makes username assignment creation-only and retry-safe', () => {
+  assert.equal(
+    chooseUsernameAssignmentAction({
+      currentUsername: null,
+      requestedUsername: 'new_player',
+      onboardingStatus: 'username_required',
+    }),
+    'assign'
+  );
+  assert.equal(
+    chooseUsernameAssignmentAction({
+      currentUsername: 'fixed_player',
+      requestedUsername: 'fixed_player',
+      onboardingStatus: 'complete',
+    }),
+    'idempotent'
+  );
+  assert.equal(
+    chooseUsernameAssignmentAction({
+      currentUsername: 'fixed_player',
+      requestedUsername: 'changed_player',
+      onboardingStatus: 'complete',
+    }),
+    'immutable'
+  );
+});
+
+test('restores and gates authenticated identity before protected work', () => {
+  assert.equal(resolveStoredIdentityStatus({}), 'unknown');
+  assert.equal(
+    resolveStoredIdentityStatus({ onboardingStatus: 'username_required' }),
+    'username_required'
+  );
+  assert.equal(
+    resolveStoredIdentityStatus({
+      username: 'complete_player',
+      onboardingStatus: 'complete',
+    }),
+    'complete'
+  );
+  assert.equal(shouldBlockAuthenticatedNavigation(true, 'username_required'), true);
+  assert.equal(shouldBlockAuthenticatedNavigation(true, 'failed'), true);
+  assert.equal(shouldBlockAuthenticatedNavigation(true, 'complete'), false);
+  assert.equal(shouldBlockAuthenticatedNavigation(false, 'unknown'), false);
+  assert.equal(canProcessProtectedAction(true, 'complete'), true);
+  assert.equal(canProcessProtectedAction(true, 'syncing'), false);
+});
+
+test('formats only canonical usernames or explicit legacy labels', () => {
+  assert.equal(formatPublicPlayerName('liam', null), '@liam');
+  assert.equal(formatPublicPlayerName(null, 'Legacy guest'), 'Legacy guest');
+  assert.equal(formatPublicPlayerName(null, null, 'Opponent'), 'Opponent');
+});
+
+test('upgrades social cache schemas without invalidating version-one quiz resources', () => {
+  assert.equal(isCacheSchemaCurrent(1, 1), true);
+  assert.equal(isCacheSchemaCurrent(1, 2), false);
+  assert.equal(isCacheSchemaCurrent(2, 2), true);
 });
 
 test('orders mutual friendships and reuses only active reusable links', () => {

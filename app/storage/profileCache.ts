@@ -3,13 +3,16 @@ import { clearCachedResource, getCachedResource, setCachedResource } from './res
 
 const PROFILE_CACHE_STALE_MS = 5 * 60 * 1000;
 const PROFILE_CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
+const PROFILE_CACHE_SCHEMA_VERSION = 2;
 
 function getProfileCacheKey(userId: string): string {
   return `profile_${userId}`;
 }
 
 export async function getCachedUserStats(userId: string): Promise<CacheEnvelope<UserStats> | null> {
-  return getCachedResource<UserStats>(getProfileCacheKey(userId));
+  return getCachedResource<UserStats>(getProfileCacheKey(userId), {
+    schemaVersion: PROFILE_CACHE_SCHEMA_VERSION,
+  });
 }
 
 export async function setCachedUserStats(userId: string, stats: UserStats): Promise<void> {
@@ -17,6 +20,7 @@ export async function setCachedUserStats(userId: string, stats: UserStats): Prom
     staleInMs: PROFILE_CACHE_STALE_MS,
     expiresInMs: PROFILE_CACHE_EXPIRY_MS,
     scopeKey: userId,
+    schemaVersion: PROFILE_CACHE_SCHEMA_VERSION,
   });
 }
 

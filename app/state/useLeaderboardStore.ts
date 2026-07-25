@@ -73,7 +73,7 @@ function buildSelfOnlyFriendsResponse(userId: string): FriendsLeaderboardRespons
     leaderboard: [
       {
         userId,
-        displayName: authUser?.name ?? null,
+        displayName: authUser?.username ?? null,
         username: authUser?.username ?? null,
         score: 0,
         gamesPlayed: 0,

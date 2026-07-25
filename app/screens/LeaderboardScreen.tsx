@@ -21,6 +21,7 @@ import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import AuthSyncScreen from '../components/AuthSyncScreen';
 import { loginWithAuth0 } from '../services/authFlow';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
+import { formatPublicPlayerName } from '../utils/publicIdentity';
 
 type ViewMode = 'friends' | 'global';
 
@@ -168,14 +169,13 @@ export default function LeaderboardScreen() {
         )}
         <Avatar
           userId={item.userId}
-          displayName={item.displayName}
           username={item.username}
           size="md"
         />
         <View style={styles.playerInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.playerName}>
-              {item.username ? `@${item.username}` : item.displayName || 'Anonymous'}
+              {formatPublicPlayerName(item.username)}
             </Text>
             {isCurrentUser && <Text style={styles.youBadge}>You</Text>}
           </View>
@@ -196,13 +196,12 @@ export default function LeaderboardScreen() {
       </View>
       <Avatar
         userId={item.userId}
-        displayName={item.displayName}
         username={item.username}
         size="md"
       />
       <View style={styles.playerInfo}>
         <Text style={styles.playerName}>
-          {item.username ? `@${item.username}` : item.displayName || 'Anonymous'}
+          {formatPublicPlayerName(item.username)}
         </Text>
         <Text style={styles.playerStats}>
           {`${item.score} pts • Streak: ${item.streak}`}

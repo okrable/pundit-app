@@ -17,6 +17,7 @@ import { theme } from '../theme/theme';
 import type { ChallengeSubmitResult } from '../types';
 import Avatar from '../components/Avatar';
 import CenteredWebContent, { webContentWidth } from '../components/ResponsiveLayout';
+import { formatPublicPlayerName } from '../utils/publicIdentity';
 
 const logoImage = require('../../assets/logo/dark/pundit-black.png');
 const celebrationImage = require('../../assets/images/Asset 9.png');
@@ -44,7 +45,12 @@ export default function ChallengeResultsScreen() {
   const correctCount = result.yourAnswers.filter(answer => answer.isCorrect).length;
   const opponentCorrectCount =
     result.opponentAnswers?.filter(answer => answer.isCorrect).length ?? 0;
-  const opponentAvatarId = `opponent_${result.opponentDisplayName || opponentName || code}`;
+  const opponentLabel = formatPublicPlayerName(
+    result.opponentUsername,
+    result.opponentLegacyLabel,
+    opponentName || 'Opponent'
+  );
+  const opponentAvatarId = `opponent_${result.opponentUsername || result.opponentLegacyLabel || code}`;
 
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(code);
@@ -183,7 +189,6 @@ export default function ChallengeResultsScreen() {
               <View style={styles.playerSummary}>
                 <Avatar
                   userId={user?.sub || 'you'}
-                  displayName={user?.name}
                   username={user?.username}
                   imageUrl={user?.picture}
                   size="md"
@@ -199,7 +204,7 @@ export default function ChallengeResultsScreen() {
               <View style={styles.playerSummary}>
                 <Avatar
                   userId={opponentAvatarId}
-                  displayName={result.opponentDisplayName || opponentName}
+                  username={result.opponentUsername}
                   size="md"
                 />
                 <Text
@@ -208,7 +213,7 @@ export default function ChallengeResultsScreen() {
                   adjustsFontSizeToFit
                   minimumFontScale={0.78}
                 >
-                  {result.opponentDisplayName || opponentName || 'Opponent'}
+                  {opponentLabel}
                 </Text>
                 <Text style={styles.playerMeta}>
                   {opponentCorrectCount}/{result.opponentAnswers?.length ?? result.yourAnswers.length}
