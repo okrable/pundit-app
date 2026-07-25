@@ -40,6 +40,7 @@ export default function ChallengeResultsScreen() {
   const { result, code, opponentName } = route.params;
   const isWaiting = result.status === 'waiting';
   const isComplete = result.status === 'complete';
+  const isQueued = result.syncState === 'failed' || result.syncState === 'pending';
   const correctCount = result.yourAnswers.filter(answer => answer.isCorrect).length;
   const opponentCorrectCount =
     result.opponentAnswers?.filter(answer => answer.isCorrect).length ?? 0;
@@ -150,6 +151,14 @@ export default function ChallengeResultsScreen() {
         </View>
 
         <View style={styles.summaryCard}>
+          {isQueued && (
+            <View style={styles.syncNotice}>
+              <Ionicons name="cloud-offline-outline" size={18} color={theme.colors.accent} />
+              <Text style={styles.syncNoticeText}>
+                Your answers are saved on this device and will retry after you reconnect.
+              </Text>
+            </View>
+          )}
           <View style={styles.heroRow}>
             <Image source={celebrationImage} style={styles.celebration} resizeMode="contain" />
             <View style={styles.heroCopy}>
@@ -273,6 +282,21 @@ const styles = StyleSheet.create({
     borderColor: '#E7DFD2',
     padding: theme.spacing.md,
     gap: theme.spacing.md,
+  },
+  syncNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing.sm,
+  },
+  syncNoticeText: {
+    flex: 1,
+    color: theme.colors.textDark,
+    fontFamily: theme.fonts.gothamBook,
+    fontSize: 12,
+    lineHeight: 16,
   },
   heroRow: {
     minHeight: 88,

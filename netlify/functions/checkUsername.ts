@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
+import { enforceRateLimit } from './lib/rateLimit';
 
 // Username validation rules:
 // - 3-20 characters
@@ -37,6 +38,15 @@ export const handler: Handler = async (event) => {
         headers,
         body: JSON.stringify({ available: false, error: 'Username is required' }),
       };
+    }
+
+    const rateLimitError = await enforceRateLimit(event, headers, {
+      scope: 'check-username',
+      limit: 30,
+      windowSeconds: 60,
+    });
+    if (rateLimitError) {
+      return rateLimitError;
     }
 
     // Normalize for validation

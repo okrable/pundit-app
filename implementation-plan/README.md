@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v1.4.2 daily leaderboard simplification
+> Last updated: v1.5.0 delivery confidence and reliability
 > Status: Active product with Daily Quiz, Challenge Mode, Friends, Auth0, and refreshed gameplay shipped
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -23,13 +23,16 @@
 - Branded bootstrap, stale-first cache hydration, and debug-log export.
 - Mobile-first web shell aligned with the native bottom-tab layout.
 - Date-aware daily leaderboard caches with forced refresh after authenticated submissions.
+- Pull-request CI, uniform Netlify previews, and same-commit web/iOS validation gates.
+- Persistent retry for daily and challenge submissions.
+- Shared database-backed rate limiting on sensitive endpoints.
+- Anonymous aggregate product funnel events.
 
 ### Hardening Remaining
 
-- Broader offline retry beyond existing daily authenticated result retry.
-- Endpoint-level rate limiting and abuse controls.
-- API observability and alerting.
-- Product analytics.
+- Operational alert configuration and error-budget reporting.
+- Broader automated integration and UI coverage.
+- Test-account data governance while previews share production services.
 
 ## Canonical Docs in This Folder
 

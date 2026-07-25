@@ -13,7 +13,11 @@ db/
 │   ├── 004_online_games.sql
 │   ├── 005_challenges.sql
 │   ├── 006_usernames.sql
-│   └── 007_challenge_usernames.sql
+│   ├── 007_challenge_usernames.sql
+│   ├── 008_friendships.sql
+│   ├── 009_leaderboard_indexes.sql
+│   ├── 010_api_rate_limits.sql
+│   └── 011_anonymous_analytics.sql
 ├── queries/
 └── README.md
 ```
@@ -30,6 +34,10 @@ cockroach sql --url "$DATABASE_URL" < db/migrations/004_online_games.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/005_challenges.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/006_usernames.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/007_challenge_usernames.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/008_friendships.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/009_leaderboard_indexes.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/010_api_rate_limits.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/011_anonymous_analytics.sql
 ```
 
 ## Tables Overview
@@ -43,6 +51,9 @@ cockroach sql --url "$DATABASE_URL" < db/migrations/007_challenge_usernames.sql
 | `online_games` | Legacy multiplayer game sessions |
 | `online_game_players` | Legacy online game participants |
 | `challenges` | Async 1v1 challenge lifecycle and answer payloads |
+| `friendships` | Symmetric friend relationships |
+| `api_rate_limits` | Shared fixed-window API throttling across serverless instances |
+| `analytics_events` | Anonymous aggregate product funnel events |
 
 The `pu_player_ques` table is the existing daily quiz source table and is not managed by these migrations.
 
@@ -53,6 +64,7 @@ The `pu_player_ques` table is the existing daily quiz source table and is not ma
 - User aggregate stats are server-authoritative for authenticated users.
 - Challenge W/L/D counters live on `users`.
 - Challenge participant usernames are copied onto challenge rows for stable history display.
+- Analytics events contain no user IDs, email addresses, codes, answers, or free-form metadata.
 
 ## Dependencies
 

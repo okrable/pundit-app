@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
+import { enforceRateLimit } from './lib/rateLimit';
 
 // Username validation rules (same as checkUsername)
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$/;
@@ -50,6 +51,16 @@ export const handler: Handler = async (event) => {
     const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
     if (authError) {
       return authError;
+    }
+
+    const rateLimitError = await enforceRateLimit(event, headers, {
+      scope: 'set-username',
+      subject: userId,
+      limit: 10,
+      windowSeconds: 300,
+    });
+    if (rateLimitError) {
+      return rateLimitError;
     }
 
     // Normalize for validation and storage

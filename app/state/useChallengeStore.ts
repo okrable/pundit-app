@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { challengeApi } from '../services/challengeApi';
+import { challengeApi, ChallengeApiError } from '../services/challengeApi';
 import type {
   Question,
   ActiveChallenge,
@@ -8,6 +8,14 @@ import type {
   ChallengeSubmitResult,
   AnswerWithTiming,
 } from '../types';
+import {
+  clearPendingChallengeSubmission,
+  getPendingChallengeSubmission,
+  setPendingChallengeSubmission,
+} from '../storage/pendingChallengeSubmission';
+import { calculateQuizPoints } from '../../shared/scoring';
+import { logError, logInfo, logWarn } from '../services/debugLog';
+import { trackAnalyticsEvent } from '../services/analytics';
 
 interface CurrentChallenge {
   challengeId: string;
@@ -35,6 +43,7 @@ interface ChallengeState {
   createChallenge: (userId: string, displayName?: string) => Promise<{ code: string; shareUrl: string }>;
   joinChallenge: (code: string, userId: string, displayName?: string) => Promise<void>;
   submitAnswers: (userId: string, answers: AnswerWithTiming[]) => Promise<ChallengeSubmitResult>;
+  retryPendingSubmission: (userId: string) => Promise<void>;
   revokeChallenge: (userId: string) => Promise<void>;
   fetchUserChallenges: (userId: string) => Promise<void>;
   clearCurrentChallenge: () => void;
@@ -80,6 +89,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         },
         isLoading: false,
       });
+      trackAnalyticsEvent('challenge_created', 'authenticated');
       return { code: response.code, shareUrl: response.shareUrl };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create challenge';
@@ -102,6 +112,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         },
         isLoading: false,
       });
+      trackAnalyticsEvent('challenge_joined', 'authenticated');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to join challenge';
       set({ error: message, isLoading: false });
@@ -113,15 +124,115 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     const { currentChallenge } = get();
     if (!currentChallenge) throw new Error('No active challenge');
 
+    const localResult: ChallengeSubmitResult = {
+      status: 'waiting',
+      yourScore: answers.reduce((total, answer) => {
+        const question = currentChallenge.questions.find(
+          (item) => item.id === answer.questionId
+        );
+        return question?.correctOptionIndex === answer.selectedOptionIndex
+          ? total + calculateQuizPoints(answer.timeRemainingMs)
+          : total;
+      }, 0),
+      yourAnswers: answers.map((answer) => {
+        const question = currentChallenge.questions.find(
+          (item) => item.id === answer.questionId
+        );
+        const correctOptionIndex = question?.correctOptionIndex ?? 0;
+        return {
+          questionId: answer.questionId,
+          selectedOptionIndex: answer.selectedOptionIndex,
+          correctOptionIndex,
+          isCorrect: answer.selectedOptionIndex === correctOptionIndex,
+        };
+      }),
+      syncState: 'pending',
+    };
+
+    await setPendingChallengeSubmission({
+      userId,
+      challengeId: currentChallenge.challengeId,
+      answers,
+      localResult,
+      queuedAt: new Date().toISOString(),
+    });
+
     set({ isLoading: true, error: null });
     try {
       const result = await challengeApi.submitAnswers(currentChallenge.challengeId, userId, answers);
+      await clearPendingChallengeSubmission();
       set({ isLoading: false });
-      return result;
+      logInfo('challenge.submit.success', {
+        userId,
+        challengeId: currentChallenge.challengeId,
+        status: result.status,
+      });
+      trackAnalyticsEvent('challenge_submitted', 'authenticated');
+      return { ...result, syncState: 'synced' };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to submit answers';
       set({ error: message, isLoading: false });
-      throw error;
+      const statusCode =
+        error instanceof ChallengeApiError ? error.statusCode : undefined;
+      const retryable =
+        statusCode === undefined || statusCode === 429 || statusCode >= 500;
+      if (!retryable) {
+        await clearPendingChallengeSubmission();
+        throw error;
+      }
+      logWarn('challenge.submit.queued', {
+        userId,
+        challengeId: currentChallenge.challengeId,
+        message,
+      });
+      return { ...localResult, syncState: 'failed' };
+    }
+  },
+
+  retryPendingSubmission: async (userId) => {
+    const pending = await getPendingChallengeSubmission();
+    if (!pending || pending.userId !== userId) {
+      return;
+    }
+
+    logWarn('challenge.submit.retry.start', {
+      userId,
+      challengeId: pending.challengeId,
+    });
+
+    try {
+      await challengeApi.submitAnswers(
+        pending.challengeId,
+        pending.userId,
+        pending.answers
+      );
+      await clearPendingChallengeSubmission();
+      await get().fetchUserChallenges(userId);
+      logInfo('challenge.submit.retry.success', {
+        userId,
+        challengeId: pending.challengeId,
+      });
+    } catch (error) {
+      const statusCode =
+        error instanceof ChallengeApiError ? error.statusCode : undefined;
+      if (
+        statusCode !== undefined &&
+        statusCode !== 429 &&
+        statusCode < 500
+      ) {
+        await clearPendingChallengeSubmission();
+        logWarn('challenge.submit.retry.discarded', {
+          userId,
+          challengeId: pending.challengeId,
+          statusCode,
+        });
+        return;
+      }
+      logError('challenge.submit.retry.error', {
+        userId,
+        challengeId: pending.challengeId,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   },
 

@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
+import { enforceRateLimit } from './lib/rateLimit';
 
 interface AcceptFriendLinkRequest {
   code: string;
@@ -50,6 +51,16 @@ export const handler: Handler = async (event) => {
     const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
     if (authError) {
       return authError;
+    }
+
+    const rateLimitError = await enforceRateLimit(event, headers, {
+      scope: 'accept-friend-link',
+      subject: userId,
+      limit: 15,
+      windowSeconds: 300,
+    });
+    if (rateLimitError) {
+      return rateLimitError;
     }
 
     // Look up the friend link

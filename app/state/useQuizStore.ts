@@ -32,6 +32,9 @@ import {
 import { useProfileStore } from './useProfileStore';
 import { useLeaderboardStore } from './useLeaderboardStore';
 import { logError, logInfo, logWarn } from '../services/debugLog';
+import { calculateQuizPoints } from '../../shared/scoring';
+import { trackAnalyticsEvent } from '../services/analytics';
+import { chooseReconciliationSource } from '../../shared/reconciliation';
 
 interface QuizState {
   quiz: Quiz | null;
@@ -53,16 +56,6 @@ interface QuizState {
   submitQuizAnswers: (answers: AnswerWithTiming[], userProfile?: UserProfile) => Promise<void>;
   retryPendingSubmission: () => Promise<void>;
   resetQuiz: () => void;
-}
-
-function calculatePoints(timeRemainingMs: number | undefined): number {
-  if (timeRemainingMs === undefined) return 60;
-  const seconds = timeRemainingMs / 1000;
-  if (seconds >= 16) return 100;
-  if (seconds >= 12) return 80;
-  if (seconds >= 8) return 60;
-  if (seconds >= 4) return 40;
-  return 20;
 }
 
 function buildUserProfile(): UserProfile | undefined {
@@ -251,7 +244,12 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         }
 
         const guestResult = await getGuestTodayResult();
-        if (!guestResult) {
+        const reconciliationSource = chooseReconciliationSource({
+          hasLocalResult: false,
+          hasServerResult: false,
+          hasGuestResult: Boolean(guestResult),
+        });
+        if (reconciliationSource === 'none' || !guestResult) {
           set({
             cachedResult: null,
             result: null,
@@ -371,7 +369,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         return total;
       }
 
-      return total + calculatePoints(answer.timeRemainingMs);
+      return total + calculateQuizPoints(answer.timeRemainingMs);
     }, 0);
 
     const currentStats = useProfileStore.getState().stats;
@@ -423,6 +421,11 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       },
       submitError: null,
     });
+
+    trackAnalyticsEvent(
+      'quiz_completed',
+      userId.startsWith('guest_') ? 'guest' : 'authenticated'
+    );
 
     return localResult;
   },

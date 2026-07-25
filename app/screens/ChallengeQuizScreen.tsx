@@ -16,19 +16,12 @@ import { getUserId } from '../storage/userStorage';
 import { theme } from '../theme/theme';
 import type { AnswerWithTiming } from '../types';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
+import { calculateQuizPoints } from '../../shared/scoring';
 
 const REVEAL_SUSPENSE_DELAY = 1000;
 const RESULT_HOLD_DELAY = 1650;
 const QUESTION_EXIT_DELAY = 1700;
 const TIMER_DURATION = 20;
-
-function calculatePoints(timeRemaining: number): number {
-  if (timeRemaining >= 16) return 100;
-  if (timeRemaining >= 12) return 80;
-  if (timeRemaining >= 8) return 60;
-  if (timeRemaining >= 4) return 40;
-  return 20;
-}
 
 export default function ChallengeQuizScreen() {
   const centeredQuizStyle = useCenteredWebStyle(webContentWidth.quiz);
@@ -103,7 +96,7 @@ export default function ChallengeQuizScreen() {
     setAnswerTimings(updatedTimings);
 
     const isCorrect = currentQuestion.correctOptionIndex === optionIndex;
-    const points = isCorrect ? calculatePoints(capturedTime) : 0;
+    const points = isCorrect ? calculateQuizPoints(capturedTime * 1000) : 0;
 
     if (revealTimer.current) {
       clearTimeout(revealTimer.current);

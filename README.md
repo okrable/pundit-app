@@ -1,4 +1,4 @@
-# Pundit Trivia v1.4.2
+# Pundit Trivia v1.5.0
 
 Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScript, Netlify Functions, and CockroachDB.
 
@@ -23,7 +23,7 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 
 ## Versioning
 
-- Current app/docs version: `1.4.2`.
+- Current app/docs version: `1.5.0`.
 - `package.json`, `app.json`, and `app/constants/version.ts` must stay aligned.
 - Settings displays the app version from `APP_VERSION`.
 - Release history is tracked in `CHANGELOG.md`.
@@ -112,6 +112,21 @@ Fast mobile loop with cache clear:
 ```bash
 npm run dev:mobile
 ```
+
+## Delivery Workflow
+
+- `main` is the only permanent and production-significant branch.
+- Create short-lived, purpose-named branches from the latest `main`.
+- Open pull requests against `main`; Netlify supplies the web Deploy Preview.
+- All non-main branches use the same preview configuration regardless of branch name.
+- Use the same commit for responsive web checks and any required EAS iOS preview build.
+- CI requires unit tests, TypeScript validation, and a successful web export before merge.
+- Production deploys only from `main`.
+
+Preview builds display a badge in Settings. Web previews call their own deployed
+Functions, and generated friend/challenge URLs remain in the preview environment.
+Preview and production Functions share the configured CockroachDB/Auth0 services,
+so testing uses designated accounts and schema changes must remain backward-compatible.
 
 ## Device Builds and TestFlight
 
@@ -210,12 +225,10 @@ The `implementation-plan/` folder is the current implementation source of truth.
 
 ## Future Work
 
-- Broader offline retry beyond existing daily authenticated result retry.
-- Endpoint-level rate limiting and abuse controls.
-- API observability and alerting.
+- Operational alerts and error-budget reporting from structured API logs.
 - Push notifications.
 - Quiz archives and historical play.
-- Product analytics.
+- Funnel reporting from anonymous aggregate analytics events.
 
 ## License
 

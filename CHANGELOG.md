@@ -2,6 +2,16 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v1.5.0 - Delivery confidence and reliability
+
+- Added pull-request CI for tests, TypeScript validation, and web exports on Node 20.19.4.
+- Added a shared cross-platform test foundation for scoring, dates, links, payload validation, and identity reconciliation policy.
+- Made all non-production Netlify contexts use the same preview behavior, with visible preview identification and environment-correct API/share URLs.
+- Added persistent challenge-submission retry with idempotent server replay.
+- Added database-backed rate limits for quiz, challenge, username, and invitation operations.
+- Added anonymous aggregate analytics for quiz, authentication, and challenge funnels.
+- Documented the main-and-feature-branch delivery workflow and cross-platform release gates.
+
 ## v1.4.3 - Web shared code handling
 
 - Added web-first shared code handling for challenge links and friend invite links.

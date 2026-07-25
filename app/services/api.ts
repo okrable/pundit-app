@@ -21,7 +21,19 @@ import { useAuthStore } from '../state/useAuthStore';
 import { logError, logInfo, logWarn } from './debugLog';
 import { getQuizDate } from '../utils/quizDate';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
+function resolveApiBaseUrl(): string {
+  if (
+    process.env.EXPO_PUBLIC_APP_ENV === 'preview' &&
+    typeof window !== 'undefined' &&
+    window.location?.origin
+  ) {
+    return `${window.location.origin}/.netlify/functions`;
+  }
+
+  return process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8888/.netlify/functions';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const inflightRequests = new Map<string, Promise<unknown>>();
 const API_TIMEOUT_MS = 8000;
 const QUIZ_TIMEOUT_MS = 15000;

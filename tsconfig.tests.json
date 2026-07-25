@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".test-dist",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "target": "ES2022"
+  },
+  "include": [
+    "tests/**/*.test.ts",
+    "shared/**/*.ts",
+    "app/services/sharedCode.ts",
+    "app/utils/quizDate.ts",
+    "netlify/functions/lib/siteUrl.ts"
+  ]
+}

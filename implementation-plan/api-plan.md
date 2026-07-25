@@ -54,3 +54,5 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 
 - Core endpoints emit structured lifecycle logs with request IDs, endpoint names, status, user context where available, and duration.
 - Client-side debug logs capture API failures, auth transitions, bootstrap, daily-loop prefetch, and reconciliation behavior.
+- Sensitive submit, challenge, username, and invitation endpoints use shared database-backed fixed-window rate limits.
+- `POST /trackEvent` accepts an allowlisted anonymous event name plus actor type, platform, app version, and app environment; it never accepts user identifiers or free-form metadata.
