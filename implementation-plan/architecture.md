@@ -44,7 +44,9 @@
 - Timezone consistency: backend `QUIZ_TIMEZONE` and frontend `EXPO_PUBLIC_QUIZ_TIMEZONE` must match.
 - Ownership enforcement: protected endpoints verify Auth0 bearer tokens and require `token.sub === userId`.
 - Auth coordination: screens call the shared auth flow; they do not exchange authorization codes directly.
-- Auth sync gating: login, cached-session restore, quiz reconciliation, and first profile/leaderboard prefetch run behind loading UI before normal tabs are released.
+- Auth sync gating: login and restoration synchronize identity first. Username
+  onboarding, quiz reconciliation, and initial protected prefetch all complete
+  before normal tabs are released.
 - Auth clients: responsive web uses an Auth0 SPA client while EAS native builds
   use a Native client and the `pundit-app://callback` scheme in the same tenant.
 - Logout behavior: local app credentials are cleared without invoking hosted Auth0 browser logout.
@@ -57,8 +59,7 @@
 
 ## Known Architectural Gaps
 
-1. The client-activation phase still needs blocking username signup, username-only public UI, and social cache-version upgrades.
-2. Broader offline behavior is incomplete beyond persisted quiz/challenge submission retry.
-3. Structured logs exist, but operational alerting and error-budget reporting are not configured.
-4. Authenticated API, cache, and cross-platform UI integration coverage remains limited.
-5. Error-boundary coverage exists at the app root; finer per-screen recovery can still be added later if needed.
+1. Broader offline behavior is incomplete beyond persisted quiz/challenge submission retry.
+2. Structured logs exist, but operational alerting and error-budget reporting are not configured.
+3. Authenticated API, cache, and cross-platform UI integration coverage remains limited.
+4. Error-boundary coverage exists at the app root; finer per-screen recovery can still be added later if needed.

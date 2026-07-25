@@ -32,7 +32,8 @@
 - [x] Cached-first auth restoration with defensive 401 refresh/retry.
 - [x] Verified Auth0 identity synchronization and persisted username-onboarding state.
 - [x] Deterministic username backfill for legacy authenticated accounts.
-- [ ] Blocking post-Auth0 username onboarding and username-only client UI (v2.0.0).
+- [x] Blocking post-Auth0 username onboarding and username-only client UI (v2.0.0).
+- [x] Permanent creation-only usernames with resumable onboarding state.
 
 ### Competition
 
@@ -65,10 +66,9 @@
 
 ## Active Hardening
 
-1. Complete v2.0.0 username-only client activation and social cache-version upgrades.
-2. Configure operational alerts and error-budget reporting from structured logs.
-3. Expand automated integration and UI coverage.
-4. Formalize designated test-account cleanup while previews share production services.
+1. Configure operational alerts and error-budget reporting from structured logs.
+2. Expand automated integration and UI coverage.
+3. Formalize designated test-account cleanup while previews share production services.
 
 ## Next Feature Wave
 

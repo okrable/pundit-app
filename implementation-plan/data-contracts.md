@@ -48,6 +48,8 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - `users` stores profile and aggregate stats.
 - `users.onboarding_status` is `username_required` or `complete`; persisted
   social actions require a completed row with a username.
+- Username assignment is creation-only. Repeating the same value is idempotent;
+  a different value returns `USERNAME_IMMUTABLE`.
 - `results` stores daily quiz submissions.
 - Daily leaderboards rank a single `quiz_date` by score, then earliest submission time, then user id.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
@@ -57,3 +59,5 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - Challenge username columns are compatibility snapshots. API reads prefer the current `users.username`.
 - Deprecated display-name response fields contain usernames during the installed-client transition.
 - New client contracts use `PublicPlayer { userId, username, avatarUrl? }`.
+- Auth storage persists `username`, `usernameRequired`, and `onboardingStatus`;
+  missing legacy metadata is resynchronized before navigation.

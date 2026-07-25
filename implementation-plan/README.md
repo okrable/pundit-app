@@ -1,12 +1,12 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v1.5.0 plus unreleased identity and social alignment
-> Status: Active product; identity foundation is merged and social backend alignment is ready for review
+> Last updated: v2.0.0 username-only client activation
+> Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
 ## Recent Delivery Summary
 
-In plain English, this thread delivered three connected changes:
+In plain English, this work delivered four connected changes:
 
 1. **PR #11 — safer delivery:** `main` became the only production-significant
    branch. Every purpose-named branch receives the same Netlify preview
@@ -21,11 +21,12 @@ In plain English, this thread delivered three connected changes:
    are reusable for seven days, one ordered friendship row connects both
    players, slow removal retries are safe, remote acceptances refresh on League
    Tables focus, and web/iOS share verified Auth0 identities. Migration 013 was
-   applied and audited; the PR is ready for review.
+   applied and audited; PR #13 is merged.
 
-The remaining v2.0.0 client-activation phase will make username selection a
-blocking signup step, remove display-name UI, and invalidate legacy social
-caches. Those client changes are not yet shipped.
+4. **v2.0.0 — client activation:** authenticated sessions now synchronize
+   identity before entering the app. Incomplete accounts resume a blocking
+   username screen, usernames are permanent, public UI uses `@username`, and
+   version-1 social caches are discarded without removing quiz progress.
 
 ## Product Status Snapshot
 
@@ -39,7 +40,7 @@ caches. Those client changes are not yet shipped.
 - Immediate daily summary screen with final score, answer recap, and native text sharing.
 - Cached completed screen for already-played daily state.
 - Guest mode with local-only daily results.
-- Auth0 accounts, Me profile, transitional username/display-name UI, and settings.
+- Auth0 accounts with blocking username onboarding, username-only Me profile, and settings.
 - Verified identity synchronization and canonical server-side usernames.
 - Mutual ordered friendships with reusable seven-day invite links and retry-safe removal.
 - Server-resolved username identities across friends, persisted leaderboards, and challenges.
@@ -54,10 +55,10 @@ caches. Those client changes are not yet shipped.
 - Persistent retry for daily and challenge submissions.
 - Shared database-backed rate limiting on sensitive endpoints.
 - Anonymous aggregate product funnel events.
+- Selective version-2 social cache invalidation that preserves gameplay state.
 
 ### Hardening Remaining
 
-- Complete v2.0.0 username-only client activation and social cache-version upgrades.
 - Operational alert configuration and error-budget reporting.
 - Broader automated integration and UI coverage.
 - Test-account data governance while previews share production services.

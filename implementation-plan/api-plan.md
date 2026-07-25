@@ -9,8 +9,9 @@ All APIs are Netlify Functions under `/.netlify/functions/`.
 - Server validates Auth0 tokens through `/userinfo` and enforces `token.sub === userId`.
 - `POST /syncIdentity` creates or refreshes the authenticated user record from verified Auth0 claims and returns username onboarding state.
 - Protected identity guards return `USERNAME_REQUIRED` when signup username onboarding is incomplete.
-- Current protected social endpoints invoke the shared identity guard; wiring
-  `syncIdentity` into a blocking post-signup client screen remains phase 3.
+- Current protected social endpoints invoke the shared identity guard; the
+  client calls `syncIdentity` before authenticated reconciliation and
+  navigation.
 - Client API calls include a defensive one-time retry for refreshed or changed tokens.
 
 ## Daily Quiz APIs
@@ -28,8 +29,10 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `POST /updateProfile`
 - `GET /checkUsername`
 - `POST /setUsername`
-- `updateProfile` and display-name response fields remain compatibility
-  surfaces until the username-only v2.0.0 client is established.
+- `updateProfile` and display-name response fields remain old-client
+  compatibility surfaces; v2 does not call or render them.
+- `setUsername` assigns only an incomplete identity. Same-value retries are
+  idempotent and later changes return `USERNAME_IMMUTABLE`.
 
 ## Leaderboard APIs
 

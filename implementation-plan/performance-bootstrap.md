@@ -24,9 +24,11 @@ Login and cached-session restore both run the same authenticated sync path befor
 1. Prompt Auth0 with Expo AuthSession.
 2. Exchange the authorization code once using the matching redirect URI and PKCE verifier.
 3. Store credentials and user info.
-4. Reconcile guest/auth daily result state.
-5. Prefetch profile, quiz, global leaderboard, and friends leaderboard data.
-6. Release the UI from `AuthSyncScreen`.
+4. Synchronize verified identity with `/syncIdentity`.
+5. If required, hold the app on username onboarding; otherwise continue.
+6. Reconcile guest/auth daily result state.
+7. Prefetch profile, quiz, global leaderboard, and friends leaderboard data.
+8. Release normal navigation from `AuthSyncScreen`.
 
 Screens do not process AuthSession responses directly. Me/profile stays
 cached-first with explicit refresh, while League Tables deliberately forces a
@@ -51,6 +53,8 @@ friends refresh whenever the screen gains navigation focus.
 
 - Profile stats are cached per authenticated user.
 - Friends and global leaderboards are cached separately.
+- Profile and leaderboard envelopes require social schema version 2; quiz
+  envelopes remain on version 1.
 - Me and League Tables render cached or placeholder content before background refresh.
 - Protected profile refreshes happen during authenticated session sync or
   explicit pull-to-refresh.

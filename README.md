@@ -1,4 +1,4 @@
-# Pundit Trivia v1.5.0
+# Pundit Trivia v2.0.0
 
 Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScript, Netlify Functions, and CockroachDB.
 
@@ -15,7 +15,8 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 - Auth0 sign-in for profile stats, leaderboards, friends, and challenge mode.
 - Guest-to-auth daily result reconciliation after login.
 - Centralized auth flow with login, quiz reconciliation, and first data prefetch behind a loading interstitial.
-- Me profile page, username support, settings, debug-log export, and guest-only cache controls.
+- Blocking, resumable username onboarding before authenticated players enter the app.
+- Username-only Me profile and public identity; usernames are permanent after selection.
 - Canonical server-side username identities, with legacy display-name fields retained temporarily for installed-client compatibility.
 - Daily global leaderboard, mutual friendships with reusable seven-day invite links, and async challenge mode.
 - Server-resolved challenge usernames and username-only persisted leaderboard ranking eligibility.
@@ -26,7 +27,7 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 
 ## Versioning
 
-- Current app/docs version: `1.5.0`.
+- Current app/docs version: `2.0.0`.
 - `package.json`, `app.json`, and `app/constants/version.ts` must stay aligned.
 - Settings displays the app version from `APP_VERSION`.
 - Release history is tracked in `CHANGELOG.md`.
@@ -237,9 +238,9 @@ Core groups:
 - Operations: `trackEvent`
 
 Protected endpoints validate Auth0 bearer tokens server-side and enforce `token.sub === userId`.
-Protected social actions also require a completed identity with a username. The
-blocking signup/onboarding client flow is planned for the v2.0.0 activation
-phase; current clients retain compatibility profile/display-name behavior.
+Protected social actions require a completed identity with a username. The
+client synchronizes identity before reconciliation and navigation, then blocks
+incomplete accounts on username selection.
 
 ## Debugging
 
@@ -253,7 +254,6 @@ The `implementation-plan/` folder is the current implementation source of truth.
 
 ## Future Work
 
-- Complete the v2.0.0 client activation: blocking username onboarding, username-only public UI, and social cache-version upgrades.
 - Operational alerts and error-budget reporting from structured API logs.
 - Push notifications.
 - Quiz archives and historical play.

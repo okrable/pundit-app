@@ -65,9 +65,9 @@ Current behavior:
 ### Auth
 
 `useAuthStore` owns user/token/session state, refresh-token restore, auth-state
-versioning, and the transitional username/display-name profile state. Canonical
-public identity comes from the server-side `users.username`; removing editable
-display-name UI belongs to the v2.0.0 client-activation phase.
+versioning, and explicit identity activation state. Canonical public identity
+comes from `users.username`; v2 does not expose display-name or username-editing
+UI.
 
 Login/logout orchestration lives in `app/services/authFlow.ts`:
 
@@ -97,8 +97,8 @@ changes mid-flight. Friends data is forcibly revalidated after accept/remove
 mutations and whenever League Tables gains navigation focus, so remote
 acceptances do not wait for cache expiry.
 
-The social cache-version bump that removes old display-name payloads is part of
-the v2.0.0 client-activation phase and has not yet shipped.
+Profile and leaderboard resources use social cache schema 2. Old social
+payloads are removed lazily while quiz and result storage keeps schema 1.
 
 ## Settings
 

@@ -15,12 +15,15 @@
    migration 012 applied and audited.**
 2. Social backend alignment: reusable mutual friendship invites, ordered mutual
    relationships, username-only persisted rankings, server-resolved challenge
-   identities, focus refresh, and retry-safe removal. **Implemented in PR #13
-   and ready for review; migration 013 applied and audited.**
+   identities, focus refresh, and retry-safe removal. **Merged in PR #13;
+   migration 013 applied and audited.**
 3. Client activation: blocking signup onboarding, username-only public UI, and
-   social cache-version upgrades. **Planned as the v2.0.0 release.**
+   selective social cache-version upgrades. **Delivered in v2.0.0.**
 
-The first two phases preserve legacy response fields for installed-client compatibility. Physical display-name cleanup waits until supported-client usage no longer includes a pre-v2.0.0 app for 30 consecutive days.
+Legacy response fields remain for installed-client compatibility. Physical
+display-name cleanup waits until v2 has a distributable native release and
+supported-client usage no longer includes a pre-v2.0.0 app for 30 consecutive
+days.
 
 Friendship removal deletes the single ordered mutual row and is idempotent. A
 retry reports success when an earlier slow request already completed, preventing
@@ -55,3 +58,16 @@ links created after migration 013 are reusable.
   legacy guest activity keeps an explicit legacy label.
 - Deprecated display-name response fields contain usernames for old-client
   compatibility.
+
+## v2.0.0 client behavior
+
+- Signup, login, and restoration synchronize identity before reconciliation,
+  protected prefetching, deep links, or navigation.
+- `username_required` survives restart and presents a full-screen gate whose
+  only escape is local sign-out.
+- A username can be selected once. Same-value retries are idempotent; later
+  changes are rejected, including for generated legacy usernames.
+- Me, friends, leaderboards, avatars, and challenges render canonical usernames
+  without consuming display-name aliases.
+- Profile and leaderboard cache schema 2 invalidates old social payloads while
+  quiz, result, guest, auth, and pending-submission storage remains intact.

@@ -123,13 +123,15 @@ npm start
 4. Auth0 redirects back with an authorization code.
 5. `authFlow` exchanges the code once using PKCE.
 6. User info and credentials are stored in `useAuthStore`.
-7. Quiz identity reconciliation runs.
-8. Daily-loop profile/leaderboard data is prefetched.
-9. The UI leaves `AuthSyncScreen`.
+7. `/syncIdentity` returns the canonical username and onboarding state.
+8. Incomplete identities remain on username onboarding until selection or sign-out.
+9. Completed identities run quiz reconciliation and daily-loop prefetch.
+10. The UI leaves `AuthSyncScreen` for normal navigation.
 
-The server-side identity foundation is active. The dedicated non-dismissible
-post-signup username screen is part of the planned v2.0.0 client-activation
-phase, so do not describe current signup as fully blocking yet.
+The server-side identity foundation and v2.0.0 client activation are active.
+Signup, login, and restoration synchronize identity before normal navigation.
+An incomplete identity receives a blocking username screen with sign-out as its
+only escape.
 
 ## Session Restoration
 
