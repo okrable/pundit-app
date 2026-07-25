@@ -22,6 +22,7 @@ import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLa
 import { acceptFriendLink } from '../services/api';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { buildShareUrl, normalizeSharedCode, resolveSharedCode } from '../services/sharedCode';
+import { formatPublicPlayerName } from '../utils/publicIdentity';
 
 export default function ChallengeScreen() {
   const centeredContentStyle = useCenteredWebStyle(webContentWidth.standard);
@@ -70,8 +71,7 @@ export default function ChallengeScreen() {
     setIsCreating(true);
     clearError();
     try {
-      const displayName = user?.name;
-      const { code, shareUrl } = await createChallenge(userId, displayName);
+      const { code, shareUrl } = await createChallenge(userId);
       setCreatedCode(code);
       setCreatedShareUrl(shareUrl);
       setShowShareModal(true);
@@ -122,7 +122,9 @@ export default function ChallengeScreen() {
         const response = await acceptFriendLink(action.code, userId);
         if (response.success) {
           await useLeaderboardStore.getState().invalidateFriends(userId);
-          const friendName = response.friendDisplayName || response.friendUsername || 'your friend';
+          const friendName = response.friendUsername
+            ? `@${response.friendUsername}`
+            : 'your friend';
           Alert.alert(
             'Friend Added',
             `You and ${friendName} are now connected. Check your friends leaderboard.`,
@@ -140,7 +142,7 @@ export default function ChallengeScreen() {
         return;
       }
 
-      await joinChallenge(action.code, userId, user?.name);
+      await joinChallenge(action.code, userId);
       setJoinCode('');
       navigation.navigate('ChallengeQuiz');
     } catch (err) {
@@ -217,7 +219,11 @@ export default function ChallengeScreen() {
         />
         <View style={styles.historyInfo}>
           <Text style={styles.historyOpponent}>
-            vs {item.opponentDisplayName || 'Anonymous'}
+            vs {formatPublicPlayerName(
+              item.opponentUsername,
+              item.opponentLegacyLabel,
+              'Opponent'
+            )}
           </Text>
           <Text style={styles.historyDate}>
             {new Date(item.completedAt).toLocaleDateString()}
@@ -273,10 +279,14 @@ export default function ChallengeScreen() {
               </View>
               <Text style={styles.roleIndicator}>
                 {activeChallenge.isCreator
-                  ? activeChallenge.opponentDisplayName
-                    ? `You challenged ${activeChallenge.opponentDisplayName}`
+                  ? activeChallenge.opponentUsername
+                    ? `You challenged ${formatPublicPlayerName(activeChallenge.opponentUsername)}`
                     : 'Waiting for a challenger...'
-                  : `vs ${activeChallenge.creatorDisplayName || 'Anonymous'}`}
+                  : `vs ${formatPublicPlayerName(
+                      activeChallenge.creatorUsername,
+                      activeChallenge.creatorLegacyLabel,
+                      'Opponent'
+                    )}`}
               </Text>
               <View style={styles.codeDisplay}>
                 <Text style={styles.codeLabel}>Challenge Code</Text>

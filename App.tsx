@@ -15,6 +15,10 @@ import { prefetchDailyLoop } from './app/services/dailyLoop';
 import { theme } from './app/theme/theme';
 import { logError, logInfo, startDebugSession } from './app/services/debugLog';
 import { MobileWebAppShell } from './app/components/ResponsiveLayout';
+import UsernameOnboardingScreen from './app/components/UsernameOnboardingScreen';
+import AuthSyncScreen from './app/components/AuthSyncScreen';
+import { useAuthStore } from './app/state/useAuthStore';
+import { shouldBlockAuthenticatedNavigation } from './shared/clientIdentityPolicy';
 
 const Stack = createNativeStackNavigator();
 const navigationRef = createNavigationContainerRef<any>();
@@ -135,6 +139,27 @@ function AppContent() {
   );
 }
 
+function ReadyApp() {
+  const { isAuthenticated, identityStatus, authSyncStatus } = useAuthStore();
+
+  if (
+    shouldBlockAuthenticatedNavigation(isAuthenticated, identityStatus) ||
+    (isAuthenticated && authSyncStatus === 'failed')
+  ) {
+    return <UsernameOnboardingScreen />;
+  }
+
+  if (isAuthenticated && authSyncStatus === 'syncing') {
+    return <AuthSyncScreen />;
+  }
+
+  return (
+    <NavigationContainer ref={navigationRef}>
+      <AppContent />
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   const fontsLoaded = useFonts();
   const authReady = useAuthInit();
@@ -177,9 +202,7 @@ export default function App() {
     <SafeAreaProvider>
       <MobileWebAppShell>
         <AppErrorBoundary>
-          <NavigationContainer ref={navigationRef}>
-            <AppContent />
-          </NavigationContainer>
+          <ReadyApp />
         </AppErrorBoundary>
       </MobileWebAppShell>
     </SafeAreaProvider>

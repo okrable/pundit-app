@@ -3,8 +3,8 @@ import {
   hydrateDailyLoopFromCache,
   prefetchDailyLoop,
   resolveEffectiveUserId,
-  syncAuthenticatedSession,
 } from '../services/dailyLoop';
+import { activateAuthenticatedSession } from '../services/authFlow';
 import { useAuthStore } from '../state/useAuthStore';
 import { logError, logInfo, logWarn } from '../services/debugLog';
 
@@ -32,11 +32,11 @@ export default function useAppBootstrap(isAuthReady: boolean): boolean {
         logInfo('bootstrap.app.cache_hydrated', { userId });
 
         if (isAuthenticated && user?.sub && token) {
-          await syncAuthenticatedSession({
+          await activateAuthenticatedSession({
             userId: user.sub,
+            intent: 'restore',
             source: 'restore',
             userProfile: {
-              displayName: user.name,
               email: user.email,
               avatarUrl: user.picture,
             },

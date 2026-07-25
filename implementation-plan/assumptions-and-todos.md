@@ -23,8 +23,8 @@
 - [x] Add pull-request CI and shared behavior tests.
 - [x] Add verified identity synchronization and canonical social username guards.
 - [x] Align mutual friendships, leaderboards, and challenges on server-resolved usernames.
-- [ ] Complete blocking username onboarding and username-only client activation for v2.0.0.
-- [ ] Bump social cache versions when the username-only client activates.
+- [x] Complete blocking username onboarding and username-only client activation for v2.0.0.
+- [x] Bump profile and leaderboard cache schemas without invalidating gameplay state.
 
 ### Medium Priority
 
@@ -44,8 +44,9 @@
 2. Error boundary coverage exists at the app root; finer per-screen recovery can still be added later if needed.
 3. Rate-limit rows require routine expiry cleanup as traffic grows.
 4. Release history before v1.1.0 is milestone-based rather than tag/date-based.
-5. Display-name columns and response aliases remain until supported-client
-   analytics show no pre-v2.0.0 use for 30 consecutive days.
+5. Display-name columns and response aliases remain until v2 is distributable
+   natively and supported-client analytics show no pre-v2.0.0 use for 30
+   consecutive days.
 
 ## Documentation Discipline
 

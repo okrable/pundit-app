@@ -40,8 +40,8 @@ interface ChallengeState {
   error: string | null;
 
   // Actions
-  createChallenge: (userId: string, displayName?: string) => Promise<{ code: string; shareUrl: string }>;
-  joinChallenge: (code: string, userId: string, displayName?: string) => Promise<void>;
+  createChallenge: (userId: string) => Promise<{ code: string; shareUrl: string }>;
+  joinChallenge: (code: string, userId: string) => Promise<void>;
   submitAnswers: (userId: string, answers: AnswerWithTiming[]) => Promise<ChallengeSubmitResult>;
   retryPendingSubmission: (userId: string) => Promise<void>;
   revokeChallenge: (userId: string) => Promise<void>;
@@ -59,10 +59,10 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  createChallenge: async (userId, displayName) => {
+  createChallenge: async (userId) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await challengeApi.createChallenge(userId, displayName);
+      const response = await challengeApi.createChallenge(userId);
       set({
         currentChallenge: {
           challengeId: response.challengeId,
@@ -78,7 +78,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           shareUrl: response.shareUrl,
           status: 'pending',
           // Compatibility display field is server-resolved username.
-          creatorDisplayName: response.creatorDisplayName,
+          creatorDisplayName: response.creatorUsername,
           creatorUsername: response.creatorUsername,
           opponentUsername: null,
           isCreator: true,
@@ -99,17 +99,19 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     }
   },
 
-  joinChallenge: async (code, userId, displayName) => {
+  joinChallenge: async (code, userId) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await challengeApi.joinChallenge(code, userId, displayName);
+      const response = await challengeApi.joinChallenge(code, userId);
       set({
         currentChallenge: {
           challengeId: response.challengeId,
           code,
           questions: response.questions,
           isCreator: false,
-          opponentName: response.creator.displayName,
+          opponentName: response.creator.username
+            ? `@${response.creator.username}`
+            : response.creator.legacyLabel || null,
         },
         isLoading: false,
       });

@@ -19,7 +19,6 @@ interface PrefetchOptions {
 interface AuthenticatedSessionSyncOptions {
   userId: string;
   userProfile?: {
-    displayName?: string;
     email?: string;
     avatarUrl?: string;
   };

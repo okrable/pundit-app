@@ -1,20 +1,29 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CacheEnvelope } from '../types';
+import { isCacheSchemaCurrent } from '../../shared/cachePolicy';
 
 const RESOURCE_CACHE_PREFIX = '@pundit_resource_';
-const CACHE_VERSION = 1;
+const DEFAULT_CACHE_VERSION = 1;
+
+interface CacheReadOptions {
+  schemaVersion?: number;
+}
 
 interface CacheWriteOptions {
   staleInMs: number;
   expiresInMs?: number;
   scopeKey?: string;
+  schemaVersion?: number;
 }
 
 function getCacheKey(key: string): string {
   return `${RESOURCE_CACHE_PREFIX}${key}`;
 }
 
-export async function getCachedResource<T>(key: string): Promise<CacheEnvelope<T> | null> {
+export async function getCachedResource<T>(
+  key: string,
+  options: CacheReadOptions = {}
+): Promise<CacheEnvelope<T> | null> {
   try {
     const raw = await AsyncStorage.getItem(getCacheKey(key));
     if (!raw) {
@@ -22,7 +31,8 @@ export async function getCachedResource<T>(key: string): Promise<CacheEnvelope<T
     }
 
     const cached = JSON.parse(raw) as CacheEnvelope<T>;
-    if (cached.version !== CACHE_VERSION) {
+    const expectedVersion = options.schemaVersion ?? DEFAULT_CACHE_VERSION;
+    if (!isCacheSchemaCurrent(cached.version, expectedVersion)) {
       await AsyncStorage.removeItem(getCacheKey(key));
       return null;
     }
@@ -51,7 +61,7 @@ export async function setCachedResource<T>(
       cachedAt: new Date(now).toISOString(),
       staleAt: new Date(now + options.staleInMs).toISOString(),
       expiresAt: options.expiresInMs ? new Date(now + options.expiresInMs).toISOString() : null,
-      version: CACHE_VERSION,
+      version: options.schemaVersion ?? DEFAULT_CACHE_VERSION,
       scopeKey: options.scopeKey,
     };
 

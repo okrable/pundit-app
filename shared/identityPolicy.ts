@@ -18,8 +18,30 @@ export function chooseIdentityProvisioningAction({
   if (hasUserRow && onboardingStatus === 'username_required') {
     return 'require_username';
   }
-  if (!hasUserRow && intent === 'signup') {
+  if (!hasUserRow) {
     return 'require_username';
   }
   return 'generate_username';
+}
+
+export type UsernameAssignmentAction = 'assign' | 'idempotent' | 'immutable';
+
+export function chooseUsernameAssignmentAction({
+  currentUsername,
+  requestedUsername,
+  onboardingStatus,
+}: {
+  currentUsername: string | null;
+  requestedUsername: string;
+  onboardingStatus: 'username_required' | 'complete';
+}): UsernameAssignmentAction {
+  if (currentUsername?.toLowerCase() === requestedUsername.toLowerCase()) {
+    return 'idempotent';
+  }
+
+  if (currentUsername || onboardingStatus === 'complete') {
+    return 'immutable';
+  }
+
+  return 'assign';
 }

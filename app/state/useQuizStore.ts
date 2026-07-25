@@ -65,7 +65,6 @@ function buildUserProfile(): UserProfile | undefined {
   }
 
   return {
-    displayName: authState.user.name,
     email: authState.user.email,
     avatarUrl: authState.user.picture,
   };

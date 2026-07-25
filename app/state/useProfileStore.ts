@@ -16,7 +16,7 @@ const GUEST_STATS: UserStats = {
   username: null,
   displayName: null,
   createdAt: null,
-  canChangeUsername: true,
+  canChangeUsername: false,
   usernameChangeAvailableAt: null,
 };
 

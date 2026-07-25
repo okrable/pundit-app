@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -17,12 +17,11 @@ import { theme } from '../theme/theme';
 import { UserStats } from '../types';
 import SettingsModal from '../components/SettingsModal';
 import Avatar from '../components/Avatar';
-import UsernameModal from '../components/UsernameModal';
-import EditProfileModal from '../components/EditProfileModal';
 import { useProfileStore } from '../state/useProfileStore';
 import AuthSyncScreen from '../components/AuthSyncScreen';
 import { loginWithAuth0 } from '../services/authFlow';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
+import { formatPublicPlayerName } from '../utils/publicIdentity';
 
 const EMPTY_STATS: UserStats = {
   streak: 0,
@@ -34,27 +33,21 @@ const EMPTY_STATS: UserStats = {
   username: null,
   displayName: null,
   createdAt: null,
-  canChangeUsername: true,
+  canChangeUsername: false,
   usernameChangeAvailableAt: null,
 };
 
 export default function MeScreen() {
   const centeredProfileStyle = useCenteredWebStyle(webContentWidth.standard);
-  const { stats, statsUserId, playedToday, revalidate, loading: profileLoading } = useProfileStore();
+  const { stats, playedToday, revalidate } = useProfileStore();
   const {
     user,
     isAuthenticated,
     isAuth0Available,
-    token,
     forceInteractiveAuth,
-    setUsername,
-    setDisplayName,
-    setUsernameRequired,
   } = useAuthStore();
   const [authLoadingIntent, setAuthLoadingIntent] = useState<'signup' | 'login' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [signupRequest, , promptSignup] = useAuthRequest({
@@ -65,33 +58,6 @@ export default function MeScreen() {
     intent: 'login',
     forceInteractive: true,
   });
-
-  useEffect(() => {
-    if (!isAuthenticated || !user || !token || !stats || profileLoading || statsUserId !== user.sub) {
-      return;
-    }
-
-    if (stats.username && stats.username !== user.username) {
-      setUsername(stats.username);
-    } else if (user.usernameRequired && !user.username) {
-      setUsernameRequired(true);
-      setShowUsernameModal(true);
-    }
-
-    if (stats.displayName && stats.displayName !== user.name) {
-      setDisplayName(stats.displayName);
-    }
-  }, [
-    isAuthenticated,
-    setDisplayName,
-    setUsername,
-    setUsernameRequired,
-    stats,
-    statsUserId,
-    token,
-    user,
-    profileLoading,
-  ]);
 
   const handleSignup = async () => {
     setAuthLoadingIntent('signup');
@@ -136,19 +102,6 @@ export default function MeScreen() {
     } finally {
       setRefreshing(false);
     }
-  };
-
-  const handleUsernameSuccess = (username: string) => {
-    setUsername(username);
-    setShowUsernameModal(false);
-  };
-
-  const handleDisplayNameChange = (name: string) => {
-    setDisplayName(name);
-  };
-
-  const handleUsernameChange = (username: string) => {
-    setUsername(username);
   };
 
   const getStreakMessage = (streak: number): string => {
@@ -258,23 +211,13 @@ export default function MeScreen() {
         <View style={styles.profileSection}>
           <Avatar
             userId={user?.sub || ''}
-            displayName={localStats.displayName || user?.name}
             username={localStats.username || user?.username}
             imageUrl={user?.picture}
             size="xl"
           />
-          <Text style={styles.displayName}>
-            {localStats.displayName || user?.name || user?.email || 'Player'}
+          <Text style={styles.username}>
+            {formatPublicPlayerName(localStats.username || user?.username)}
           </Text>
-          {(localStats.username || user?.username) && (
-            <Text style={styles.username}>@{localStats.username || user?.username}</Text>
-          )}
-          <TouchableOpacity
-            style={styles.editProfileButton}
-            onPress={() => setShowEditProfileModal(true)}
-          >
-            <Text style={styles.editProfileButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.statsSection}>
@@ -333,24 +276,6 @@ export default function MeScreen() {
         onClose={() => setSettingsVisible(false)}
       />
 
-      <UsernameModal
-        visible={showUsernameModal}
-        onClose={() => setShowUsernameModal(false)}
-        onSuccess={handleUsernameSuccess}
-        currentUsername={localStats.username || user?.username}
-        isRequired={user?.usernameRequired}
-      />
-
-      <EditProfileModal
-        visible={showEditProfileModal}
-        onClose={() => setShowEditProfileModal(false)}
-        currentDisplayName={localStats.displayName || user?.name}
-        currentUsername={localStats.username || user?.username}
-        canChangeUsername={localStats.canChangeUsername}
-        usernameChangeAvailableAt={localStats.usernameChangeAvailableAt}
-        onDisplayNameChange={handleDisplayNameChange}
-        onUsernameChange={handleUsernameChange}
-      />
     </SafeAreaView>
   );
 }
@@ -422,29 +347,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: theme.spacing.xl,
   },
-  displayName: {
+  username: {
     fontSize: 22,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
     marginTop: theme.spacing.md,
-  },
-  username: {
-    fontSize: 15,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.mediumGray,
-    marginTop: theme.spacing.xs,
-  },
-  editProfileButton: {
-    marginTop: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.md,
-  },
-  editProfileButtonText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.gothamMedium,
-    color: theme.colors.primary,
   },
   statsSection: {
     marginBottom: theme.spacing.xl,

@@ -19,6 +19,7 @@ import { theme } from '../theme/theme';
 import { clearDebugLogs, getDebugLogText, logInfo } from '../services/debugLog';
 import { logoutWithAuth0 } from '../services/authFlow';
 import { APP_VERSION } from '../constants/version';
+import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { IS_PREVIEW_BUILD } from '../constants/environment';
 
 const DONATION_URL = process.env.EXPO_PUBLIC_DONATION_URL || 'https://www.buymeacoffee.com';
@@ -131,7 +132,9 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
                     <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
                   </View>
                   <View style={styles.accountDetails}>
-                    <Text style={styles.accountName}>{user.name || 'User'}</Text>
+                    <Text style={styles.accountName}>
+                      {formatPublicPlayerName(user.username)}
+                    </Text>
                     {user.email && <Text style={styles.accountEmail}>{user.email}</Text>}
                   </View>
                 </View>

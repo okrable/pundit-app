@@ -118,6 +118,7 @@ export interface CheckUsernameResponse {
 export interface SetUsernameResponse {
   success: boolean;
   username?: string;
+  code?: 'USERNAME_IMMUTABLE';
   error?: string;
 }
 
@@ -127,15 +128,6 @@ export interface SyncIdentityResponse {
   username: string | null;
   usernameRequired: boolean;
   onboardingStatus: IdentityOnboardingStatus;
-}
-
-export interface UpdateProfileResponse {
-  success: boolean;
-  profile?: {
-    displayName: string | null;
-    username: string | null;
-  };
-  error?: string;
 }
 
 // Challenge Mode Types

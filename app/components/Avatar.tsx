@@ -4,7 +4,6 @@ import { theme } from '../theme/theme';
 
 interface AvatarProps {
   userId: string;
-  displayName?: string | null;
   username?: string | null;
   imageUrl?: string | null;
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -27,9 +26,8 @@ function getAvatarColor(userId: string): string {
   return theme.colors.avatarColors[index];
 }
 
-// Get initials from displayName or username
-function getInitials(displayName?: string | null, username?: string | null): string {
-  const name = displayName || username;
+function getInitials(username?: string | null): string {
+  const name = username;
   if (!name) return '?';
 
   const trimmed = name.trim();
@@ -45,7 +43,6 @@ function getInitials(displayName?: string | null, username?: string | null): str
 
 export default function Avatar({
   userId,
-  displayName,
   username,
   imageUrl,
   size = 'md',
@@ -72,7 +69,7 @@ export default function Avatar({
   }
 
   // Otherwise render initials on colored background
-  const initials = getInitials(displayName, username);
+  const initials = getInitials(username);
 
   return (
     <View

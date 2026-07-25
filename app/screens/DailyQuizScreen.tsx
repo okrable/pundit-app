@@ -119,7 +119,6 @@ export default function DailyQuizScreen() {
     }
 
     void reconcileIdentity(user.sub, {
-      displayName: user.name,
       email: user.email,
       avatarUrl: user.picture,
     });

@@ -4,6 +4,8 @@ import { syncAuthenticatedSession } from './dailyLoop';
 import { logError, logInfo, logWarn } from './debugLog';
 import { useAuthStore } from '../state/useAuthStore';
 import { trackAnalyticsEvent } from './analytics';
+import { setUsername as setUsernameApi, syncIdentity } from './api';
+import type { SetUsernameResponse } from '../types';
 
 export type AuthFlowIntent = 'signup' | 'login';
 
@@ -26,6 +28,139 @@ interface AuthFlowUser {
 }
 
 let inflightLogin: Promise<AuthFlowUser | null> | null = null;
+const inflightIdentityActivations = new Map<string, Promise<boolean>>();
+
+interface ActivateIdentityOptions {
+  userId: string;
+  intent: 'signup' | 'login' | 'restore';
+  source: 'login' | 'restore';
+  userProfile?: {
+    email?: string;
+    avatarUrl?: string;
+  };
+}
+
+export async function activateAuthenticatedSession({
+  userId,
+  intent,
+  source,
+  userProfile,
+}: ActivateIdentityOptions): Promise<boolean> {
+  const authState = useAuthStore.getState();
+  const authStateVersion = authState.authStateVersion;
+  const activationKey = `${userId}:${source}:${authStateVersion}`;
+  const existingActivation = inflightIdentityActivations.get(activationKey);
+  if (existingActivation) return existingActivation;
+
+  const activation = (async () => {
+    authState.beginIdentitySync(source);
+    logInfo('auth.flow.identity.start', { userId, intent, source });
+
+    try {
+      const identity = await syncIdentity(userId, intent);
+      const latestAuthState = useAuthStore.getState();
+      if (
+        latestAuthState.authStateVersion !== authStateVersion ||
+        latestAuthState.user?.sub !== userId
+      ) {
+        logWarn('auth.flow.identity.discarded_stale', { userId, source });
+        return false;
+      }
+
+      if (!identity.usernameRequired && identity.username) {
+        latestAuthState.beginAuthSync(source);
+      }
+      await latestAuthState.applyIdentity(identity);
+      if (identity.usernameRequired || !identity.username) {
+        logInfo('auth.flow.identity.username_required', { userId, source });
+        return false;
+      }
+
+      await syncAuthenticatedSession({
+        userId,
+        source,
+        userProfile,
+      });
+      logInfo('auth.flow.identity.complete', { userId, source });
+      return true;
+    } catch (error) {
+      const latestAuthState = useAuthStore.getState();
+      if (
+        latestAuthState.authStateVersion === authStateVersion &&
+        latestAuthState.user?.sub === userId
+      ) {
+        latestAuthState.failIdentitySync(
+          error instanceof Error ? error.message : 'Unable to synchronize your account'
+        );
+      }
+      throw error;
+    }
+  })().finally(() => {
+    inflightIdentityActivations.delete(activationKey);
+  });
+
+  inflightIdentityActivations.set(activationKey, activation);
+  return activation;
+}
+
+export async function completeUsernameOnboarding(
+  username: string
+): Promise<SetUsernameResponse> {
+  const authState = useAuthStore.getState();
+  const userId = authState.user?.sub;
+  if (!userId || !authState.token) {
+    return { success: false, error: 'Your session is no longer available' };
+  }
+
+  const authStateVersion = authState.authStateVersion;
+  const response = await setUsernameApi(userId, username);
+  if (!response.success || !response.username) {
+    return response;
+  }
+
+  const latestAuthState = useAuthStore.getState();
+  if (
+    latestAuthState.authStateVersion !== authStateVersion ||
+    latestAuthState.user?.sub !== userId
+  ) {
+    return { success: false, error: 'Your session changed. Please try again.' };
+  }
+
+  const source = latestAuthState.identitySource ?? 'login';
+  latestAuthState.beginAuthSync(source);
+  await latestAuthState.applyIdentity({
+    username: response.username,
+    usernameRequired: false,
+    onboardingStatus: 'complete',
+  });
+  trackAnalyticsEvent('username_onboarding_completed', 'authenticated');
+  await syncAuthenticatedSession({
+    userId,
+    source,
+    userProfile: {
+      email: latestAuthState.user?.email,
+      avatarUrl: latestAuthState.user?.picture,
+    },
+  });
+  return response;
+}
+
+export async function retryIdentityActivation(): Promise<boolean> {
+  const authState = useAuthStore.getState();
+  if (!authState.user?.sub || !authState.token) {
+    return false;
+  }
+
+  return activateAuthenticatedSession({
+    userId: authState.user.sub,
+    intent: 'restore',
+    source: authState.identitySource ?? 'restore',
+    userProfile: {
+      email: authState.user.email,
+      avatarUrl: authState.user.picture,
+    },
+  });
+}
 
 export async function loginWithAuth0({
   intent,
@@ -87,11 +222,11 @@ export async function loginWithAuth0({
       userInfo,
       tokenResponse.refreshToken
     );
-    await syncAuthenticatedSession({
+    await activateAuthenticatedSession({
       userId: userInfo.sub,
+      intent,
       source: 'login',
       userProfile: {
-        displayName: userInfo.name,
         email: userInfo.email,
         avatarUrl: userInfo.picture,
       },

@@ -2,8 +2,13 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
-## Unreleased - Username and social identity alignment
+## v2.0.0 - Username-only identity and social alignment
 
+- Added blocking, resumable username onboarding before authenticated navigation, reconciliation, prefetching, and deep-link actions.
+- Made usernames permanent after first selection, with idempotent retries and explicit immutable-username responses.
+- Removed editable display names and username changes from the current client, using `@username` across public surfaces.
+- Added selective version-2 profile and leaderboard caches without invalidating quiz progress, results, or pending submissions.
+- Added aggregate username-onboarding events and structured client handling for incomplete identities.
 - Added verified Auth0 identity synchronization, persisted username-onboarding state, and deterministic username backfill for legacy authenticated accounts.
 - Centralized authenticated user creation behind identity synchronization and protected incomplete identities from persisted social actions and rankings.
 - Made new friendship invites reusable for seven days while preserving legacy single-use codes.

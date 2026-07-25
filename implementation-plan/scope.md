@@ -8,8 +8,8 @@
 - Speed-based scoring with post-zero minimum score for correct answers.
 - Daily summary immediately after play and completed state on return.
 - Guest play with local-only daily result storage.
-- Auth0 sign-in, profile stats, canonical server usernames, transitional
-  display-name compatibility, and settings.
+- Auth0 sign-in, blocking username onboarding, permanent canonical usernames,
+  username-only profile UI, and settings.
 - Guest-to-auth result migration/adoption after login.
 - Global leaderboard plus a mutual friends leaderboard backed by one ordered
   relationship row and reusable seven-day invite links.
@@ -43,7 +43,6 @@
 
 ## Hardening Work Remaining
 
-- Blocking username signup, username-only public UI, and social cache invalidation for v2.0.0.
 - API alerting and incident visibility.
 - Broader automated integration and UI coverage.
 - Test-account cleanup while preview and production deployments share services.

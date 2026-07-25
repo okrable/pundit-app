@@ -3,8 +3,6 @@ import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 
-const COOLDOWN_DAYS = 30;
-
 export const handler: Handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -50,7 +48,7 @@ export const handler: Handler = async (event) => {
           username: null,
           displayName: null,
           createdAt: null,
-          canChangeUsername: true,
+          canChangeUsername: false,
           usernameChangeAvailableAt: null,
         }),
       };
@@ -73,7 +71,6 @@ export const handler: Handler = async (event) => {
       display_name: string | null;
       created_at: string;
       last_played: string | null;
-      username_last_changed_at: string | null;
     }>(
       `SELECT
         streak,
@@ -85,8 +82,7 @@ export const handler: Handler = async (event) => {
         username,
         display_name,
         created_at,
-        last_played::TEXT as last_played,
-        username_last_changed_at
+        last_played::TEXT as last_played
       FROM users
       WHERE id = $1`,
       [userId]
@@ -107,7 +103,7 @@ export const handler: Handler = async (event) => {
           username: null,
           displayName: null,
           createdAt: null,
-          canChangeUsername: true,
+          canChangeUsername: false,
           usernameChangeAvailableAt: null,
         }),
       };
@@ -120,21 +116,6 @@ export const handler: Handler = async (event) => {
       userStats.last_played === today || userStats.last_played === yesterday
         ? Number(userStats.streak || 0)
         : 0;
-
-    // Calculate username change availability
-    let canChangeUsername = true;
-    let usernameChangeAvailableAt: string | null = null;
-
-    if (userStats.username_last_changed_at) {
-      const lastChanged = new Date(userStats.username_last_changed_at);
-      const cooldownEnd = new Date(lastChanged.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
-      const now = new Date();
-
-      if (now < cooldownEnd) {
-        canChangeUsername = false;
-        usernameChangeAvailableAt = cooldownEnd.toISOString();
-      }
-    }
 
     return {
       statusCode: 200,
@@ -149,8 +130,8 @@ export const handler: Handler = async (event) => {
         username: userStats.username,
         displayName: userStats.display_name,
         createdAt: userStats.created_at,
-        canChangeUsername,
-        usernameChangeAvailableAt,
+        canChangeUsername: false,
+        usernameChangeAvailableAt: null,
       }),
     };
   } catch (error) {

@@ -1,14 +1,81 @@
 import { Handler } from '@netlify/functions';
-import { query } from './lib/db';
+import { queryWithClient, withTransaction } from './lib/db';
 import { authorizeUser } from './lib/auth';
 import { enforceRateLimit } from './lib/rateLimit';
 import { syncIdentityRecord } from './lib/identity';
+import { chooseUsernameAssignmentAction } from '../../shared/identityPolicy';
 
 // Username validation rules (same as checkUsername)
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$/;
 const MIN_LENGTH = 3;
 const MAX_LENGTH = 20;
-const COOLDOWN_DAYS = 30;
+
+async function assignUsernameOnce(userId: string, normalized: string) {
+  return withTransaction(async (client) => {
+    const users = await queryWithClient<{
+      username: string | null;
+      onboarding_status: 'username_required' | 'complete';
+    }>(
+      client,
+      `SELECT username, onboarding_status
+       FROM users
+       WHERE id = $1
+       FOR UPDATE`,
+      [userId]
+    );
+    const current = users[0];
+    if (!current) {
+      throw new Error('Identity synchronization did not create a user row');
+    }
+
+    const action = chooseUsernameAssignmentAction({
+      currentUsername: current.username,
+      requestedUsername: normalized,
+      onboardingStatus: current.onboarding_status,
+    });
+
+    if (action !== 'assign') {
+      return { action, username: current.username };
+    }
+
+    const updated = await queryWithClient<{ username: string }>(
+      client,
+      `UPDATE users
+       SET
+         username = $2,
+         username_normalized = $2,
+         onboarding_status = 'complete'
+       WHERE id = $1
+         AND username IS NULL
+         AND onboarding_status = 'username_required'
+       RETURNING username`,
+      [userId, normalized]
+    );
+
+    if (!updated[0]) {
+      throw new Error('Username assignment lost its identity lock');
+    }
+    return { action, username: updated[0].username };
+  });
+}
+
+async function assignUsername(userId: string, normalized: string) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await assignUsernameOnce(userId, normalized);
+    } catch (error) {
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? String(error.code)
+          : '';
+      if (code !== '40001' || attempt === 2) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error('Username assignment did not complete');
+}
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -66,10 +133,33 @@ export const handler: Handler = async (event) => {
 
     // Identity synchronization owns user-row creation. Calling this with signup
     // intent also keeps direct/older setUsername clients compatible.
-    await syncIdentityRecord(authorization.user, 'signup');
+    const syncedIdentity = await syncIdentityRecord(authorization.user, 'signup');
 
     // Normalize for validation and storage
     const normalized = username.toLowerCase().trim();
+
+    if (syncedIdentity.username) {
+      if (syncedIdentity.username.toLowerCase() === normalized) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: true,
+            username: syncedIdentity.username,
+          }),
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          code: 'USERNAME_IMMUTABLE',
+          error: 'Usernames cannot be changed',
+        }),
+      };
+    }
 
     // Validate length
     if (normalized.length < MIN_LENGTH) {
@@ -106,67 +196,27 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Check cooldown for existing users
-    const user = await query<{
-      username: string | null;
-      username_last_changed_at: string | null;
-    }>(
-      'SELECT username, username_last_changed_at FROM users WHERE id = $1',
-      [userId]
-    );
+    try {
+      const assignment = await assignUsername(userId, normalized);
 
-    if (user.length > 0 && user[0].username_last_changed_at) {
-      const lastChanged = new Date(user[0].username_last_changed_at);
-      const cooldownEnd = new Date(lastChanged.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
-      const now = new Date();
-
-      if (now < cooldownEnd) {
+      if (assignment.action === 'immutable') {
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
             success: false,
-            error: `Username can be changed again on ${cooldownEnd.toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}`,
+            code: 'USERNAME_IMMUTABLE',
+            error: 'Usernames cannot be changed',
           }),
         };
       }
-    }
-
-    // Check if username is same as current (no-op)
-    if (user.length > 0 && user[0].username?.toLowerCase() === normalized) {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          username: user[0].username,
-        }),
-      };
-    }
-
-    // Atomic update with uniqueness check. Identity synchronization above
-    // guarantees the user row exists.
-    try {
-      await query(
-        `UPDATE users SET
-           username = $2,
-           username_normalized = $2,
-           username_last_changed_at = NOW(),
-           onboarding_status = 'complete'
-         WHERE id = $1`,
-        [userId, normalized]
-      );
 
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: true,
-          username: normalized,
+          username: assignment.username,
         }),
       };
     } catch (err: any) {
