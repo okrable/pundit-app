@@ -19,6 +19,7 @@ import { theme } from '../theme/theme';
 import { clearDebugLogs, getDebugLogText, logInfo } from '../services/debugLog';
 import { logoutWithAuth0 } from '../services/authFlow';
 import { APP_VERSION } from '../constants/version';
+import { IS_PREVIEW_BUILD } from '../constants/environment';
 
 const DONATION_URL = process.env.EXPO_PUBLIC_DONATION_URL || 'https://www.buymeacoffee.com';
 const FEEDBACK_URL = process.env.EXPO_PUBLIC_FEEDBACK_URL || 'mailto:feedback@pundit-trivia.com';
@@ -196,6 +197,11 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
             <Text style={styles.sectionTitle}>ABOUT</Text>
             <View style={styles.aboutCard}>
               <Text style={styles.aboutTitle}>Pundit Trivia</Text>
+              {IS_PREVIEW_BUILD && (
+                <View style={styles.previewBadge}>
+                  <Text style={styles.previewBadgeText}>PREVIEW BUILD</Text>
+                </View>
+              )}
               <Text style={styles.aboutVersion}>Version {APP_VERSION}</Text>
               <Text style={styles.aboutDescription}>Daily football quiz</Text>
             </View>
@@ -355,6 +361,19 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.gothamBook,
     color: theme.colors.mediumGray,
     marginTop: theme.spacing.xs,
+  },
+  previewBadge: {
+    marginTop: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.accent,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+  },
+  previewBadgeText: {
+    color: theme.colors.white,
+    fontFamily: theme.fonts.gothamBold,
+    fontSize: 11,
+    letterSpacing: 0.8,
   },
   aboutDescription: {
     fontSize: 13,

@@ -3,6 +3,8 @@ import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { getQuizDate } from './lib/quizDate';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
+import { getSiteUrl } from './lib/siteUrl';
+import { enforceRateLimit } from './lib/rateLimit';
 
 interface CreateChallengeRequest {
   userId: string;
@@ -18,10 +20,6 @@ function generateChallengeCode(): string {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
-}
-
-function getSiteUrl(): string {
-  return (process.env.URL || process.env.DEPLOY_PRIME_URL || 'https://pundit-app.netlify.app').replace(/\/$/, '');
 }
 
 export const handler: Handler = async (event) => {
@@ -72,6 +70,16 @@ export const handler: Handler = async (event) => {
     const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
     if (authError) {
       return authError;
+    }
+
+    const rateLimitError = await enforceRateLimit(event, headers, {
+      scope: 'create-challenge',
+      subject: userId,
+      limit: 10,
+      windowSeconds: 300,
+    });
+    if (rateLimitError) {
+      return rateLimitError;
     }
 
     // Check if user already has an active challenge (pending or active, not expired)

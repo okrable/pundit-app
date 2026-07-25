@@ -3,6 +3,9 @@ import { assertAuthorizedUser } from './lib/auth';
 import { query, queryWithClient, withTransaction } from './lib/db';
 import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
+import { calculateQuizPoints } from '../../shared/scoring';
+import { validateSubmittedAnswers } from '../../shared/submissionValidation';
+import { enforceRateLimit } from './lib/rateLimit';
 
 interface SubmitQuizRequest {
   quizId: string;
@@ -44,18 +47,6 @@ interface ExistingResultWithStatsRow {
   answers: boolean[];
   streak: number | null;
   best_score: number | null;
-}
-
-// Calculate points based on time remaining (correct answers only)
-// Max 100 points per question, 500 total
-function calculatePoints(timeRemainingMs: number | undefined): number {
-  if (timeRemainingMs === undefined) return 60;
-  const seconds = timeRemainingMs / 1000;
-  if (seconds >= 16) return 100;
-  if (seconds >= 12) return 80;
-  if (seconds >= 8) return 60;
-  if (seconds >= 4) return 40;
-  return 20;
 }
 
 function buildServerTimingHeader(metrics: Array<{ name: string; durationMs: number }>): string {
@@ -103,7 +94,7 @@ export const handler: Handler = async (event) => {
     const { quizId, userId, answers, userProfile } = body;
     logRequestStart({ endpoint: 'submitQuiz', requestId, userId });
 
-    if (!quizId || !userId || !answers || answers.length === 0) {
+    if (!quizId || !userId) {
       return {
         statusCode: 400,
         headers: baseHeaders,
@@ -111,62 +102,32 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    if (!Array.isArray(answers)) {
+    const validationError = validateSubmittedAnswers(answers);
+    if (validationError) {
       return {
         statusCode: 400,
         headers: baseHeaders,
-        body: JSON.stringify({ error: 'answers must be an array' }),
+        body: JSON.stringify({ error: validationError }),
       };
-    }
-
-    if (answers.length > 5) {
-      return {
-        statusCode: 400,
-        headers: baseHeaders,
-        body: JSON.stringify({ error: 'Too many answers submitted' }),
-      };
-    }
-
-    const seenQuestionIds = new Set<string>();
-    for (const answer of answers) {
-      if (!answer?.questionId || typeof answer.selectedOptionIndex !== 'number') {
-        return {
-          statusCode: 400,
-          headers: baseHeaders,
-          body: JSON.stringify({ error: 'Each answer must include questionId and selectedOptionIndex' }),
-        };
-      }
-
-      if (!Number.isInteger(answer.selectedOptionIndex) || answer.selectedOptionIndex < 0 || answer.selectedOptionIndex > 3) {
-        return {
-          statusCode: 400,
-          headers: baseHeaders,
-          body: JSON.stringify({ error: 'selectedOptionIndex must be an integer between 0 and 3' }),
-        };
-      }
-
-      if (
-        answer.timeRemainingMs !== undefined &&
-        (!Number.isFinite(answer.timeRemainingMs) || answer.timeRemainingMs < 0 || answer.timeRemainingMs > 20_000)
-      ) {
-        return {
-          statusCode: 400,
-          headers: baseHeaders,
-          body: JSON.stringify({ error: 'timeRemainingMs must be between 0 and 20000' }),
-        };
-      }
-
-      if (seenQuestionIds.has(answer.questionId)) {
-        return {
-          statusCode: 400,
-          headers: baseHeaders,
-          body: JSON.stringify({ error: 'Duplicate questionId in answers' }),
-        };
-      }
-
-      seenQuestionIds.add(answer.questionId);
     }
     mark('validate');
+
+    const authError = await assertAuthorizedUser(event, userId, baseHeaders, { allowGuest: true });
+    if (authError) {
+      return authError;
+    }
+    mark('auth');
+
+    const rateLimitError = await enforceRateLimit(event, baseHeaders, {
+      scope: 'submit-quiz',
+      subject: userId,
+      limit: 8,
+      windowSeconds: 300,
+    });
+    if (rateLimitError) {
+      return rateLimitError;
+    }
+    mark('rate_limit');
 
     const questionIds = answers.map((a) => a.questionId);
     const correctAnswers = await query<CorrectAnswerRow>(
@@ -212,7 +173,7 @@ export const handler: Handler = async (event) => {
       const correctIndex = options.findIndex((opt) => opt === correct.player_name);
       const isCorrect = userAnswer.selectedOptionIndex === correctIndex;
       if (isCorrect) {
-        score += calculatePoints(userAnswer.timeRemainingMs);
+        score += calculateQuizPoints(userAnswer.timeRemainingMs);
       }
 
       detailedAnswers.push({
@@ -226,12 +187,6 @@ export const handler: Handler = async (event) => {
     mark('score');
 
     const quizDate = quizId.replace('quiz-', '');
-
-    const authError = await assertAuthorizedUser(event, userId, baseHeaders, { allowGuest: true });
-    if (authError) {
-      return authError;
-    }
-    mark('auth');
 
     if (userId.startsWith('guest_')) {
       const responseBody = {

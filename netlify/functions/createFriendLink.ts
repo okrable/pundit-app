@@ -1,5 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { randomInt } from 'node:crypto';
+import { getSiteUrl } from './lib/siteUrl';
+import { enforceRateLimit } from './lib/rateLimit';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 
@@ -15,10 +17,6 @@ function generateFriendCode(): string {
     code += chars.charAt(randomInt(chars.length));
   }
   return code;
-}
-
-function getSiteUrl(): string {
-  return (process.env.URL || process.env.DEPLOY_PRIME_URL || 'https://pundit-app.netlify.app').replace(/\/$/, '');
 }
 
 export const handler: Handler = async (event) => {
@@ -64,6 +62,16 @@ export const handler: Handler = async (event) => {
     const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
     if (authError) {
       return authError;
+    }
+
+    const rateLimitError = await enforceRateLimit(event, headers, {
+      scope: 'create-friend-link',
+      subject: userId,
+      limit: 10,
+      windowSeconds: 300,
+    });
+    if (rateLimitError) {
+      return rateLimitError;
     }
 
     // Generate unique code (retry if collision)

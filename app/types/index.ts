@@ -177,6 +177,7 @@ export interface ChallengeSubmitResult {
   opponentScore?: number;
   opponentDisplayName?: string;
   opponentAnswers?: ChallengeAnswer[];
+  syncState?: SyncState;
 }
 
 export interface CreateChallengeResponse {
@@ -268,5 +269,13 @@ export interface PendingQuizSubmission {
   answers: AnswerWithTiming[];
   userProfile?: UserProfile;
   localResult: QuizResultImmediate;
+  queuedAt: string;
+}
+
+export interface PendingChallengeSubmission {
+  userId: string;
+  challengeId: string;
+  answers: AnswerWithTiming[];
+  localResult: ChallengeSubmitResult;
   queuedAt: string;
 }

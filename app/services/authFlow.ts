@@ -3,6 +3,7 @@ import { auth0Config, fetchUserInfo } from './auth0';
 import { syncAuthenticatedSession } from './dailyLoop';
 import { logError, logInfo, logWarn } from './debugLog';
 import { useAuthStore } from '../state/useAuthStore';
+import { trackAnalyticsEvent } from './analytics';
 
 export type AuthFlowIntent = 'signup' | 'login';
 
@@ -95,6 +96,7 @@ export async function loginWithAuth0({
         avatarUrl: userInfo.picture,
       },
     });
+    trackAnalyticsEvent('auth_completed', 'authenticated');
 
     logInfo('auth.flow.login.success', { intent, userId: userInfo.sub });
     return userInfo;

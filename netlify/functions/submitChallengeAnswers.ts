@@ -2,6 +2,9 @@ import { Handler } from '@netlify/functions';
 import { query, queryWithClient, withTransaction } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
+import { calculateQuizPoints } from '../../shared/scoring';
+import { validateSubmittedAnswers } from '../../shared/submissionValidation';
+import { enforceRateLimit } from './lib/rateLimit';
 
 interface SubmitChallengeRequest {
   challengeId: string;
@@ -42,17 +45,6 @@ interface CorrectAnswerRow {
 
 type ChallengeResult = 'win' | 'loss' | 'draw';
 type WinnerRef = 'creator' | 'opponent' | null;
-
-// Calculate points based on time remaining (same as daily quiz)
-function calculatePoints(timeRemainingMs: number | undefined): number {
-  if (timeRemainingMs === undefined) return 60;
-  const seconds = timeRemainingMs / 1000;
-  if (seconds >= 16) return 100;
-  if (seconds >= 12) return 80;
-  if (seconds >= 8) return 60;
-  if (seconds >= 4) return 40;
-  return 20;
-}
 
 function buildBadRequest(headers: Record<string, string>, error: string) {
   return {
@@ -121,45 +113,28 @@ export const handler: Handler = async (event) => {
 
     logRequestStart({ endpoint: 'submitChallengeAnswers', requestId, userId });
 
-    if (!challengeId || !userId || !answers || answers.length === 0) {
+    if (!challengeId || !userId) {
       return buildBadRequest(headers, 'Missing required fields');
     }
 
-    if (!Array.isArray(answers)) {
-      return buildBadRequest(headers, 'answers must be an array');
-    }
-
-    if (answers.length > 5) {
-      return buildBadRequest(headers, 'Too many answers submitted');
-    }
-
-    const seenQuestionIds = new Set<string>();
-    for (const answer of answers) {
-      if (!answer?.questionId || typeof answer.selectedOptionIndex !== 'number') {
-        return buildBadRequest(headers, 'Each answer must include questionId and selectedOptionIndex');
-      }
-
-      if (!Number.isInteger(answer.selectedOptionIndex) || answer.selectedOptionIndex < 0 || answer.selectedOptionIndex > 3) {
-        return buildBadRequest(headers, 'selectedOptionIndex must be an integer between 0 and 3');
-      }
-
-      if (
-        answer.timeRemainingMs !== undefined &&
-        (!Number.isFinite(answer.timeRemainingMs) || answer.timeRemainingMs < 0 || answer.timeRemainingMs > 20_000)
-      ) {
-        return buildBadRequest(headers, 'timeRemainingMs must be between 0 and 20000');
-      }
-
-      if (seenQuestionIds.has(answer.questionId)) {
-        return buildBadRequest(headers, 'Duplicate questionId in answers');
-      }
-
-      seenQuestionIds.add(answer.questionId);
+    const validationError = validateSubmittedAnswers(answers);
+    if (validationError) {
+      return buildBadRequest(headers, validationError);
     }
 
     const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
     if (authError) {
       return authError;
+    }
+
+    const rateLimitError = await enforceRateLimit(event, headers, {
+      scope: 'submit-challenge',
+      subject: userId,
+      limit: 12,
+      windowSeconds: 300,
+    });
+    if (rateLimitError) {
+      return rateLimitError;
     }
 
     // Fetch correct answers from database
@@ -202,7 +177,7 @@ export const handler: Handler = async (event) => {
       const isCorrect = userAnswer.selectedOptionIndex === correctIndex;
 
       if (isCorrect) {
-        score += calculatePoints(userAnswer.timeRemainingMs);
+        score += calculateQuizPoints(userAnswer.timeRemainingMs);
       }
 
       detailedAnswers.push({
@@ -242,7 +217,12 @@ export const handler: Handler = async (event) => {
       }
 
       if ((isCreator && challenge.creator_score !== null) || (isOpponent && challenge.opponent_score !== null)) {
-        return { kind: 'already_submitted' as const };
+        return {
+          kind: 'submitted' as const,
+          challenge,
+          isCreator,
+          replayed: true,
+        };
       }
 
       const submittedChallenges = isCreator
@@ -276,7 +256,17 @@ export const handler: Handler = async (event) => {
           );
 
       if (submittedChallenges.length === 0) {
-        return { kind: 'already_submitted' as const };
+        const replayedChallenges = await queryWithClient<DbChallenge>(
+          client,
+          `SELECT * FROM challenges WHERE id = $1`,
+          [challengeId]
+        );
+        return {
+          kind: 'submitted' as const,
+          challenge: replayedChallenges[0] || challenge,
+          isCreator,
+          replayed: true,
+        };
       }
 
       let updatedChallenge = submittedChallenges[0];
@@ -340,6 +330,7 @@ export const handler: Handler = async (event) => {
         kind: 'submitted' as const,
         challenge: updatedChallenge,
         isCreator,
+        replayed: false,
       };
     });
 
@@ -367,16 +358,18 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    if (transactionResult.kind === 'already_submitted') {
-      return {
-        statusCode: 409,
-        headers,
-        body: JSON.stringify({ error: 'You have already submitted answers' }),
-      };
-    }
-
     const updatedChallenge = transactionResult.challenge;
     const isCreator = transactionResult.isCreator;
+    const storedAnswers = isCreator
+      ? updatedChallenge.creator_answers
+      : updatedChallenge.opponent_answers;
+    const myAnswers =
+      typeof storedAnswers === 'string'
+        ? JSON.parse(storedAnswers)
+        : storedAnswers || detailedAnswers;
+    const myStoredScore = isCreator
+      ? updatedChallenge.creator_score
+      : updatedChallenge.opponent_score;
 
     // If both have submitted, return the completed challenge result.
     if (updatedChallenge.creator_score !== null && updatedChallenge.opponent_score !== null) {
@@ -386,7 +379,7 @@ export const handler: Handler = async (event) => {
 
       // Return complete result
       const myResult = isCreator ? creatorResult : opponentResult;
-      const myScore = isCreator ? updatedChallenge.creator_score : updatedChallenge.opponent_score;
+      const myScore = myStoredScore ?? score;
       const theirScore = isCreator ? updatedChallenge.opponent_score : updatedChallenge.creator_score;
       const theirDisplayName = isCreator ? updatedChallenge.opponent_display_name : updatedChallenge.creator_display_name;
       const theirAnswers = isCreator ? updatedChallenge.opponent_answers : updatedChallenge.creator_answers;
@@ -401,7 +394,7 @@ export const handler: Handler = async (event) => {
           yourScore: myScore,
           opponentScore: theirScore,
           opponentDisplayName: theirDisplayName,
-          yourAnswers: detailedAnswers,
+          yourAnswers: myAnswers,
           opponentAnswers: typeof theirAnswers === 'string' ? JSON.parse(theirAnswers) : theirAnswers,
         }),
       };
@@ -414,8 +407,8 @@ export const handler: Handler = async (event) => {
       headers,
       body: JSON.stringify({
         status: 'waiting',
-        yourScore: score,
-        yourAnswers: detailedAnswers,
+        yourScore: myStoredScore ?? score,
+        yourAnswers: myAnswers,
       }),
     };
   } catch (error) {

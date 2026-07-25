@@ -6,6 +6,15 @@
 [build.environment]
   NODE_VERSION = "20.19.4"
 
+[context.deploy-preview.environment]
+  EXPO_PUBLIC_APP_ENV = "preview"
+
+[context.branch-deploy.environment]
+  EXPO_PUBLIC_APP_ENV = "preview"
+
+[context.production.environment]
+  EXPO_PUBLIC_APP_ENV = "production"
+
 [functions]
   node_bundler = "esbuild"
 

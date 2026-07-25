@@ -49,15 +49,21 @@
 - [x] Transactional challenge submission completion and stat updates.
 - [x] Settings version display from app SemVer.
 - [x] Authenticated settings hide guest-only clear-cache controls.
+- [x] Pull-request CI for tests, TypeScript, and web export.
+- [x] Uniform Netlify preview behavior across all non-main branches.
+- [x] Preview build identification and environment-correct share links.
+- [x] Persistent challenge submission retry with idempotent server replay.
+- [x] Database-backed endpoint rate limits.
+- [x] Anonymous aggregate funnel analytics.
 
 ## Active Hardening
 
-1. Extend offline retry beyond existing daily authenticated result retry.
-2. Add endpoint-level rate limiting and abuse controls.
-3. Improve API observability, alerting, and error budgets.
+1. Configure operational alerts and error-budget reporting from structured logs.
+2. Expand automated integration and UI coverage.
+3. Formalize designated test-account cleanup while previews share production services.
 
 ## Next Feature Wave
 
 1. Push notifications.
 2. Quiz archives and historical access.
-3. Product analytics and funnel telemetry.
+3. Use anonymous funnel telemetry to prioritize the next product wave.

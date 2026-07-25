@@ -3,6 +3,7 @@ import { useAuthStore } from '../state/useAuthStore';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { useProfileStore } from '../state/useProfileStore';
 import { useQuizStore } from '../state/useQuizStore';
+import { useChallengeStore } from '../state/useChallengeStore';
 import { logError, logInfo, logWarn } from './debugLog';
 
 const inflightPrefetches = new Map<string, Promise<void>>();
@@ -89,6 +90,7 @@ export async function prefetchDailyLoop(options?: string | PrefetchOptions): Pro
 
   if (shouldRunProtected) {
     tasks.push(useQuizStore.getState().retryPendingSubmission());
+    tasks.push(useChallengeStore.getState().retryPendingSubmission(effectiveUserId));
     tasks.push(useProfileStore.getState().revalidate(effectiveUserId));
   }
 

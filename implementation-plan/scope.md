@@ -14,6 +14,9 @@
 - Async 1v1 challenge mode with create/join/play/reveal/history.
 - Stale-first cache hydration and background refresh.
 - Debug-log export from Settings.
+- Uniform pull-request web previews and same-commit iOS validation.
+- Persistent retry for authenticated quiz and challenge submissions.
+- Anonymous aggregate product analytics.
 
 ## Current Constraints
 
@@ -34,6 +37,6 @@
 
 ## Hardening Work Remaining
 
-- Broader offline retry beyond existing daily authenticated result retry.
-- Endpoint-level rate limiting and abuse controls.
-- API monitoring and incident visibility.
+- API alerting and incident visibility.
+- Broader automated integration and UI coverage.
+- Test-account cleanup while preview and production deployments share services.
