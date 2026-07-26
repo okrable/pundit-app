@@ -1,0 +1,36 @@
+import React from 'react';
+import Svg, { Path } from 'react-native-svg';
+
+interface StreakIconProps {
+  active: boolean;
+  size?: number;
+}
+
+const OUTER_FLAME =
+  'M26 19.3399C26 25.4393 20.9491 30.3451 14.8501 29.981C8.58145 29.6067 4.2892 23.5781 5.09774 17.2765C5.58685 13.4429 7.38361 10.1555 9.34008 7.6065C9.67947 7.16144 10.0288 10.7422 10.3782 10.3477C10.7276 9.94307 13.9717 4.32923 15.0997 2.35679C15.3093 1.99265 15.7884 1.88139 16.1278 2.14438C18.3937 3.85382 26 10.2769 26 19.3399Z';
+const INNER_FLAME =
+  'M23 21.8512C23 25.893 19.4812 29.142 15.2011 28.9952C10.5815 28.8386 7.41254 24.6109 8.09159 20.256C9.06903 14.0124 15.4789 10 15.4789 10C15.4789 10 23 14.7072 23 21.8512Z';
+
+const ACTIVE_COLORS = {
+  outer: '#FF6723',
+  inner: '#FFB02E',
+} as const;
+
+const INACTIVE_COLORS = {
+  outer: '#6E6E73',
+  inner: '#C7C7CC',
+} as const;
+
+export default function StreakIcon({
+  active,
+  size = 32,
+}: StreakIconProps) {
+  const colors = active ? ACTIVE_COLORS : INACTIVE_COLORS;
+
+  return (
+    <Svg width={size} height={size} viewBox="0 0 32 32">
+      <Path d={OUTER_FLAME} fill={colors.outer} />
+      <Path d={INNER_FLAME} fill={colors.inner} />
+    </Svg>
+  );
+}

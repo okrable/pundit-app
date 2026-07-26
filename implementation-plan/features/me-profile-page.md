@@ -1,7 +1,7 @@
 # Feature: Me Profile Page
 
 > Status: Implemented
-> Last updated: v2.1.0 profile and streak redesign
+> Last updated: v2.1.1 streak icon polish
 
 ## Delivered
 
@@ -12,8 +12,9 @@
 - Settings modal is accessible from the Me header.
 - Authenticated profiles display the canonical username without editable
   display-name or username controls.
-- The inline streak indicator uses a coloured integrated football-flame for
-  active and at-risk streaks, and a greyscale football when no streak is active.
+- The inline streak indicator uses the two-tone Microsoft Fluent Emoji flame:
+  its original orange colours for active and at-risk streaks, and the identical
+  silhouette in greys when no streak is active.
 - Required username selection is an app-level gate before the Me screen or
   other authenticated navigation can render.
 - Guest-only options, including clear daily quiz cache, are hidden for authenticated users.

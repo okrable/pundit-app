@@ -28,7 +28,7 @@ import {
 import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { buildStreakStatus } from '../../shared/streak';
 import { getQuizDate } from '../utils/quizDate';
-import StreakFootballIcon from '../components/StreakFootballIcon';
+import StreakIcon from '../components/StreakIcon';
 
 const EMPTY_STATS: UserStats = {
   streak: 0,
@@ -250,7 +250,7 @@ export default function MeScreen() {
             accessible
             accessibilityLabel={streakAccessibilityLabel}
           >
-            <StreakFootballIcon
+            <StreakIcon
               active={hasActiveStreak}
               size={isCompactWidth ? 26 : 32}
             />

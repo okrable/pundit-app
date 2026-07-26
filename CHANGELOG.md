@@ -2,6 +2,11 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.1.1 - Streak icon polish
+
+- Replaced the profile streak artwork with the two-tone Microsoft Fluent Emoji
+  flame, using its original colours for active streaks and greys for inactive.
+
 ## v2.1.0 - Profile and streak redesign
 
 - Refreshed the authenticated Me page with a compact username header,
