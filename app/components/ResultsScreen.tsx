@@ -51,7 +51,7 @@ export default function ResultsScreen({ result, quiz }: ResultsScreenProps) {
     result.syncState === 'pending'
       ? 'Stats syncing in the background.'
       : result.syncState === 'failed'
-        ? 'We will retry syncing your result shortly.'
+        ? 'Your result is saved on this device. We’ll retry when the app next syncs.'
         : null;
 
   const handleShare = async () => {

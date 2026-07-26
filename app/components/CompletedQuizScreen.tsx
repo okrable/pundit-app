@@ -57,7 +57,9 @@ export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps
               <Text style={styles.statusText}>Stats still syncing in the background.</Text>
             )}
             {result.syncState === 'failed' && (
-              <Text style={styles.statusText}>We will retry syncing your result shortly.</Text>
+              <Text style={styles.statusText}>
+                Your result is saved on this device. We’ll retry when the app next syncs.
+              </Text>
             )}
           </View>
 

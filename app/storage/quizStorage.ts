@@ -31,6 +31,7 @@ function toCompactResult(result: QuizResultImmediate | QuizResult): QuizResult {
       bestScore: immediateResult.bestScore,
       answers: immediateResult.answers.map(a => a.isCorrect),
       syncState: immediateResult.syncState,
+      isOptimistic: immediateResult.isOptimistic,
     };
   }
 
