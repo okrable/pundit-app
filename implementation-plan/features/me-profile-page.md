@@ -1,7 +1,7 @@
 # Feature: Me Profile Page
 
 > Status: Implemented
-> Last updated: v2.1.1 streak icon polish
+> Last updated: v2.1.2 optimistic streak hardening
 
 ## Delivered
 
@@ -19,6 +19,8 @@
   other authenticated navigation can render.
 - Guest-only options, including clear daily quiz cache, are hidden for authenticated users.
 - Login uses the centralized auth flow and shows `AuthSyncScreen` while reconciliation/prefetch runs.
+- Completing a quiz publishes the projected post-play streak immediately; the
+  authoritative submission result reconciles it in the background.
 
 ## Follow-Up
 

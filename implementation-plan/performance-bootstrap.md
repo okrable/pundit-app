@@ -19,7 +19,9 @@ Keep warm opens fast while avoiding stale identity flashes after login/logout.
 
 ## Auth Sync Sequence
 
-Login and cached-session restore both run the same authenticated sync path before normal tabs are released:
+Interactive login and cached-session restore enter the same authenticated sync
+pipeline before normal tabs are released, but only one owner can activate a
+given user and auth-state version:
 
 1. Prompt Auth0 with Expo AuthSession.
 2. Exchange the authorization code once using the matching redirect URI and PKCE verifier.
@@ -33,6 +35,11 @@ Login and cached-session restore both run the same authenticated sync path befor
 Screens do not process AuthSession responses directly. Me/profile stays
 cached-first with explicit refresh, while League Tables deliberately forces a
 friends refresh whenever the screen gains navigation focus.
+
+Interactive login owns activation after the authorization-code exchange.
+Bootstrap activation is reserved for sessions restored from storage. Every
+completion/failure update rechecks the active user, token, and auth-state
+version so stale work cannot revive a logged-out or replaced session.
 
 ## Cache Strategy
 
@@ -63,10 +70,18 @@ friends refresh whenever the screen gains navigation focus.
 
 ## Result Submission Model
 
-- After the fifth answer, the app computes an immediate local result from the quiz payload.
-- Authenticated plays submit to the server and finalize stats.
+- After the fifth answer, the app computes and publishes an immediate local
+  result plus an optimistic streak projection.
+- The result and pending submission are durably stored before an authenticated
+  network request begins.
+- Authenticated plays submit to the server and reconcile the optimistic state
+  with authoritative stats before refreshing leaderboards.
 - Guest plays are not submitted while still guest.
-- Pending authenticated submissions can retry on later warm paths.
+- One transient network, timeout, or server failure is retried automatically.
+- Pending authenticated submissions survive persistent failure and retry on a
+  later authenticated warm path.
+- Submission logs include client duration and the existing `Server-Timing`
+  response header for backend phase attribution.
 - Challenge answers are persisted before submission and retry on authenticated warm paths.
 - Challenge submission is idempotent: replaying a completed request returns the stored result instead of incrementing stats again.
 

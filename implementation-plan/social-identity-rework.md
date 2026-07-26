@@ -59,12 +59,21 @@ links created after migration 013 are reusable.
 - Deprecated display-name response fields contain usernames for old-client
   compatibility.
 
-## v2.0.0 client behavior
+## Current client behavior
 
+- Interactive login owns post-login activation. Bootstrap activates only
+  sessions restored from storage, and activation is deduplicated by user and
+  auth-state version.
+- Every activation stage checks the current user, token, and auth-state version;
+  late results after logout, token failure, or account switching are discarded.
 - Signup, login, and restoration synchronize identity before reconciliation,
   protected prefetching, deep links, or navigation.
 - `username_required` survives restart and presents a full-screen gate whose
   only escape is local sign-out.
+- Only explicit `username_required` state renders onboarding. Transient work
+  uses `AuthSyncScreen`, while genuine failures offer retry or sign-out.
+- New signup flows require username selection. Legacy login/restore accounts
+  without one receive a deterministic username.
 - A username can be selected once. Same-value retries are idempotent; later
   changes are rejected, including for generated legacy usernames.
 - Me, friends, leaderboards, avatars, and challenges render canonical usernames

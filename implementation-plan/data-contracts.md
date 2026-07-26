@@ -42,6 +42,9 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - Guest daily results are cached locally first and can be migrated after login.
 - Same-day cached results prevent replay and drive `CompletedQuizScreen`.
 - Immediate in-memory results drive the current-session daily summary.
+- Authenticated completion stores a user/quiz-scoped pending submission before
+  contacting the server. Its optimistic result is replaced by the authoritative
+  response or retained for a later retry.
 
 ## Database-Facing Model
 
@@ -71,3 +74,7 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 `at_risk`, or `inactive` state, last played date, and quiz date used to
 evaluate the status. A run ending yesterday remains active but at risk; older
 runs expose a current value of zero.
+
+Immediately after a local play, the client projects `at_risk` as current plus
+one, `not_started` or `inactive` as one, and `active_today` as unchanged. The
+server result remains authoritative after synchronization.

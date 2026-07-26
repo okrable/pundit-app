@@ -46,7 +46,9 @@
 - Timezone consistency: backend `QUIZ_TIMEZONE` and frontend `EXPO_PUBLIC_QUIZ_TIMEZONE` must match.
 - Ownership enforcement: protected endpoints verify Auth0 bearer tokens and require `token.sub === userId`.
 - Auth coordination: screens call the shared auth flow; they do not exchange authorization codes directly.
-- Auth sync gating: login and restoration synchronize identity first. Username
+- Auth sync gating: interactive login owns post-login activation and bootstrap
+  activates only stored-session restoration. Activation is deduplicated by user
+  and auth-state version; stale work is discarded. Explicit username
   onboarding, quiz reconciliation, and initial protected prefetch all complete
   before normal tabs are released.
 - Auth clients: responsive web uses an Auth0 SPA client while EAS native builds
@@ -58,6 +60,9 @@
   gains navigation focus.
 - Defensive auth retry: API requests can retry once after token refresh or mid-flight token change, and refresh-token rotation is protected by single-flight refresh.
 - Debuggability: persistent debug logs can be copied from Settings.
+- Quiz completion ordering: local result, pending submission, and optimistic
+  streak are published and persisted before the protected submission starts;
+  authoritative success reconciles them before leaderboard refresh.
 
 ## Known Architectural Gaps
 

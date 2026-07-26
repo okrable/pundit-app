@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.1.0 profile and streak redesign
+> Last updated: v2.1.2 authentication and quiz sync hardening
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -28,6 +28,12 @@ In plain English, this work delivered four connected changes:
    username screen, usernames are permanent, public UI uses `@username`, and
    version-1 social caches are discarded without removing quiz progress.
 
+5. **v2.1.2 — auth and quiz hardening:** interactive login has sole ownership
+   of post-login activation, stale identity work is discarded, and onboarding
+   appears only for explicit new-account requirements. Quiz completion now
+   publishes and persists an optimistic streak before a retryable background
+   submission.
+
 ## Product Status Snapshot
 
 ### Delivered
@@ -53,6 +59,8 @@ In plain English, this work delivered four connected changes:
 - Friends-leaderboard refresh after friendship mutations and League Tables focus.
 - Pull-request CI, uniform Netlify previews, and same-commit web/iOS validation gates.
 - Persistent retry for daily and challenge submissions.
+- Immediate local quiz completion and projected post-play streak before server
+  reconciliation.
 - Shared database-backed rate limiting on sensitive endpoints.
 - Anonymous aggregate product funnel events.
 - Selective version-2 social cache invalidation that preserves gameplay state.
