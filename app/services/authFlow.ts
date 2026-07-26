@@ -6,6 +6,10 @@ import { useAuthStore } from '../state/useAuthStore';
 import { trackAnalyticsEvent } from './analytics';
 import { setUsername as setUsernameApi, syncIdentity } from './api';
 import type { SetUsernameResponse } from '../types';
+import {
+  buildIdentityActivationKey,
+  isIdentityActivationCurrent,
+} from '../../shared/clientIdentityPolicy';
 
 export type AuthFlowIntent = 'signup' | 'login';
 
@@ -30,6 +34,16 @@ interface AuthFlowUser {
 let inflightLogin: Promise<AuthFlowUser | null> | null = null;
 const inflightIdentityActivations = new Map<string, Promise<boolean>>();
 
+function isCurrentActivation(userId: string, authStateVersion: number): boolean {
+  const authState = useAuthStore.getState();
+  return isIdentityActivationCurrent(userId, authStateVersion, {
+    userId: authState.user?.sub,
+    token: authState.token,
+    isAuthenticated: authState.isAuthenticated,
+    authStateVersion: authState.authStateVersion,
+  });
+}
+
 interface ActivateIdentityOptions {
   userId: string;
   intent: 'signup' | 'login' | 'restore';
@@ -48,29 +62,39 @@ export async function activateAuthenticatedSession({
 }: ActivateIdentityOptions): Promise<boolean> {
   const authState = useAuthStore.getState();
   const authStateVersion = authState.authStateVersion;
-  const activationKey = `${userId}:${source}:${authStateVersion}`;
+  const activationKey = buildIdentityActivationKey(userId, authStateVersion);
   const existingActivation = inflightIdentityActivations.get(activationKey);
   if (existingActivation) return existingActivation;
 
   const activation = (async () => {
+    if (!isCurrentActivation(userId, authStateVersion)) {
+      logWarn('auth.flow.identity.discarded_before_start', { userId, source });
+      return false;
+    }
+
     authState.beginIdentitySync(source);
     logInfo('auth.flow.identity.start', { userId, intent, source });
 
     try {
       const identity = await syncIdentity(userId, intent);
       const latestAuthState = useAuthStore.getState();
-      if (
-        latestAuthState.authStateVersion !== authStateVersion ||
-        latestAuthState.user?.sub !== userId
-      ) {
+      if (!isCurrentActivation(userId, authStateVersion)) {
         logWarn('auth.flow.identity.discarded_stale', { userId, source });
         return false;
+      }
+
+      if (!identity.usernameRequired && !identity.username) {
+        throw new Error('Identity synchronization did not return a username');
       }
 
       if (!identity.usernameRequired && identity.username) {
         latestAuthState.beginAuthSync(source);
       }
       await latestAuthState.applyIdentity(identity);
+      if (!isCurrentActivation(userId, authStateVersion)) {
+        logWarn('auth.flow.identity.discarded_after_apply', { userId, source });
+        return false;
+      }
       if (identity.usernameRequired || !identity.username) {
         logInfo('auth.flow.identity.username_required', { userId, source });
         return false;
@@ -81,14 +105,15 @@ export async function activateAuthenticatedSession({
         source,
         userProfile,
       });
+      if (!isCurrentActivation(userId, authStateVersion)) {
+        logWarn('auth.flow.identity.discarded_after_sync', { userId, source });
+        return false;
+      }
       logInfo('auth.flow.identity.complete', { userId, source });
       return true;
     } catch (error) {
       const latestAuthState = useAuthStore.getState();
-      if (
-        latestAuthState.authStateVersion === authStateVersion &&
-        latestAuthState.user?.sub === userId
-      ) {
+      if (isCurrentActivation(userId, authStateVersion)) {
         latestAuthState.failIdentitySync(
           error instanceof Error ? error.message : 'Unable to synchronize your account'
         );
@@ -119,10 +144,7 @@ export async function completeUsernameOnboarding(
   }
 
   const latestAuthState = useAuthStore.getState();
-  if (
-    latestAuthState.authStateVersion !== authStateVersion ||
-    latestAuthState.user?.sub !== userId
-  ) {
+  if (!isCurrentActivation(userId, authStateVersion)) {
     return { success: false, error: 'Your session changed. Please try again.' };
   }
 
@@ -133,6 +155,9 @@ export async function completeUsernameOnboarding(
     usernameRequired: false,
     onboardingStatus: 'complete',
   });
+  if (!isCurrentActivation(userId, authStateVersion)) {
+    return { success: false, error: 'Your session changed. Please try again.' };
+  }
   trackAnalyticsEvent('username_onboarding_completed', 'authenticated');
   await syncAuthenticatedSession({
     userId,

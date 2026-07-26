@@ -19,7 +19,7 @@ export function chooseIdentityProvisioningAction({
     return 'require_username';
   }
   if (!hasUserRow) {
-    return 'require_username';
+    return intent === 'signup' ? 'require_username' : 'generate_username';
   }
   return 'generate_username';
 }

@@ -17,8 +17,13 @@ import { logError, logInfo, startDebugSession } from './app/services/debugLog';
 import { MobileWebAppShell } from './app/components/ResponsiveLayout';
 import UsernameOnboardingScreen from './app/components/UsernameOnboardingScreen';
 import AuthSyncScreen from './app/components/AuthSyncScreen';
+import AuthSyncFailureScreen from './app/components/AuthSyncFailureScreen';
 import { useAuthStore } from './app/state/useAuthStore';
-import { shouldBlockAuthenticatedNavigation } from './shared/clientIdentityPolicy';
+import {
+  shouldShowIdentityFailure,
+  shouldShowIdentitySync,
+  shouldShowUsernameOnboarding,
+} from './shared/clientIdentityPolicy';
 
 const Stack = createNativeStackNavigator();
 const navigationRef = createNavigationContainerRef<any>();
@@ -142,14 +147,21 @@ function AppContent() {
 function ReadyApp() {
   const { isAuthenticated, identityStatus, authSyncStatus } = useAuthStore();
 
-  if (
-    shouldBlockAuthenticatedNavigation(isAuthenticated, identityStatus) ||
-    (isAuthenticated && authSyncStatus === 'failed')
-  ) {
+  if (shouldShowUsernameOnboarding(isAuthenticated, identityStatus)) {
     return <UsernameOnboardingScreen />;
   }
 
-  if (isAuthenticated && authSyncStatus === 'syncing') {
+  if (
+    shouldShowIdentityFailure(
+      isAuthenticated,
+      identityStatus,
+      authSyncStatus
+    )
+  ) {
+    return <AuthSyncFailureScreen />;
+  }
+
+  if (shouldShowIdentitySync(isAuthenticated, identityStatus, authSyncStatus)) {
     return <AuthSyncScreen />;
   }
 
