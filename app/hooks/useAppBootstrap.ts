@@ -10,7 +10,7 @@ import { logError, logInfo, logWarn } from '../services/debugLog';
 
 export default function useAppBootstrap(isAuthReady: boolean): boolean {
   const [isReady, setIsReady] = useState(false);
-  const { user, isAuthenticated, token } = useAuthStore();
+  const { user, isAuthenticated, token, identitySource } = useAuthStore();
 
   useEffect(() => {
     let isMounted = true;
@@ -31,7 +31,12 @@ export default function useAppBootstrap(isAuthReady: boolean): boolean {
         await hydrateDailyLoopFromCache(userId);
         logInfo('bootstrap.app.cache_hydrated', { userId });
 
-        if (isAuthenticated && user?.sub && token) {
+        if (
+          isAuthenticated &&
+          user?.sub &&
+          token &&
+          identitySource === 'restore'
+        ) {
           await activateAuthenticatedSession({
             userId: user.sub,
             intent: 'restore',

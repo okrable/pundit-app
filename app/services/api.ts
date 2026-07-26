@@ -117,12 +117,14 @@ async function executeFetch<T>(
   }
 
   clearTimeout(timeout);
+  const serverTiming = response.headers.get('server-timing') || undefined;
   logInfo('api.request.response', {
     endpoint,
     method,
     status: response.status,
     durationMs: Date.now() - startedAt,
     attempt,
+    serverTiming,
   });
 
   if (!response.ok) {

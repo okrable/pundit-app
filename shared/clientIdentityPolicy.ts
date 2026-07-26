@@ -5,6 +5,31 @@ export type ClientIdentityStatus =
   | 'complete'
   | 'failed';
 
+export function buildIdentityActivationKey(
+  userId: string,
+  authStateVersion: number
+): string {
+  return `${userId}:${authStateVersion}`;
+}
+
+export function isIdentityActivationCurrent(
+  expectedUserId: string,
+  expectedAuthStateVersion: number,
+  current: {
+    userId?: string | null;
+    token?: string | null;
+    isAuthenticated: boolean;
+    authStateVersion: number;
+  }
+): boolean {
+  return (
+    current.authStateVersion === expectedAuthStateVersion &&
+    current.userId === expectedUserId &&
+    current.isAuthenticated &&
+    Boolean(current.token)
+  );
+}
+
 export function resolveStoredIdentityStatus({
   username,
   onboardingStatus,
@@ -22,6 +47,38 @@ export function shouldBlockAuthenticatedNavigation(
   identityStatus: ClientIdentityStatus
 ): boolean {
   return isAuthenticated && identityStatus !== 'complete';
+}
+
+export function shouldShowUsernameOnboarding(
+  isAuthenticated: boolean,
+  identityStatus: ClientIdentityStatus
+): boolean {
+  return isAuthenticated && identityStatus === 'username_required';
+}
+
+export function shouldShowIdentitySync(
+  isAuthenticated: boolean,
+  identityStatus: ClientIdentityStatus,
+  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed'
+): boolean {
+  return (
+    isAuthenticated &&
+    authSyncStatus !== 'failed' &&
+    (identityStatus === 'unknown' ||
+      identityStatus === 'syncing' ||
+      authSyncStatus === 'syncing')
+  );
+}
+
+export function shouldShowIdentityFailure(
+  isAuthenticated: boolean,
+  identityStatus: ClientIdentityStatus,
+  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed'
+): boolean {
+  return (
+    isAuthenticated &&
+    (identityStatus === 'failed' || authSyncStatus === 'failed')
+  );
 }
 
 export function canProcessProtectedAction(

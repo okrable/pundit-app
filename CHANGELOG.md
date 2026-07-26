@@ -2,6 +2,17 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.1.2 - Authentication and quiz sync hardening
+
+- Removed duplicate post-login identity activation and restricted username
+  onboarding to accounts explicitly marked as requiring a username.
+- Discarded stale authentication work after logout, token changes, or account
+  switches, with a dedicated retry/sign-out state for genuine sync failures.
+- Made quiz completion local-first so the result and projected streak update
+  immediately before the durable server submission starts.
+- Added one automatic transient submission retry, retained failed submissions
+  for later warm-start retry, and logged server timing details.
+
 ## v2.1.1 - Streak icon polish
 
 - Replaced the profile streak artwork with the two-tone Microsoft Fluent Emoji

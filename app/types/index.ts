@@ -64,6 +64,7 @@ export interface QuizResult {
   bestScore: number;
   answers: boolean[];
   syncState?: SyncState;
+  isOptimistic?: boolean;
 }
 
 export type LeaderboardPeriod = 'daily';

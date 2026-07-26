@@ -23,8 +23,20 @@ export async function setPendingQuizSubmission(
   }
 }
 
-export async function clearPendingQuizSubmission(): Promise<void> {
+export async function clearPendingQuizSubmission(expected?: {
+  userId: string;
+  quizId: string;
+}): Promise<void> {
   try {
+    if (expected) {
+      const current = await getPendingQuizSubmission();
+      if (
+        current &&
+        (current.userId !== expected.userId || current.quizId !== expected.quizId)
+      ) {
+        return;
+      }
+    }
     await AsyncStorage.removeItem(PENDING_SUBMISSION_KEY);
   } catch (error) {
     console.error('Error clearing pending quiz submission:', error);

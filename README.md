@@ -213,17 +213,24 @@ pundit-app/
 3. Question prompt types out intentionally before answer options appear.
 4. Timer starts after all options are visible.
 5. Answer tap locks the choice, pauses briefly, reveals correctness, then transitions to the next question.
-6. After the fifth answer, the app shows the daily summary immediately.
-7. Authenticated plays submit to the server; guest plays remain local until migrated after login.
+6. After the fifth answer, the app durably saves the result, updates the
+   projected streak, and shows the daily summary immediately.
+7. Authenticated plays submit in the background with one transient retry;
+   guest plays remain local until migrated after login.
 
 ## Auth and Guest Model
 
 - Guests can play the daily quiz without registration.
 - Guest daily results are stored locally and do not call `submitQuiz` immediately.
+- Interactive login owns its activation path; bootstrap activates only sessions
+  restored from storage, and stale activation results are discarded after
+  logout, token changes, or account switches.
 - After login, the centralized auth flow reconciles identity before releasing the UI:
   - authenticated local/server result wins if present;
   - otherwise a valid guest result is migrated to the authenticated user;
   - stale guest cache is cleared after reconciliation.
+- Username onboarding is shown only when the synchronized profile explicitly
+  reports `username_required`; other sync work uses the normal auth handoff.
 - Logout clears the local app session without opening the Auth0 browser logout flow.
 
 ## API Surface

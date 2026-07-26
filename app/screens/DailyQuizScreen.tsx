@@ -47,8 +47,7 @@ export default function DailyQuizScreen() {
     userId: quizUserId,
     isReconcilingIdentity,
     fetchQuiz,
-    submitQuizAnswers,
-    createLocalResult,
+    completeQuiz,
     reconcileIdentity,
     setUserId,
     setCachedResult,
@@ -252,8 +251,7 @@ export default function DailyQuizScreen() {
               })
             );
 
-            void createLocalResult(formattedAnswers);
-            void submitQuizAnswers(formattedAnswers);
+            void completeQuiz(formattedAnswers);
           } else {
             setCurrentQuestionIndex((prev) => prev + 1);
             setTimeRemaining(TIMER_DURATION);

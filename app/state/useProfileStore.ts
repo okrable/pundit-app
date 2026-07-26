@@ -181,14 +181,32 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
   markPlayedToday: async (result: QuizResultImmediate | QuizResult, userId: string) => {
     const isGuest = userId.startsWith('guest_');
+    const authState = useAuthStore.getState();
+    if (
+      !isGuest &&
+      (!authState.isAuthenticated || authState.user?.sub !== userId)
+    ) {
+      logInfo('profile.mark_played.discarded_stale', {
+        userId,
+        authUserId: authState.user?.sub,
+      });
+      return;
+    }
+
     const alreadyPlayedToday = get().playedToday;
-    const currentStats = get().stats ?? (userId.startsWith('guest_') ? GUEST_STATS : null);
+    const currentStats =
+      (get().statsUserId === userId ? get().stats : null) ??
+      (isGuest ? GUEST_STATS : null);
+    const isServerConfirmed =
+      result.syncState === undefined || result.syncState === 'synced';
+    const shouldApplyResult =
+      isGuest || isServerConfirmed || Boolean(result.isOptimistic);
+
     if (!currentStats) {
-      const isServerConfirmed = result.syncState === undefined || result.syncState === 'synced';
       const nextStats: UserStats = {
         ...GUEST_STATS,
-        streak: isGuest || isServerConfirmed ? result.streak : 0,
-        streakStatus: isGuest || isServerConfirmed
+        streak: shouldApplyResult ? result.streak : 0,
+        streakStatus: shouldApplyResult
           ? {
               current: result.streak,
               state: 'active_today',
@@ -197,12 +215,8 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
             }
           : GUEST_STATS.streakStatus,
         bestScore: Math.max(result.bestScore, result.score),
-        totalQuizzes: isGuest || isServerConfirmed ? 1 : 0,
+        totalQuizzes: shouldApplyResult ? 1 : 0,
       };
-
-      if (!isGuest) {
-        await setCachedUserStats(userId, nextStats);
-      }
 
       set({
         statsUserId: userId,
@@ -210,14 +224,22 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         playedToday: true,
         error: null,
       });
+
+      if (!isGuest) {
+        await setCachedUserStats(userId, nextStats);
+        const refreshedCache = await getCachedUserStats(userId);
+        if (get().statsUserId === userId) {
+          set({ statsCache: refreshedCache });
+        }
+      }
+
       return;
     }
 
-    const isServerConfirmed = result.syncState === undefined || result.syncState === 'synced';
     const nextStats: UserStats = {
       ...currentStats,
-      streak: isGuest || isServerConfirmed ? result.streak : currentStats.streak,
-      streakStatus: isGuest || isServerConfirmed
+      streak: shouldApplyResult ? result.streak : currentStats.streak,
+      streakStatus: shouldApplyResult
         ? {
             current: result.streak,
             state: 'active_today',
@@ -231,16 +253,20 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         : currentStats.totalQuizzes,
     };
 
-    if (!isGuest) {
-      await setCachedUserStats(userId, nextStats);
-    }
-
     set({
       statsUserId: userId,
       stats: nextStats,
       playedToday: true,
       error: null,
     });
+
+    if (!isGuest) {
+      await setCachedUserStats(userId, nextStats);
+      const refreshedCache = await getCachedUserStats(userId);
+      if (get().statsUserId === userId) {
+        set({ statsCache: refreshedCache });
+      }
+    }
   },
 
   reset: () => set({

@@ -22,9 +22,14 @@ import {
 import { isCacheSchemaCurrent } from '../shared/cachePolicy';
 import { formatPublicPlayerName } from '../app/utils/publicIdentity';
 import {
+  buildIdentityActivationKey,
   canProcessProtectedAction,
+  isIdentityActivationCurrent,
   resolveStoredIdentityStatus,
   shouldBlockAuthenticatedNavigation,
+  shouldShowIdentityFailure,
+  shouldShowIdentitySync,
+  shouldShowUsernameOnboarding,
 } from '../shared/clientIdentityPolicy';
 import {
   canReuseFriendLink,
@@ -40,7 +45,12 @@ import {
 import {
   buildStreakStatus,
   calculateStreakProjection,
+  projectStreakAfterPlay,
 } from '../shared/streak';
+import {
+  isQuizSubmissionCurrent,
+  isTransientQuizSubmissionFailure,
+} from '../shared/quizSync';
 
 test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(undefined), 60);
@@ -195,7 +205,15 @@ test('keeps incomplete signup onboarding blocking across later restores', () => 
       hasUsername: false,
       intent: 'login',
     }),
-    'require_username'
+    'generate_username'
+  );
+  assert.equal(
+    chooseIdentityProvisioningAction({
+      hasUserRow: false,
+      hasUsername: false,
+      intent: 'restore',
+    }),
+    'generate_username'
   );
 });
 
@@ -245,6 +263,129 @@ test('restores and gates authenticated identity before protected work', () => {
   assert.equal(shouldBlockAuthenticatedNavigation(false, 'unknown'), false);
   assert.equal(canProcessProtectedAction(true, 'complete'), true);
   assert.equal(canProcessProtectedAction(true, 'syncing'), false);
+  assert.equal(shouldShowUsernameOnboarding(true, 'username_required'), true);
+  assert.equal(shouldShowUsernameOnboarding(true, 'syncing'), false);
+  assert.equal(shouldShowIdentitySync(true, 'unknown', 'idle'), true);
+  assert.equal(shouldShowIdentitySync(true, 'complete', 'syncing'), true);
+  assert.equal(shouldShowIdentityFailure(true, 'failed', 'idle'), true);
+  assert.equal(shouldShowIdentityFailure(true, 'complete', 'failed'), true);
+  assert.equal(buildIdentityActivationKey('auth0|player', 4), 'auth0|player:4');
+  assert.notEqual(
+    buildIdentityActivationKey('auth0|player', 4),
+    buildIdentityActivationKey('auth0|player', 5)
+  );
+  assert.equal(
+    isIdentityActivationCurrent('auth0|player', 4, {
+      userId: 'auth0|player',
+      token: 'token',
+      isAuthenticated: true,
+      authStateVersion: 4,
+    }),
+    true
+  );
+  assert.equal(
+    isIdentityActivationCurrent('auth0|player', 4, {
+      userId: 'auth0|other',
+      token: 'token',
+      isAuthenticated: true,
+      authStateVersion: 4,
+    }),
+    false
+  );
+  assert.equal(
+    isIdentityActivationCurrent('auth0|player', 4, {
+      userId: 'auth0|player',
+      token: null,
+      isAuthenticated: true,
+      authStateVersion: 4,
+    }),
+    false
+  );
+  assert.equal(
+    isIdentityActivationCurrent('auth0|player', 4, {
+      userId: 'auth0|player',
+      token: 'token',
+      isAuthenticated: true,
+      authStateVersion: 5,
+    }),
+    false
+  );
+});
+
+test('projects an immediate post-play streak from date-aware state', () => {
+  assert.equal(
+    projectStreakAfterPlay({
+      current: 3,
+      state: 'at_risk',
+      lastPlayedDate: '2026-07-25',
+      asOfQuizDate: '2026-07-26',
+    }),
+    4
+  );
+  assert.equal(
+    projectStreakAfterPlay({
+      current: 3,
+      state: 'active_today',
+      lastPlayedDate: '2026-07-26',
+      asOfQuizDate: '2026-07-26',
+    }),
+    3
+  );
+  assert.equal(
+    projectStreakAfterPlay({
+      current: 0,
+      state: 'inactive',
+      lastPlayedDate: '2026-07-20',
+      asOfQuizDate: '2026-07-26',
+    }),
+    1
+  );
+  assert.equal(
+    projectStreakAfterPlay({
+      current: 0,
+      state: 'not_started',
+      lastPlayedDate: null,
+      asOfQuizDate: '2026-07-26',
+    }),
+    1
+  );
+});
+
+test('retries only transient quiz submission failures', () => {
+  assert.equal(isTransientQuizSubmissionFailure(undefined), true);
+  assert.equal(isTransientQuizSubmissionFailure(408), true);
+  assert.equal(isTransientQuizSubmissionFailure(500), true);
+  assert.equal(isTransientQuizSubmissionFailure(503), true);
+  assert.equal(isTransientQuizSubmissionFailure(400), false);
+  assert.equal(isTransientQuizSubmissionFailure(401), false);
+  assert.equal(isTransientQuizSubmissionFailure(429), false);
+  assert.equal(
+    isQuizSubmissionCurrent(
+      'auth0|player',
+      'quiz-today',
+      'auth0|player',
+      'quiz-today'
+    ),
+    true
+  );
+  assert.equal(
+    isQuizSubmissionCurrent(
+      'auth0|player',
+      'quiz-today',
+      'auth0|other',
+      'quiz-today'
+    ),
+    false
+  );
+  assert.equal(
+    isQuizSubmissionCurrent(
+      'auth0|player',
+      'quiz-today',
+      'auth0|player',
+      'quiz-newer'
+    ),
+    false
+  );
 });
 
 test('formats only canonical usernames or explicit legacy labels', () => {

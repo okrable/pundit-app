@@ -84,3 +84,15 @@ export function buildStreakStatus(
 export function formatStreakLabel(streak: number): string {
   return `${streak} ${streak === 1 ? 'day' : 'days'} streak`;
 }
+
+export function projectStreakAfterPlay(status: StreakStatus): number {
+  if (status.state === 'active_today') {
+    return status.current;
+  }
+
+  if (status.state === 'at_risk') {
+    return status.current + 1;
+  }
+
+  return 1;
+}

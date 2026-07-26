@@ -5,6 +5,7 @@ import { useProfileStore } from '../state/useProfileStore';
 import { useQuizStore } from '../state/useQuizStore';
 import { useChallengeStore } from '../state/useChallengeStore';
 import { logError, logInfo, logWarn } from './debugLog';
+import { isIdentityActivationCurrent } from '../../shared/clientIdentityPolicy';
 
 const inflightPrefetches = new Map<string, Promise<void>>();
 const inflightAuthSyncs = new Map<string, Promise<void>>();
@@ -114,7 +115,9 @@ export async function syncAuthenticatedSession({
   userProfile,
   source,
 }: AuthenticatedSessionSyncOptions): Promise<void> {
-  const syncKey = `${userId}:${source}:${useAuthStore.getState().authStateVersion}`;
+  const startedAuthState = useAuthStore.getState();
+  const startedAuthStateVersion = startedAuthState.authStateVersion;
+  const syncKey = `${userId}:${startedAuthStateVersion}`;
   const existingSync = inflightAuthSyncs.get(syncKey);
   if (existingSync) {
     logWarn('dailyLoop.authSync.skipped_inflight', { userId, source });
@@ -122,17 +125,42 @@ export async function syncAuthenticatedSession({
   }
 
   const sync = (async () => {
+    const assertCurrentSession = () => {
+      const currentAuthState = useAuthStore.getState();
+      if (!isIdentityActivationCurrent(userId, startedAuthStateVersion, {
+        userId: currentAuthState.user?.sub,
+        token: currentAuthState.token,
+        isAuthenticated: currentAuthState.isAuthenticated,
+        authStateVersion: currentAuthState.authStateVersion,
+      })) {
+        throw new Error('Authenticated session changed during synchronization');
+      }
+    };
+
+    assertCurrentSession();
     useAuthStore.getState().beginAuthSync(source);
     logInfo('dailyLoop.authSync.start', { userId, source });
 
     try {
       await useQuizStore.getState().reconcileIdentity(userId, userProfile);
+      assertCurrentSession();
       await prefetchDailyLoop({ userId, mode: 'bootstrap-auth' });
+      assertCurrentSession();
       useAuthStore.getState().finishAuthSync();
       logInfo('dailyLoop.authSync.success', { userId, source });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sync authenticated session';
-      useAuthStore.getState().failAuthSync(message);
+      const latestAuthState = useAuthStore.getState();
+      if (isIdentityActivationCurrent(userId, startedAuthStateVersion, {
+        userId: latestAuthState.user?.sub,
+        token: latestAuthState.token,
+        isAuthenticated: latestAuthState.isAuthenticated,
+        authStateVersion: latestAuthState.authStateVersion,
+      })) {
+        latestAuthState.failAuthSync(message);
+      } else {
+        logWarn('dailyLoop.authSync.discarded_stale', { userId, source });
+      }
       logError('dailyLoop.authSync.error', { userId, source, message });
       throw error;
     }
