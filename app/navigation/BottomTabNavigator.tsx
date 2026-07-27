@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import DailyQuizScreen from '../screens/DailyQuizScreen';
+import GamesNavigator from './GamesNavigator';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import MeScreen from '../screens/MeScreen';
 import ChallengeScreen from '../screens/ChallengeScreen';
@@ -47,9 +47,10 @@ export default function BottomTabNavigator() {
     >
       <Tab.Screen
         name="Games"
-        component={DailyQuizScreen}
+        component={GamesNavigator}
         options={{
-          title: 'Quiz',
+          title: 'Games',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="football-outline" color={color} size={size} />
           ),

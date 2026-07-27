@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import QuestionCard from '../components/QuestionCard';
 import ResultsScreen from '../components/ResultsScreen';
 import WelcomeScreen from '../components/WelcomeScreen';
@@ -15,13 +16,16 @@ import { theme } from '../theme/theme';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 import { calculateQuizPoints } from '../../shared/scoring';
 import { trackAnalyticsEvent } from '../services/analytics';
+import type { GamesStackParamList } from '../navigation/GamesNavigator';
 
 const REVEAL_SUSPENSE_DELAY = 1000;
 const RESULT_HOLD_DELAY = 1650;
 const QUESTION_EXIT_DELAY = 1700;
 const TIMER_DURATION = 20;
 
-export default function DailyQuizScreen() {
+type Props = NativeStackScreenProps<GamesStackParamList, 'DailyQuiz'>;
+
+export default function DailyQuizScreen({ navigation, route }: Props) {
   const centeredQuizStyle = useCenteredWebStyle(webContentWidth.quiz);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -98,6 +102,28 @@ export default function DailyQuizScreen() {
       setStartRequested(false);
     }
   }, [quiz, startRequested]);
+
+  useEffect(() => {
+    if (!route.params?.autoStart || cachedResult || quizStarted) {
+      return;
+    }
+
+    resetPlayState();
+    if (quiz) {
+      setQuizStarted(true);
+    } else {
+      setStartRequested(true);
+      void fetchQuiz();
+    }
+    navigation.setParams({ autoStart: false });
+  }, [
+    cachedResult,
+    fetchQuiz,
+    navigation,
+    quiz,
+    quizStarted,
+    route.params?.autoStart,
+  ]);
 
   useEffect(() => {
     if (quiz) {
@@ -276,17 +302,11 @@ export default function DailyQuizScreen() {
       ? answers[currentQuestion.id]
       : null;
 
-  const handleCloseResults = async () => {
+  const handleReturnToGames = () => {
     resetPlayState();
     setQuizStarted(false);
     resetQuiz();
-
-    const userId = isAuthenticated && user ? user.sub : await getUserId();
-    const todayResult = await getTodayQuizResult(userId);
-    setCachedResult(todayResult);
-    if (!todayResult) {
-      void fetchQuiz();
-    }
+    navigation.popToTop();
   };
 
   const handleStartQuiz = () => {
@@ -322,11 +342,22 @@ export default function DailyQuizScreen() {
   }
 
   if (result && quiz) {
-    return <ResultsScreen result={result} quiz={quiz} onPlayAgain={handleCloseResults} />;
+    return (
+      <ResultsScreen
+        result={result}
+        quiz={quiz}
+        onReturnToGames={handleReturnToGames}
+      />
+    );
   }
 
   if (cachedResult) {
-    return <CompletedQuizScreen result={cachedResult} />;
+    return (
+      <CompletedQuizScreen
+        result={cachedResult}
+        onReturnToGames={handleReturnToGames}
+      />
+    );
   }
 
   if (!quizStarted) {
