@@ -21,11 +21,34 @@ Canonical TypeScript interfaces live in `app/types/index.ts`.
       "options": ["A", "B", "C", "D"],
       "correctOptionIndex": 1
     }
-  ]
+  ],
+  "careerGame": {
+    "id": "career-YYYY-MM-DD",
+    "date": "YYYY-MM-DD",
+    "prompt": "...",
+    "canonicalName": "Anthony Gordon",
+    "acceptedAliases": [],
+    "acceptedSurnames": ["Gordon"],
+    "career": [
+      {
+        "years": "2017–2023",
+        "team": "Everton",
+        "appearances": 65,
+        "goals": 7,
+        "category": "Domestic",
+        "rank": 1
+      }
+    ]
+  }
 }
 ```
 
 `correctOptionIndex` is intentionally present before submit so the app can reveal answers and build local results immediately.
+
+`careerGame` is optional so a missing career datasource never blocks the
+five-question quiz. The installed fallback is date-scoped and uses the supplied
+Anthony Gordon record until the upstream adapter replaces it. Only Years, Team,
+Apps, and Goals are displayed; category and rank remain source metadata.
 
 ## Answer Timing
 
@@ -56,6 +79,8 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
   a different value returns `USERNAME_IMMUTABLE`.
 - `results` stores daily quiz submissions and is authoritative for streak
   reconstruction.
+- `career_game_results` stores independent career-game completion and does not
+  contribute to quiz scores, streaks, profile aggregates, or leaderboards.
 - Daily leaderboards rank a single `quiz_date` by score, then earliest submission time, then user id.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
 - `users.username` is the canonical public identity for persisted social data.

@@ -27,6 +27,17 @@ Bottom tabs:
 - League Tables
 - Me
 
+## Games Hub
+
+The Games tab opens an internal stack and displays the Daily Quiz and player
+journey as independent mode components. Each component reads its own daily
+result: completing the quiz shows its score recap without disabling the career
+game, and finding the career player leaves an unplayed quiz available.
+
+The player journey uses the headline “Whose journey is this?”, the supporting
+copy “Trace the clubs. Guess the player.”, an illustrated How it works modal,
+and a responsive Years/Team/Apps/Goals card with unlimited unscored guesses.
+
 ## Daily Quiz Flow
 
 ```text
@@ -97,8 +108,9 @@ changes mid-flight. Friends data is forcibly revalidated after accept/remove
 mutations and whenever League Tables gains navigation focus, so remote
 acceptances do not wait for cache expiry.
 
-Profile and leaderboard resources use social cache schema 2. Old social
-payloads are removed lazily while quiz and result storage keeps schema 1.
+Profile and leaderboard resources use dedicated social cache schemas. The daily
+payload uses quiz cache schema 2 so clients refresh for `careerGame`, while
+stored quiz and career results remain separate and are not cleared.
 
 ## Settings
 

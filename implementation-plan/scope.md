@@ -5,6 +5,9 @@
 - One daily 5-question football quiz.
 - Bottom navigation: Games, Challenge, League Tables, Me.
 - Refreshed shared quiz gameplay for daily and challenge modes.
+- Games hub with independent Daily Quiz and daily player-journey completion.
+- Daily career card with unlimited name guesses and separate guest/authenticated
+  result persistence.
 - Speed-based scoring with post-zero minimum score for correct answers.
 - Daily summary immediately after play and completed state on return.
 - Guest play with local-only daily result storage.
