@@ -1,0 +1,50 @@
+import type { CareerGame } from '../../../app/types';
+
+export async function getCareerGameForDate(
+  date: string,
+  _language = 'uk'
+): Promise<CareerGame> {
+  return {
+    id: `career-${date}`,
+    date,
+    prompt:
+      'Sold by Merseyside neighbours for a hefty fee, this direct winger earned England caps before a surprising Catalan move.',
+    canonicalName: 'Anthony Gordon',
+    acceptedAliases: [],
+    acceptedSurnames: ['Gordon'],
+    career: [
+      {
+        years: '2017–2023',
+        team: 'Everton',
+        appearances: 65,
+        goals: 7,
+        category: 'Domestic',
+        rank: 1,
+      },
+      {
+        years: '2021',
+        team: '→ Preston North End (loan)',
+        appearances: 11,
+        goals: 0,
+        category: 'Domestic',
+        rank: 2,
+      },
+      {
+        years: '2023–2026',
+        team: 'Newcastle United',
+        appearances: 111,
+        goals: 24,
+        category: 'Domestic',
+        rank: 3,
+      },
+      {
+        years: '2026–',
+        team: 'Barcelona',
+        appearances: 0,
+        goals: 0,
+        category: 'Domestic',
+        rank: 4,
+      },
+    ],
+  };
+}

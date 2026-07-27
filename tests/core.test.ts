@@ -51,6 +51,13 @@ import {
   isQuizSubmissionCurrent,
   isTransientQuizSubmissionFailure,
 } from '../shared/quizSync';
+import {
+  matchesCareerAnswer,
+  normalizeCareerAnswer,
+} from '../shared/careerAnswer';
+import { getCareerGameForDate } from '../netlify/functions/lib/careerGame';
+import { buildDailyQuizResponse } from '../netlify/functions/lib/dailyQuizResponse';
+import { getGamesHubCompletionState } from '../shared/gamesHub';
 
 test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(undefined), 60);
@@ -59,6 +66,104 @@ test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(8_000), 60);
   assert.equal(calculateQuizPoints(4_000), 40);
   assert.equal(calculateQuizPoints(0), 20);
+});
+
+test('matches career answers with configured names and conservative spelling tolerance', () => {
+  const answerKey = {
+    canonicalName: 'Anthony Gordon',
+    acceptedAliases: ['Anthony M. Gordon'],
+    acceptedSurnames: ['Gordon', 'Van der Vaart'],
+  };
+
+  assert.equal(normalizeCareerAnswer('  ÁNTHONY-GORDON  '), 'anthony gordon');
+  assert.equal(matchesCareerAnswer('Anthony Gordon', answerKey), true);
+  assert.equal(matchesCareerAnswer('gordon', answerKey), true);
+  assert.equal(matchesCareerAnswer('van-der-vaart', answerKey), true);
+  assert.equal(matchesCareerAnswer('Anthony Gordn', answerKey), true);
+  assert.equal(matchesCareerAnswer('Gordn', answerKey), false);
+  assert.equal(matchesCareerAnswer('Anthony Jordan', answerKey), false);
+  assert.equal(matchesCareerAnswer('   ', answerKey), false);
+});
+
+test('returns the temporary Anthony Gordon career fixture in display order', async () => {
+  const game = await getCareerGameForDate('2026-07-27', 'uk');
+
+  assert.equal(game.id, 'career-2026-07-27');
+  assert.equal(game.date, '2026-07-27');
+  assert.equal(game.number, undefined);
+  assert.equal(game.canonicalName, 'Anthony Gordon');
+  assert.deepEqual(game.acceptedSurnames, ['Gordon']);
+  assert.deepEqual(
+    game.career.map((row) => [
+      row.years,
+      row.team,
+      row.appearances,
+      row.goals,
+      row.category,
+      row.rank,
+    ]),
+    [
+      ['2017–2023', 'Everton', 65, 7, 'Domestic', 1],
+      ['2021', '→ Preston North End (loan)', 11, 0, 'Domestic', 2],
+      ['2023–2026', 'Newcastle United', 111, 24, 'Domestic', 3],
+      ['2026–', 'Barcelona', 0, 0, 'Domestic', 4],
+    ]
+  );
+});
+
+test('adds the career game without changing daily quiz root fields', async () => {
+  const careerGame = await getCareerGameForDate('2026-07-27', 'uk');
+  const response = buildDailyQuizResponse(
+    '2026-07-27',
+    [
+      {
+        question_id: 'question-1',
+        question: 'Who is this player?',
+        player_name: 'Correct Player',
+        player_0: 'First Player',
+        player_1: 'Correct Player',
+        player_2: 'Third Player',
+        player_3: 'Fourth Player',
+      },
+    ],
+    careerGame
+  );
+
+  assert.equal(response.id, 'quiz-2026-07-27');
+  assert.equal(response.date, '2026-07-27');
+  assert.deepEqual(response.questions, [
+    {
+      id: 'question-1',
+      prompt: 'Who is this player?',
+      options: [
+        'First Player',
+        'Correct Player',
+        'Third Player',
+        'Fourth Player',
+      ],
+      correctOptionIndex: 1,
+    },
+  ]);
+  assert.equal(response.careerGame, careerGame);
+});
+
+test('keeps daily quiz and career completion states independent', () => {
+  assert.deepEqual(getGamesHubCompletionState(false, false), {
+    quiz: 'available',
+    career: 'available',
+  });
+  assert.deepEqual(getGamesHubCompletionState(true, false), {
+    quiz: 'completed',
+    career: 'available',
+  });
+  assert.deepEqual(getGamesHubCompletionState(false, true), {
+    quiz: 'available',
+    career: 'completed',
+  });
+  assert.deepEqual(getGamesHubCompletionState(true, true), {
+    quiz: 'completed',
+    career: 'completed',
+  });
 });
 
 test('validates answer shape, bounds, and duplicates', () => {
@@ -394,7 +499,7 @@ test('formats only canonical usernames or explicit legacy labels', () => {
   assert.equal(formatPublicPlayerName(null, null, 'Opponent'), 'Opponent');
 });
 
-test('upgrades social cache schemas without invalidating version-one quiz resources', () => {
+test('compares resource cache schemas without cross-resource assumptions', () => {
   assert.equal(isCacheSchemaCurrent(1, 1), true);
   assert.equal(isCacheSchemaCurrent(1, 2), false);
   assert.equal(isCacheSchemaCurrent(2, 2), true);

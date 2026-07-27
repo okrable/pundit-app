@@ -11,6 +11,7 @@ export interface Quiz {
   id: string;
   date: string;
   questions: Question[];
+  careerGame?: CareerGame;
 }
 
 export interface CacheEnvelope<T> {
@@ -23,6 +24,36 @@ export interface CacheEnvelope<T> {
 }
 
 export type SyncState = 'pending' | 'synced' | 'failed';
+
+export interface CareerStatRow {
+  years: string;
+  team: string;
+  appearances: number;
+  goals: number;
+  category?: string;
+  rank?: number;
+}
+
+export interface CareerGame {
+  id: string;
+  date: string;
+  number?: number;
+  prompt: string;
+  canonicalName: string;
+  acceptedAliases: string[];
+  acceptedSurnames: string[];
+  career: CareerStatRow[];
+}
+
+export interface CareerGameResult {
+  date: string;
+  gameId: string;
+  completed: true;
+  canonicalName: string;
+  submittedAnswer: string;
+  syncState?: SyncState;
+  isOptimistic?: boolean;
+}
 
 // Answer submitted with timing info
 export interface AnswerWithTiming {
@@ -334,5 +365,13 @@ export interface PendingChallengeSubmission {
   challengeId: string;
   answers: AnswerWithTiming[];
   localResult: ChallengeSubmitResult;
+  queuedAt: string;
+}
+
+export interface PendingCareerGameSubmission {
+  userId: string;
+  gameId: string;
+  submittedAnswer: string;
+  localResult: CareerGameResult;
   queuedAt: string;
 }
