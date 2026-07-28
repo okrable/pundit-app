@@ -18,6 +18,7 @@ import { getUserId } from '../storage/userStorage';
 import { getTodayQuizResult } from '../storage/quizStorage';
 import ComingSoonModal from '../components/ComingSoonModal';
 import GameGalleryTile from '../components/GameGalleryTile';
+import JourneyGraphic from '../components/JourneyGraphic';
 import CenteredWebContent, {
   useMobileLayoutMetrics,
   webContentWidth,
@@ -178,22 +179,34 @@ export default function GamesHomeScreen({ navigation }: Props) {
     Boolean(careerResult)
   );
 
-  const quizBadge =
+  const quizActionLabel =
     hubState.quiz === 'completed'
-      ? 'COMPLETE'
+      ? 'View recap'
       : quizAvailable
-        ? 'PLAY TODAY'
+        ? 'Kick Off'
         : isDailyPayloadLoading
-          ? 'LOADING'
-          : 'UNAVAILABLE';
-  const careerBadge =
+          ? 'Warming up'
+          : 'Unavailable';
+  const careerActionLabel =
     hubState.career === 'completed'
-      ? 'COMPLETE'
+      ? 'View result'
       : careerAvailable
-        ? 'PLAY TODAY'
+        ? 'Start guessing'
         : isDailyPayloadLoading
-          ? 'LOADING'
-          : 'UNAVAILABLE';
+          ? 'Warming up'
+          : 'Unavailable';
+  const quizActionTone =
+    quizAvailable || hubState.quiz === 'completed'
+      ? 'primary'
+      : quizError
+        ? 'unavailable'
+        : 'muted';
+  const careerActionTone =
+    careerAvailable || hubState.career === 'completed'
+      ? 'primary'
+      : careerUnavailableError
+        ? 'unavailable'
+        : 'muted';
 
   const quizDisabled =
     hubState.quiz !== 'completed' &&
@@ -217,18 +230,34 @@ export default function GamesHomeScreen({ navigation }: Props) {
 
           <GallerySection title="Today" cardWidth={cardWidth}>
             <GameGalleryTile
-              title="Pundit"
-              description="Five questions. One daily score."
-              iconName="football-outline"
-              badgeLabel={quizBadge}
-              badgeTone={
-                hubState.quiz === 'completed'
-                  ? 'complete'
-                  : quizAvailable
-                    ? 'accent'
-                    : quizError
-                      ? 'unavailable'
-                      : 'muted'
+              title="PUNDIT"
+              titleVariant="pundit"
+              description="5 Questions. Don’t bottle it."
+              artwork={
+                <View style={styles.punditFootball}>
+                  <Ionicons
+                    name="football"
+                    size={42}
+                    color={theme.colors.white}
+                  />
+                </View>
+              }
+              actionLabel={quizActionLabel}
+              actionTone={quizActionTone}
+              showActionArrow={quizAvailable && !cachedResult}
+              actionSummary={
+                cachedResult ? (
+                  <View style={styles.quizSummary}>
+                    <Text style={styles.quizScore}>
+                      {cachedResult.score} pts
+                    </Text>
+                    <Text style={styles.quizRecap}>
+                      {quizEmojis} · {quizCorrect}/{cachedResult.totalQuestions}
+                    </Text>
+                  </View>
+                ) : quizError ? (
+                  <Text style={styles.unavailableCopy}>Try again later</Text>
+                ) : undefined
               }
               width={cardWidth}
               disabled={quizDisabled}
@@ -243,32 +272,33 @@ export default function GamesHomeScreen({ navigation }: Props) {
                   hubState.quiz === 'completed' ? undefined : { autoStart: true }
                 )
               }
-            >
-              {cachedResult ? (
-                <>
-                  <Text style={styles.quizScore}>{cachedResult.score} pts</Text>
-                  <Text style={styles.quizRecap}>
-                    {quizEmojis} · {quizCorrect}/{cachedResult.totalQuestions}
-                  </Text>
-                </>
-              ) : quizError ? (
-                <Text style={styles.statusCopy}>Try again later</Text>
-              ) : null}
-            </GameGalleryTile>
+            />
 
             <GameGalleryTile
               title="Whose journey is this?"
               description="Trace the clubs. Guess the player."
-              iconName="git-branch-outline"
-              badgeLabel={careerBadge}
-              badgeTone={
-                hubState.career === 'completed'
-                  ? 'complete'
-                  : careerAvailable
-                    ? 'accent'
-                    : careerUnavailableError
-                      ? 'unavailable'
-                      : 'muted'
+              artwork={
+                <JourneyGraphic
+                  width={Math.min(220, Math.max(180, cardWidth - 64))}
+                />
+              }
+              artworkPlacement="wide"
+              actionLabel={careerActionLabel}
+              actionTone={careerActionTone}
+              showActionArrow={careerAvailable && !careerResult}
+              actionSummary={
+                careerResult ? (
+                  <View style={styles.playerFound}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={21}
+                      color={theme.colors.white}
+                    />
+                    <Text style={styles.playerFoundText}>Player found</Text>
+                  </View>
+                ) : careerUnavailableError ? (
+                  <Text style={styles.unavailableCopy}>Try again later</Text>
+                ) : undefined
               }
               width={cardWidth}
               disabled={careerDisabled}
@@ -278,20 +308,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
                   : 'Starts today’s career game'
               }
               onPress={() => navigation.navigate('CareerGame')}
-            >
-              {careerResult ? (
-                <View style={styles.playerFound}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={23}
-                    color={theme.colors.primary}
-                  />
-                  <Text style={styles.playerFoundText}>Player found</Text>
-                </View>
-              ) : careerUnavailableError ? (
-                <Text style={styles.statusCopy}>Try again later</Text>
-              ) : null}
-            </GameGalleryTile>
+            />
           </GallerySection>
 
           <GallerySection title="More games" cardWidth={cardWidth}>
@@ -385,16 +402,27 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.sm,
     paddingBottom: theme.spacing.lg,
   },
+  punditFootball: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: theme.colors.primary,
+  },
+  quizSummary: {
+    alignItems: 'flex-end',
+  },
   quizScore: {
-    fontSize: 21,
+    fontSize: 16,
     fontFamily: theme.fonts.gothamBlack,
-    color: theme.colors.textDark,
+    color: theme.colors.white,
   },
   quizRecap: {
     marginTop: 2,
-    fontSize: 11,
+    fontSize: 9,
     fontFamily: theme.fonts.gothamMedium,
-    color: theme.colors.neutralDark,
+    color: theme.colors.white,
   },
   playerFound: {
     minHeight: 28,
@@ -403,12 +431,12 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   playerFoundText: {
-    fontSize: 13,
-    fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.primary,
-  },
-  statusCopy: {
     fontSize: 12,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.white,
+  },
+  unavailableCopy: {
+    fontSize: 11,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.incorrect,
   },

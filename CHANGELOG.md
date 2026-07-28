@@ -6,7 +6,8 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 
 - Renamed the Quiz tab to Games and added independently completed Daily Quiz
   and career-game tiles with cached recaps in a swipeable gallery alongside
-  provisional coming-soon game concepts.
+  provisional coming-soon game concepts. Playable tiles retain their own
+  Pundit typography, artwork, and green matchday actions.
 - Added an unlimited-guess player journey using career appearances and goals,
   tolerant name matching, illustrated rules, and a temporary Anthony Gordon
   fixture pending the upstream datasource.

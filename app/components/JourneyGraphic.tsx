@@ -3,10 +3,12 @@ import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { theme } from '../theme/theme';
 
 export default function JourneyGraphic({ width = 250 }: { width?: number }) {
+  const height = (width / 250) * 74;
+
   return (
     <Svg
       width={width}
-      height={74}
+      height={height}
       viewBox="0 0 250 74"
       accessibilityLabel="A football journey through several club stops"
     >

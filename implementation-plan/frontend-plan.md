@@ -105,7 +105,9 @@ Important behaviors:
 on the orange Games surface. The warm-white Daily Quiz and career tiles are
 single press targets: available tiles start play, while completed tiles open
 their own cached recap. Their loading, unavailable, and completion states stay
-independent.
+independent. The Daily Quiz uses Uni Sans, its football treatment, and original
+tagline; the career tile uses the custom journey artwork. Both integrate their
+green action treatment into the card without creating a nested button.
 
 Provisional concept tiles use code-native icons and open one shared Coming Soon
 message. They do not add routes, stores, persistence, or API contracts. Rules
