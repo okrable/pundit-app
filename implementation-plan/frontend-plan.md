@@ -99,6 +99,19 @@ Important behaviors:
 - Guest results can be migrated/adopted after login when no authenticated result already exists.
 - Reconciliation resets transient play UI so stale in-progress questions do not flash.
 
+### Games Gallery
+
+`GamesHomeScreen` presents vertically stacked, horizontally snapping card rails
+on the orange Games surface. The warm-white Daily Quiz and career tiles are
+single press targets: available tiles start play, while completed tiles open
+their own cached recap. Their loading, unavailable, and completion states stay
+independent.
+
+Provisional concept tiles use code-native icons and open one shared Coming Soon
+message. They do not add routes, stores, persistence, or API contracts. Rules
+components remain available to the game surfaces but are not entry points from
+the gallery.
+
 ### Profile and Leaderboards
 
 `useProfileStore` and `useLeaderboardStore` render cached data first and
