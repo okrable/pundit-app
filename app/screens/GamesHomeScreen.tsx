@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -67,7 +68,10 @@ function GameRow({ cardWidth, children }: GameRowProps) {
         disableIntervalMomentum
         snapToAlignment="start"
         snapToInterval={cardWidth + theme.spacing.md}
-        contentContainerStyle={styles.railContent}
+        contentContainerStyle={[
+          styles.railContent,
+          Platform.OS === 'web' && styles.webRailContent,
+        ]}
       >
         {children}
       </ScrollView>
@@ -346,6 +350,10 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
+  },
+  webRailContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   punditFootball: {
     width: 64,

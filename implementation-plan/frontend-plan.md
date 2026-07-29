@@ -104,7 +104,9 @@ Important behaviors:
 `GamesHomeScreen` presents one warm-white game tile per horizontal row on the
 orange Games surface. Each row retains the horizontal rail behavior for future
 expansion, but currently contains one tile and therefore has no practical
-sideways scroll. The Daily Quiz and career tiles are single press targets:
+sideways scroll. On web, the single tile is centred within the constrained app
+shell rather than sitting at the rail's leading edge. The Daily Quiz and career
+tiles are single press targets:
 available tiles start play, while completed tiles open their own cached recap.
 Their loading, unavailable, and completion states stay independent. The Daily
 Quiz uses Uni Sans, its football treatment, and original tagline; the career
