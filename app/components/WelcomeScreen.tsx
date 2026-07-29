@@ -22,7 +22,7 @@ export default function WelcomeScreen({
   return (
     <View style={styles.container}>
       <CenteredWebContent
-        maxWidth={webContentWidth.narrow}
+        maxWidth={webContentWidth.quiz}
         style={[
           styles.content,
           { transform: [{ translateY: verticalLift }] },

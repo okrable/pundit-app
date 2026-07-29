@@ -90,7 +90,7 @@ export default function CareerGameScreen({ navigation }: Props) {
   if (result) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <CenteredWebContent maxWidth={webContentWidth.narrow} style={styles.resultContent}>
+        <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.resultContent}>
           <Image source={logoImage} style={styles.resultLogo} resizeMode="contain" />
           <View style={styles.resultCard}>
             <View style={styles.resultTick}>
@@ -158,7 +158,7 @@ export default function CareerGameScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <CenteredWebContent maxWidth={webContentWidth.standard} style={styles.content}>
+          <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Image source={logoImage} style={styles.logo} resizeMode="contain" />

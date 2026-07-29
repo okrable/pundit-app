@@ -2,6 +2,18 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.3.0 - Adaptive web and native iOS navigation
+
+- Replaced the mobile-width browser shell and bottom tabs with a full-viewport
+  responsive web layout, centred content widths, and a global Pundit header
+  with an accessible right-side navigation drawer.
+- Added compact, tablet, and desktop gutters; widened the Games gallery,
+  challenge, leaderboard, profile, gameplay, and result surfaces according to
+  their reading needs.
+- Moved iOS to React Navigation's native Apple tab controller with SF Symbols
+  and automatic iPhone/iPad presentation while leaving Android's JavaScript
+  bottom tabs unchanged.
+
 ## v2.2.0 - Games hub and daily player journey
 
 - Renamed the Quiz tab to Games and added independently completed Daily Quiz

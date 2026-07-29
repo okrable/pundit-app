@@ -9,24 +9,35 @@ import {
 } from 'react-native';
 import { theme } from '../theme/theme';
 
-export const MOBILE_WEB_SHELL_MAX_WIDTH = 460;
+export const webBreakpoint = {
+  compact: 600,
+  desktop: 900,
+} as const;
 
 export const webContentWidth = {
-  narrow: MOBILE_WEB_SHELL_MAX_WIDTH,
-  quiz: MOBILE_WEB_SHELL_MAX_WIDTH,
-  standard: MOBILE_WEB_SHELL_MAX_WIDTH,
-  wide: MOBILE_WEB_SHELL_MAX_WIDTH,
+  narrow: 560,
+  quiz: 760,
+  standard: 960,
+  wide: 1200,
 } as const;
 
 export function useMobileLayoutMetrics() {
   const { width, height } = useWindowDimensions();
-  const appWidth = Platform.OS === 'web'
-    ? Math.min(width, MOBILE_WEB_SHELL_MAX_WIDTH)
-    : width;
-  const isCompactWidth = appWidth < 390;
+  const isWeb = Platform.OS === 'web';
+  const appWidth = width;
+  const isCompactWidth = appWidth < (isWeb ? webBreakpoint.compact : 390);
   const isShortHeight = height < 720;
   const isTallPhone = height >= 840;
   const isTight = isCompactWidth || isShortHeight;
+  const responsiveScreenPadding = isWeb
+    ? appWidth < webBreakpoint.compact
+      ? theme.spacing.lg
+      : appWidth < webBreakpoint.desktop
+        ? theme.spacing.xl
+        : 40
+    : isCompactWidth
+      ? theme.spacing.md
+      : theme.spacing.lg;
 
   return {
     appWidth,
@@ -34,7 +45,15 @@ export function useMobileLayoutMetrics() {
     isShortHeight,
     isTallPhone,
     isTight,
-    screenPadding: isCompactWidth ? theme.spacing.md : theme.spacing.lg,
+    webLayout:
+      !isWeb
+        ? 'native'
+        : appWidth < webBreakpoint.compact
+          ? 'compact'
+          : appWidth < webBreakpoint.desktop
+            ? 'tablet'
+            : 'desktop',
+    screenPadding: responsiveScreenPadding,
     quizTopPadding: isShortHeight ? theme.spacing.xs : theme.spacing.md,
     quizBottomPadding: isShortHeight ? theme.spacing.md : theme.spacing.lg,
     verticalGap: isShortHeight ? theme.spacing.sm : theme.spacing.md,
@@ -56,7 +75,7 @@ export function useCenteredWebStyle(
     return null;
   }
 
-  return [styles.centered, { maxWidth: Math.min(maxWidth, MOBILE_WEB_SHELL_MAX_WIDTH) }];
+  return [styles.centered, { maxWidth }];
 }
 
 interface CenteredWebContentProps {
@@ -75,7 +94,7 @@ export default function CenteredWebContent({
   return <View style={[centeredStyle, style]}>{children}</View>;
 }
 
-export function MobileWebAppShell({ children }: { children: React.ReactNode }) {
+export function ResponsiveAppShell({ children }: { children: React.ReactNode }) {
   const { height } = useWindowDimensions();
 
   if (Platform.OS !== 'web') {
@@ -97,13 +116,11 @@ const styles = StyleSheet.create({
   webViewport: {
     flex: 1,
     width: '100%',
-    alignItems: 'center',
     backgroundColor: theme.colors.background,
   },
   webShell: {
     flex: 1,
     width: '100%',
-    maxWidth: MOBILE_WEB_SHELL_MAX_WIDTH,
     backgroundColor: theme.colors.background,
   },
 });

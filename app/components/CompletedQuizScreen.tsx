@@ -43,7 +43,7 @@ export default function CompletedQuizScreen({
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <CenteredWebContent maxWidth={webContentWidth.narrow} style={styles.content}>
+        <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
           <View style={styles.logoRow}>
             <Image
               source={require('../../assets/logo/white/pundit-white.png')}

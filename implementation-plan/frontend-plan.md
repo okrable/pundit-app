@@ -2,14 +2,15 @@
 
 ## App Structure
 
-The app uses React Navigation bottom tabs, not Expo Router.
+The app uses React Navigation, not Expo Router. Its top-level navigator is
+selected by platform.
 
 ```text
 app/
 ├── components/       # Shared UI: quiz card, results, modals, loading screens
 ├── constants/        # App constants such as version
 ├── hooks/            # Bootstrap/auth/font hooks
-├── navigation/       # Bottom tab navigator
+├── navigation/       # Web drawer, native iOS tabs, and Android bottom tabs
 ├── screens/          # Daily, Challenge, Leaderboard, Me screens
 ├── services/         # API, auth flow, Auth0 config, daily prefetch
 ├── state/            # Zustand stores
@@ -18,14 +19,40 @@ app/
 └── types/            # Shared TypeScript interfaces
 ```
 
-## Navigation
+## Adaptive Shell and Navigation
 
-Bottom tabs:
+All platforms expose the same primary sections:
 
 - Games
 - Challenge
 - League Tables
 - Me
+
+The shell differs by platform:
+
+- Web uses the full viewport, a full-width orange header, and a warm-white
+  drawer opening from the right. The header keeps the Pundit logo on the left,
+  the active section centred, and the menu control on the right.
+- iOS uses React Navigation's experimental native bottom tabs, backed by
+  Apple's tab controller. It uses SF Symbols and the system's automatic
+  iPhone/iPad tab-bar or sidebar presentation.
+- Android retains the JavaScript bottom tab navigator.
+
+Web breakpoints are compact below 600px, tablet from 600px to 899px, and
+desktop at 900px and above. Gutters are 16px, 24px, and 40px respectively.
+Authentication content is capped at 560px, gameplay/results and profile
+compositions at 760px, lists at 960px, and gallery/header framing at 1200px.
+The Games tiles themselves grow to 760px.
+
+Challenge creation and code entry form two columns on desktop. Leaderboards
+remain a centred 960px list, while Me and the daily game surfaces retain a
+comfortable 760px reading width. Mobile browsers remain single-column.
+
+Expo SDK 54 currently pins React Native 0.81 and `react-native-screens`
+`~4.16.0`. `react-native-screens` 4.25 requires React Native 0.82, so the
+native-tab controller must remain on the Expo-compatible screens version until
+the SDK is upgraded. Native-tab changes require an EAS build; Expo Go is not an
+acceptance environment.
 
 ## Games Hub
 
@@ -104,8 +131,8 @@ Important behaviors:
 `GamesHomeScreen` presents one warm-white game tile per horizontal row on the
 orange Games surface. Each row retains the horizontal rail behavior for future
 expansion, but currently contains one tile and therefore has no practical
-sideways scroll. On web, the single tile is centred within the constrained app
-shell rather than sitting at the rail's leading edge. The Daily Quiz and career
+sideways scroll. On web, the single tile is centred within the 1200px gallery
+surface and grows up to 760px. The Daily Quiz and career
 tiles are single press targets:
 available tiles start play, while completed tiles open their own cached recap.
 Their loading, unavailable, and completion states stay independent. The Daily

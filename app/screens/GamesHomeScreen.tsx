@@ -53,10 +53,11 @@ const conceptGames: ConceptGame[] = [
 
 interface GameRowProps {
   cardWidth: number;
+  screenPadding: number;
   children: React.ReactNode;
 }
 
-function GameRow({ cardWidth, children }: GameRowProps) {
+function GameRow({ cardWidth, screenPadding, children }: GameRowProps) {
   return (
     <View style={styles.gameRow}>
       <ScrollView
@@ -70,6 +71,7 @@ function GameRow({ cardWidth, children }: GameRowProps) {
         snapToInterval={cardWidth + theme.spacing.md}
         contentContainerStyle={[
           styles.railContent,
+          { paddingHorizontal: screenPadding },
           Platform.OS === 'web' && styles.webRailContent,
         ]}
       >
@@ -143,7 +145,16 @@ export default function GamesHomeScreen({ navigation }: Props) {
   );
 
   const cardWidth = useMemo(() => {
-    const availableWidth = appWidth - screenPadding * 2;
+    const availableWidth =
+      Math.min(appWidth, webContentWidth.wide) - screenPadding * 2;
+
+    if (Platform.OS === 'web' && appWidth >= 600) {
+      return Math.min(
+        webContentWidth.quiz,
+        Math.max(320, Math.round(availableWidth))
+      );
+    }
+
     return Math.min(360, Math.max(246, Math.round(availableWidth * 0.86)));
   }, [appWidth, screenPadding]);
 
@@ -203,13 +214,15 @@ export default function GamesHomeScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
       >
-        <CenteredWebContent maxWidth={webContentWidth.narrow}>
-          <View style={[styles.headerRow, { paddingHorizontal: screenPadding }]}>
-            <Image source={whiteLogo} style={styles.headerLogo} resizeMode="contain" />
-            <Text style={styles.gamesLabel}>GAMES</Text>
-          </View>
+        <CenteredWebContent maxWidth={webContentWidth.wide}>
+          {Platform.OS !== 'web' ? (
+            <View style={[styles.headerRow, { paddingHorizontal: screenPadding }]}>
+              <Image source={whiteLogo} style={styles.headerLogo} resizeMode="contain" />
+              <Text style={styles.gamesLabel}>GAMES</Text>
+            </View>
+          ) : null}
 
-          <GameRow cardWidth={cardWidth}>
+          <GameRow cardWidth={cardWidth} screenPadding={screenPadding}>
             <GameGalleryTile
               title="PUNDIT"
               titleVariant="pundit"
@@ -256,13 +269,13 @@ export default function GamesHomeScreen({ navigation }: Props) {
             />
           </GameRow>
 
-          <GameRow cardWidth={cardWidth}>
+          <GameRow cardWidth={cardWidth} screenPadding={screenPadding}>
             <GameGalleryTile
               title="Whose journey is this?"
               description="Trace the clubs. Guess the player."
               artwork={
                 <JourneyGraphic
-                  width={Math.min(220, Math.max(180, cardWidth - 64))}
+                  width={Math.min(360, Math.max(180, cardWidth - 64))}
                 />
               }
               artworkPlacement="wide"
@@ -295,7 +308,11 @@ export default function GamesHomeScreen({ navigation }: Props) {
           </GameRow>
 
           {conceptGames.map((game) => (
-            <GameRow key={game.title} cardWidth={cardWidth}>
+            <GameRow
+              key={game.title}
+              cardWidth={cardWidth}
+              screenPadding={screenPadding}
+            >
               <GameGalleryTile
                 {...game}
                 badgeLabel="COMING SOON"
@@ -348,7 +365,6 @@ const styles = StyleSheet.create({
   },
   railContent: {
     gap: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
   },
   webRailContent: {

@@ -3,7 +3,7 @@ import { NavigationContainer, createNavigationContainerRef } from '@react-naviga
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import BottomTabNavigator from './app/navigation/BottomTabNavigator';
+import MainNavigator from './app/navigation/MainNavigator';
 import ChallengeQuizScreen from './app/screens/ChallengeQuizScreen';
 import ChallengeResultsScreen from './app/screens/ChallengeResultsScreen';
 import useFonts from './app/hooks/useFonts';
@@ -14,7 +14,7 @@ import BootstrapScreen from './app/components/BootstrapScreen';
 import { prefetchDailyLoop } from './app/services/dailyLoop';
 import { theme } from './app/theme/theme';
 import { logError, logInfo, startDebugSession } from './app/services/debugLog';
-import { MobileWebAppShell } from './app/components/ResponsiveLayout';
+import { ResponsiveAppShell } from './app/components/ResponsiveLayout';
 import UsernameOnboardingScreen from './app/components/UsernameOnboardingScreen';
 import AuthSyncScreen from './app/components/AuthSyncScreen';
 import AuthSyncFailureScreen from './app/components/AuthSyncFailureScreen';
@@ -119,7 +119,7 @@ function AppContent() {
     >
       <Stack.Screen
         name="Main"
-        component={BottomTabNavigator}
+        component={MainNavigator}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -212,11 +212,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <MobileWebAppShell>
+      <ResponsiveAppShell>
         <AppErrorBoundary>
           <ReadyApp />
         </AppErrorBoundary>
-      </MobileWebAppShell>
+      </ResponsiveAppShell>
     </SafeAreaProvider>
   );
 }
