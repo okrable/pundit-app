@@ -37,7 +37,7 @@ interface ConceptGame {
 
 const whiteLogo = require('../../assets/logo/white/pundit-white.png');
 
-const moreGames: ConceptGame[] = [
+const conceptGames: ConceptGame[] = [
   {
     title: 'Starting XI',
     description: 'Build the team from eleven clues.',
@@ -48,39 +48,16 @@ const moreGames: ConceptGame[] = [
     description: 'Find what connects the players.',
     iconName: 'link-outline',
   },
-  {
-    title: 'Deadline Day',
-    description: 'Match the player to the move.',
-    iconName: 'swap-horizontal-outline',
-  },
 ];
 
-const quickGames: ConceptGame[] = [
-  {
-    title: 'Final Whistle',
-    description: 'Race through football’s fastest quiz.',
-    iconName: 'timer-outline',
-  },
-  {
-    title: 'Derby Days',
-    description: 'Know the rivals, cities and stories.',
-    iconName: 'shield-half-outline',
-  },
-];
-
-interface GallerySectionProps {
-  title: string;
+interface GameRowProps {
   cardWidth: number;
   children: React.ReactNode;
 }
 
-function GallerySection({ title, cardWidth, children }: GallerySectionProps) {
+function GameRow({ cardWidth, children }: GameRowProps) {
   return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <Text style={styles.swipeHint}>SWIPE</Text>
-      </View>
+    <View style={styles.gameRow}>
       <ScrollView
         horizontal
         nestedScrollEnabled
@@ -228,7 +205,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
             <Text style={styles.gamesLabel}>GAMES</Text>
           </View>
 
-          <GallerySection title="Today" cardWidth={cardWidth}>
+          <GameRow cardWidth={cardWidth}>
             <GameGalleryTile
               title="PUNDIT"
               titleVariant="pundit"
@@ -273,7 +250,9 @@ export default function GamesHomeScreen({ navigation }: Props) {
                 )
               }
             />
+          </GameRow>
 
+          <GameRow cardWidth={cardWidth}>
             <GameGalleryTile
               title="Whose journey is this?"
               description="Trace the clubs. Guess the player."
@@ -309,12 +288,11 @@ export default function GamesHomeScreen({ navigation }: Props) {
               }
               onPress={() => navigation.navigate('CareerGame')}
             />
-          </GallerySection>
+          </GameRow>
 
-          <GallerySection title="More games" cardWidth={cardWidth}>
-            {moreGames.map((game) => (
+          {conceptGames.map((game) => (
+            <GameRow key={game.title} cardWidth={cardWidth}>
               <GameGalleryTile
-                key={game.title}
                 {...game}
                 badgeLabel="COMING SOON"
                 badgeTone="muted"
@@ -322,22 +300,8 @@ export default function GamesHomeScreen({ navigation }: Props) {
                 accessibilityHint="Shows a coming soon message"
                 onPress={() => setComingSoonTitle(game.title)}
               />
-            ))}
-          </GallerySection>
-
-          <GallerySection title="Quick games" cardWidth={cardWidth}>
-            {quickGames.map((game) => (
-              <GameGalleryTile
-                key={game.title}
-                {...game}
-                badgeLabel="COMING SOON"
-                badgeTone="muted"
-                width={cardWidth}
-                accessibilityHint="Shows a coming soon message"
-                onPress={() => setComingSoonTitle(game.title)}
-              />
-            ))}
-          </GallerySection>
+            </GameRow>
+          ))}
         </CenteredWebContent>
       </ScrollView>
 
@@ -375,32 +339,13 @@ const styles = StyleSheet.create({
     color: theme.colors.background,
     letterSpacing: 2,
   },
-  section: {
-    marginTop: theme.spacing.xl,
-  },
-  sectionHeader: {
-    minHeight: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontFamily: theme.fonts.gothamBlack,
-    color: theme.colors.textDark,
-  },
-  swipeHint: {
-    fontSize: 9,
-    fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.background,
-    letterSpacing: 1.2,
+  gameRow: {
+    marginTop: theme.spacing.md,
   },
   railContent: {
     gap: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.sm,
-    paddingBottom: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
   },
   punditFootball: {
     width: 64,

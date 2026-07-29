@@ -101,18 +101,20 @@ Important behaviors:
 
 ### Games Gallery
 
-`GamesHomeScreen` presents vertically stacked, horizontally snapping card rails
-on the orange Games surface. The warm-white Daily Quiz and career tiles are
-single press targets: available tiles start play, while completed tiles open
-their own cached recap. Their loading, unavailable, and completion states stay
-independent. The Daily Quiz uses Uni Sans, its football treatment, and original
-tagline; the career tile uses the custom journey artwork. Both integrate their
-green action treatment into the card without creating a nested button.
+`GamesHomeScreen` presents one warm-white game tile per horizontal row on the
+orange Games surface. Each row retains the horizontal rail behavior for future
+expansion, but currently contains one tile and therefore has no practical
+sideways scroll. The Daily Quiz and career tiles are single press targets:
+available tiles start play, while completed tiles open their own cached recap.
+Their loading, unavailable, and completion states stay independent. The Daily
+Quiz uses Uni Sans, its football treatment, and original tagline; the career
+tile uses the custom journey artwork. Both integrate their green action
+treatment into the card without creating a nested button.
 
-Provisional concept tiles use code-native icons and open one shared Coming Soon
-message. They do not add routes, stores, persistence, or API contracts. Rules
-components remain available to the game surfaces but are not entry points from
-the gallery.
+The provisional Starting XI and The Link Up tiles use code-native icons and
+open one shared Coming Soon message. They do not add routes, stores,
+persistence, or API contracts. Rules components remain available to the game
+surfaces but are not entry points from the gallery.
 
 ### Profile and Leaderboards
 
