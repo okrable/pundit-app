@@ -54,11 +54,11 @@ const conceptGames: ConceptGame[] = [
 
 interface GameRowProps {
   cardWidth: number;
-  screenPadding: number;
+  horizontalPadding: number;
   children: React.ReactNode;
 }
 
-function GameRow({ cardWidth, screenPadding, children }: GameRowProps) {
+function GameRow({ cardWidth, horizontalPadding, children }: GameRowProps) {
   return (
     <View style={styles.gameRow}>
       <ScrollView
@@ -72,7 +72,7 @@ function GameRow({ cardWidth, screenPadding, children }: GameRowProps) {
         snapToInterval={cardWidth + theme.spacing.md}
         contentContainerStyle={[
           styles.railContent,
-          { paddingHorizontal: screenPadding },
+          { paddingHorizontal: horizontalPadding },
           Platform.OS === 'web' && styles.webRailContent,
         ]}
       >
@@ -159,6 +159,10 @@ export default function GamesHomeScreen({ navigation }: Props) {
 
     return Math.min(360, Math.max(246, Math.round(availableWidth * 0.86)));
   }, [appWidth, screenPadding]);
+  const rowHorizontalPadding =
+    Platform.OS === 'web'
+      ? screenPadding
+      : Math.max(screenPadding, Math.round((appWidth - cardWidth) / 2));
 
   const quizEmojis = cachedResult?.answers
     .map((isCorrect) => (isCorrect ? '⚽️' : '❌'))
@@ -224,7 +228,10 @@ export default function GamesHomeScreen({ navigation }: Props) {
             </View>
           ) : null}
 
-          <GameRow cardWidth={cardWidth} screenPadding={screenPadding}>
+          <GameRow
+            cardWidth={cardWidth}
+            horizontalPadding={rowHorizontalPadding}
+          >
             <GameGalleryTile
               title="PUNDIT"
               titleVariant="pundit"
@@ -271,7 +278,10 @@ export default function GamesHomeScreen({ navigation }: Props) {
             />
           </GameRow>
 
-          <GameRow cardWidth={cardWidth} screenPadding={screenPadding}>
+          <GameRow
+            cardWidth={cardWidth}
+            horizontalPadding={rowHorizontalPadding}
+          >
             <GameGalleryTile
               title="Whose journey is this?"
               description="Trace the clubs. Guess the player."
@@ -313,7 +323,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
             <GameRow
               key={game.title}
               cardWidth={cardWidth}
-              screenPadding={screenPadding}
+              horizontalPadding={rowHorizontalPadding}
             >
               <GameGalleryTile
                 {...game}
