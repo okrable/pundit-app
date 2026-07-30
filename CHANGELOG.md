@@ -16,7 +16,9 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 - Upgraded the native runtime to Expo SDK 55, React Native 0.83, Reanimated
   4.2, and Worklets 0.7 so iOS builds can use `react-native-screens` 4.25.
   Expo Go and runtimes without `Tabs.Host` now fall back to the existing
-  JavaScript tabs instead of crashing.
+  JavaScript tabs instead of crashing. Worklets resolution and the Uni Sans
+  asset path are pinned so simulator builds load matching animation code and
+  retain the Pundit typography.
 - Added a development-client EAS profile and aligned the tracked iOS and
   Android native projects with the SDK 55 templates while preserving the
   existing identifiers, signing settings, Auth0 callback scheme, and app

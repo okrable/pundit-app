@@ -53,7 +53,9 @@ The native runtime uses Expo SDK 55, React Native 0.83, Reanimated 4.2.1,
 Gesture Handler 2.30, and Worklets 0.7.4. Native tabs deliberately use
 `react-native-screens` 4.25.x, which supplies the experimental `Tabs.Host`
 API required by React Navigation 7. `@react-navigation/bottom-tabs` is pinned
-to 7.10.1 because this API is unstable.
+to 7.10.1 because this API is unstable. The package-level Worklets override
+keeps Expo and Reanimated on the same 0.7.4 runtime and Babel plugin rather
+than allowing npm to install a second 0.8.x copy beneath Expo.
 
 `react-native-screens` is listed in `expo.install.exclude` so Expo's SDK 55
 dependency checker does not replace it with the normally recommended 4.23
