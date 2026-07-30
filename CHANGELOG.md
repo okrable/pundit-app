@@ -18,7 +18,9 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
   Expo Go and runtimes without `Tabs.Host` now fall back to the existing
   JavaScript tabs instead of crashing. Worklets resolution and the Uni Sans
   asset path are pinned so simulator builds load matching animation code and
-  retain the Pundit typography.
+  retain the Pundit typography. The native-tab adapter now supplies Screens
+  4.25 with stable screen keys so switching iOS tabs cannot hit its nil-key
+  assertion.
 - Added a development-client EAS profile and aligned the tracked iOS and
   Android native projects with the SDK 55 templates while preserving the
   existing identifiers, signing settings, Auth0 callback scheme, and app
