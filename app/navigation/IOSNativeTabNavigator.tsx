@@ -36,7 +36,7 @@ export default function IOSNativeTabNavigator() {
             headerShown: false,
             tabBarIcon: ({ focused }) => ({
               type: 'sfSymbol',
-              name: focused ? 'house.fill' : 'house',
+              name: focused ? 'soccerball.inverse' : 'soccerball',
             }),
           }}
         />

@@ -14,6 +14,7 @@ These instructions are for coding agents working in this repository.
 - Run `npx tsc --noEmit` before handoff unless the task is docs-only and clearly cannot affect TypeScript.
 - For gameplay, auth, cache, or profile changes, manually reason through guest, authenticated, logout/login, and warm-cache paths.
 - For UI changes, check small and large mobile layouts conceptually and avoid text overlap, wasted space, or hidden controls.
+- Treat web, iOS, and Android as equally important product surfaces. Assess every change on all three platforms, and verify that a platform-specific fix does not regress either of the others.
 
 ## Versioning
 

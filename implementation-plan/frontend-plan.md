@@ -36,8 +36,15 @@ The shell differs by platform:
 - iOS uses React Navigation's experimental native bottom tabs, backed by
   Apple's tab controller. It uses SF Symbols and the system's automatic
   iPhone/iPad tab-bar or sidebar presentation in development, preview, and
-  production builds.
+  production builds. Games uses the `soccerball` symbol rather than a generic
+  home icon.
 - Android retains the JavaScript bottom tab navigator.
+
+Web, iOS, and Android are equal acceptance surfaces. Every product, layout, and
+behavior change must be considered on all three platforms, even when the
+original request or defect names only one. Platform-specific implementations
+may differ, but their impact on the other two platforms must be assessed and
+validated before the change is complete.
 
 Web breakpoints are compact below 600px, tablet from 600px to 899px, and
 desktop at 900px and above. Gutters are 16px, 24px, and 40px respectively.
@@ -154,8 +161,10 @@ Important behaviors:
 `GamesHomeScreen` presents one warm-white game tile per horizontal row on the
 orange Games surface. Each row retains the horizontal rail behavior for future
 expansion, but currently contains one tile and therefore has no practical
-sideways scroll. On web, the single tile is centred within the 1200px gallery
-surface and grows up to 760px. The Daily Quiz and career
+sideways scroll. Each single tile is centred in its row on web, iOS, and
+Android; web centres it within the 1200px gallery surface and lets it grow up
+to 760px, while native rails centre their narrower card within the device
+viewport. The Daily Quiz and career
 tiles are single press targets:
 available tiles start play, while completed tiles open their own cached recap.
 Their loading, unavailable, and completion states stay independent. The Daily
