@@ -26,6 +26,7 @@ import CenteredWebContent, {
 } from '../components/ResponsiveLayout';
 import { theme } from '../theme/theme';
 import { getGamesHubCompletionState } from '../../shared/gamesHub';
+import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
 type Props = NativeStackScreenProps<GamesStackParamList, 'GamesHome'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -82,6 +83,7 @@ function GameRow({ cardWidth, screenPadding, children }: GameRowProps) {
 }
 
 export default function GamesHomeScreen({ navigation }: Props) {
+  const safeAreaEdges = useMainTabSafeAreaEdges(['top', 'bottom']);
   const [comingSoonTitle, setComingSoonTitle] = useState<string | null>(null);
   const [isHubRefreshing, setIsHubRefreshing] = useState(true);
   const { appWidth, screenPadding } = useMobileLayoutMetrics();
@@ -208,7 +210,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
     (!careerAvailable || isDailyPayloadLoading);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}

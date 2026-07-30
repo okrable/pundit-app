@@ -30,6 +30,7 @@ import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { buildStreakStatus } from '../../shared/streak';
 import { getQuizDate } from '../utils/quizDate';
 import StreakIcon from '../components/StreakIcon';
+import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
 const EMPTY_STATS: UserStats = {
   streak: 0,
@@ -50,6 +51,7 @@ const EMPTY_STATS: UserStats = {
 };
 
 export default function MeScreen() {
+  const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
   const centeredProfileStyle = useCenteredWebStyle(webContentWidth.quiz);
   const { appWidth, isCompactWidth, screenPadding } = useMobileLayoutMetrics();
   const settingsRight =
@@ -152,7 +154,7 @@ export default function MeScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={styles.container} edges={safeAreaEdges}>
         <TouchableOpacity
           style={[styles.settingsButton, { right: settingsRight }]}
           onPress={() => setSettingsVisible(true)}
@@ -204,7 +206,7 @@ export default function MeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       <TouchableOpacity
         style={[styles.settingsButton, { right: settingsRight }]}
         onPress={() => setSettingsVisible(true)}

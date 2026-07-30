@@ -35,7 +35,8 @@ The shell differs by platform:
   the active section centred, and the menu control on the right.
 - iOS uses React Navigation's experimental native bottom tabs, backed by
   Apple's tab controller. It uses SF Symbols and the system's automatic
-  iPhone/iPad tab-bar or sidebar presentation.
+  iPhone/iPad tab-bar or sidebar presentation in development, preview, and
+  production builds.
 - Android retains the JavaScript bottom tab navigator.
 
 Web breakpoints are compact below 600px, tablet from 600px to 899px, and
@@ -48,11 +49,29 @@ Challenge creation and code entry form two columns on desktop. Leaderboards
 remain a centred 960px list, while Me and the daily game surfaces retain a
 comfortable 760px reading width. Mobile browsers remain single-column.
 
-Expo SDK 54 currently pins React Native 0.81 and `react-native-screens`
-`~4.16.0`. `react-native-screens` 4.25 requires React Native 0.82, so the
-native-tab controller must remain on the Expo-compatible screens version until
-the SDK is upgraded. Native-tab changes require an EAS build; Expo Go is not an
-acceptance environment.
+The native runtime uses Expo SDK 55, React Native 0.83, Reanimated 4.2.1,
+Gesture Handler 2.30, and Worklets 0.7.4. Native tabs deliberately use
+`react-native-screens` 4.25.x, which supplies the experimental `Tabs.Host`
+API required by React Navigation 7. `@react-navigation/bottom-tabs` is pinned
+to 7.10.1 because this API is unstable.
+
+`react-native-screens` is listed in `expo.install.exclude` so Expo's SDK 55
+dependency checker does not replace it with the normally recommended 4.23
+line. iOS selects native tabs only when it is not running in Expo Go and the
+`Tabs.Host` JavaScript API is present. Otherwise it logs a diagnostic and
+uses the existing JavaScript bottom tabs. Native-tab acceptance therefore
+requires an EAS development-client or preview build, not Expo Go.
+
+The repository intentionally keeps its native iOS and Android projects rather
+than adopting CNG. Expo Doctor's app-config synchronization warning is disabled
+for that reason: SDK upgrades apply the generated template diff to both tracked
+projects and then regenerate CocoaPods/Gradle inputs while preserving signing,
+identifiers, callback schemes, and app resources.
+
+The native tab controller owns the bottom inset. Screens inside the main tab
+subtree omit their own bottom safe-area edge only while native tabs are active;
+Android, web, Expo Go, and standalone challenge/result routes retain their
+existing safe-area handling.
 
 ## Games Hub
 
