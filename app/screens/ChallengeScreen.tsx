@@ -27,8 +27,10 @@ import { acceptFriendLink } from '../services/api';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { buildShareUrl, normalizeSharedCode, resolveSharedCode } from '../services/sharedCode';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
+import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
 export default function ChallengeScreen() {
+  const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
   const centeredContentStyle = useCenteredWebStyle(webContentWidth.standard);
   const { screenPadding, webLayout } = useMobileLayoutMetrics();
   const useDesktopGrid = Platform.OS === 'web' && webLayout === 'desktop';
@@ -250,7 +252,7 @@ export default function ChallengeScreen() {
   // Guest users see sign-in prompt
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={styles.container} edges={safeAreaEdges}>
         <View style={styles.guestContainer}>
           <View style={styles.guestContent}>
             <Ionicons name="flash" size={64} color={theme.colors.accent} />
@@ -269,7 +271,7 @@ export default function ChallengeScreen() {
 
   // Authenticated users see full challenge UI
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[

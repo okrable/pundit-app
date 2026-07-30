@@ -17,6 +17,7 @@ import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLa
 import { calculateQuizPoints } from '../../shared/scoring';
 import { trackAnalyticsEvent } from '../services/analytics';
 import type { GamesStackParamList } from '../navigation/GamesNavigator';
+import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
 const REVEAL_SUSPENSE_DELAY = 1000;
 const RESULT_HOLD_DELAY = 1650;
@@ -26,6 +27,7 @@ const TIMER_DURATION = 20;
 type Props = NativeStackScreenProps<GamesStackParamList, 'DailyQuiz'>;
 
 export default function DailyQuizScreen({ navigation, route }: Props) {
+  const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
   const centeredQuizStyle = useCenteredWebStyle(webContentWidth.quiz);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -381,7 +383,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       <Pressable
         style={styles.pressable}
         onPressIn={() => setIsHolding(true)}

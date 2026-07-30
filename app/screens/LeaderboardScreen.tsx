@@ -28,10 +28,12 @@ import {
 } from '../components/ResponsiveLayout';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { formatStreakLabel } from '../../shared/streak';
+import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
 type ViewMode = 'friends' | 'global';
 
 export default function LeaderboardScreen() {
+  const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
   const centeredContentStyle = useCenteredWebStyle(webContentWidth.standard);
   const { appWidth, screenPadding } = useMobileLayoutMetrics();
   const responsiveHorizontalPadding =
@@ -315,7 +317,7 @@ export default function LeaderboardScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       {renderGuestBanner()}
 
       <View
