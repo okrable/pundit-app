@@ -17,8 +17,8 @@ export default function useFonts() {
           'Gotham-Medium': require('../../assets/fonts/gotham-bundle/Gotham-Medium.otf'),
           'Gotham-Book': require('../../assets/fonts/gotham-bundle/Gotham-Book.otf'),
           'Gotham-Light': require('../../assets/fonts/gotham-bundle/Gotham-Light.otf'),
-          'UniSans-Heavy': require('../../assets/fonts/uni-sans/Uni Sans Heavy.otf'),
-          'UniSans-Thin': require('../../assets/fonts/uni-sans/Uni Sans Thin.otf'),
+          'UniSans-Heavy': require('../../assets/fonts/uni-sans/UniSans-Heavy.otf'),
+          'UniSans-Thin': require('../../assets/fonts/uni-sans/UniSans-Thin.otf'),
         });
         logInfo('fonts.load.success');
       } catch (error) {
