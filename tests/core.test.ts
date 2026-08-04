@@ -65,6 +65,10 @@ import {
   classifyAuth0VerificationFailure,
 } from '../netlify/functions/lib/auth';
 import { getGamesHubCompletionState } from '../shared/gamesHub';
+import {
+  getNativeTabsFallbackReason,
+  selectMainNavigator,
+} from '../shared/navigationPolicy';
 
 test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(undefined), 60);
@@ -242,6 +246,65 @@ test('keeps temporary Auth0 userinfo failures distinct from invalid tokens', asy
       process.env.AUTH0_DOMAIN = originalDomain;
     }
   }
+});
+
+test('selects the platform navigator and safely falls back when native tabs are unavailable', () => {
+  assert.equal(
+    selectMainNavigator({
+      platform: 'web',
+      isExpoGo: false,
+      hasNativeTabsHost: true,
+    }),
+    'web-drawer'
+  );
+  assert.equal(
+    selectMainNavigator({
+      platform: 'android',
+      isExpoGo: false,
+      hasNativeTabsHost: true,
+    }),
+    'js-tabs'
+  );
+  assert.equal(
+    selectMainNavigator({
+      platform: 'ios',
+      isExpoGo: false,
+      hasNativeTabsHost: true,
+    }),
+    'ios-native-tabs'
+  );
+  assert.equal(
+    selectMainNavigator({
+      platform: 'ios',
+      isExpoGo: true,
+      hasNativeTabsHost: true,
+    }),
+    'js-tabs'
+  );
+  assert.equal(
+    getNativeTabsFallbackReason({
+      platform: 'ios',
+      isExpoGo: true,
+      hasNativeTabsHost: true,
+    }),
+    'expo-go'
+  );
+  assert.equal(
+    selectMainNavigator({
+      platform: 'ios',
+      isExpoGo: false,
+      hasNativeTabsHost: false,
+    }),
+    'js-tabs'
+  );
+  assert.equal(
+    getNativeTabsFallbackReason({
+      platform: 'ios',
+      isExpoGo: false,
+      hasNativeTabsHost: false,
+    }),
+    'tabs-host-unavailable'
+  );
 });
 
 test('validates answer shape, bounds, and duplicates', () => {

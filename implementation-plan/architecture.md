@@ -2,7 +2,7 @@
 
 ## Runtime Topology
 
-- Client: Expo React Native app with TypeScript.
+- Client: Expo SDK 55 / React Native 0.83 app with TypeScript.
 - API: Netlify Functions under `netlify/functions/*`.
 - Data: CockroachDB/PostgreSQL via `pg`.
 - Auth: Auth0 through Expo AuthSession.
@@ -64,6 +64,10 @@
   before normal tabs are released.
 - Auth clients: responsive web uses an Auth0 SPA client while EAS native builds
   use a Native client and the `pundit-app://callback` scheme in the same tenant.
+- Platform navigation: web uses a responsive drawer, Android uses JavaScript
+  bottom tabs, and custom iOS builds use the native Apple tab controller.
+  Expo Go or a runtime without the experimental `Tabs.Host` API falls back to
+  JavaScript tabs and records a diagnostic instead of attempting native tabs.
 - Logout behavior: local app credentials are cleared without invoking hosted Auth0 browser logout.
 - Stale-first loading: quiz, result, profile, and leaderboard caches hydrate before authenticated sync or public warm refresh.
 - Protected refresh: Me/profile refresh remains explicit, while friends data is

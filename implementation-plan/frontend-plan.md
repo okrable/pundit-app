@@ -2,14 +2,15 @@
 
 ## App Structure
 
-The app uses React Navigation bottom tabs, not Expo Router.
+The app uses React Navigation, not Expo Router. Its top-level navigator is
+selected by platform.
 
 ```text
 app/
 ├── components/       # Shared UI: quiz card, results, modals, loading screens
 ├── constants/        # App constants such as version
 ├── hooks/            # Bootstrap/auth/font hooks
-├── navigation/       # Bottom tab navigator
+├── navigation/       # Web drawer, native iOS tabs, and Android bottom tabs
 ├── screens/          # Daily, Challenge, Leaderboard, Me screens
 ├── services/         # API, auth flow, Auth0 config, daily prefetch
 ├── state/            # Zustand stores
@@ -18,14 +19,76 @@ app/
 └── types/            # Shared TypeScript interfaces
 ```
 
-## Navigation
+## Adaptive Shell and Navigation
 
-Bottom tabs:
+All platforms expose the same primary sections:
 
 - Games
 - Challenge
 - League Tables
 - Me
+
+The shell differs by platform:
+
+- Web uses the full viewport, a full-width orange header, and a warm-white
+  drawer opening from the right. The header keeps the Pundit logo on the left,
+  the active section centred, and the menu control on the right.
+- iOS uses React Navigation's experimental native bottom tabs, backed by
+  Apple's tab controller. It uses SF Symbols and the system's automatic
+  iPhone/iPad tab-bar or sidebar presentation in development, preview, and
+  production builds. Games uses the `soccerball` symbol rather than a generic
+  home icon.
+- Android retains the JavaScript bottom tab navigator.
+
+Web, iOS, and Android are equal acceptance surfaces. Every product, layout, and
+behavior change must be considered on all three platforms, even when the
+original request or defect names only one. Platform-specific implementations
+may differ, but their impact on the other two platforms must be assessed and
+validated before the change is complete.
+
+Web breakpoints are compact below 600px, tablet from 600px to 899px, and
+desktop at 900px and above. Gutters are 16px, 24px, and 40px respectively.
+Authentication content is capped at 560px, gameplay/results and profile
+compositions at 760px, lists at 960px, and gallery/header framing at 1200px.
+The Games tiles themselves grow to 760px.
+
+Challenge creation and code entry form two columns on desktop. Leaderboards
+remain a centred 960px list, while Me and the daily game surfaces retain a
+comfortable 760px reading width. Mobile browsers remain single-column.
+
+The native runtime uses Expo SDK 55, React Native 0.83, Reanimated 4.2.1,
+Gesture Handler 2.30, and Worklets 0.7.4. Native tabs deliberately use
+`react-native-screens` 4.25.x, which supplies the experimental `Tabs.Host`
+API required by React Navigation 7. `@react-navigation/bottom-tabs` is pinned
+to 7.18.14 because this API is unstable and earlier releases passed the legacy
+`tabKey` prop instead of the `screenKey` required by Screens 4.25, causing a
+native assertion when changing tabs. The package-level Worklets override keeps
+Expo and Reanimated on the same 0.7.4 runtime and Babel plugin rather than
+allowing npm to install a second 0.8.x copy beneath Expo.
+
+`react-native-screens` is listed in `expo.install.exclude` so Expo's SDK 55
+dependency checker does not replace it with the normally recommended 4.23
+line. iOS selects native tabs only when it is not running in Expo Go and the
+`Tabs.Host` JavaScript API is present. Otherwise it logs a diagnostic and
+uses the existing JavaScript bottom tabs. Native-tab acceptance therefore
+requires an EAS development-client or preview build, not Expo Go.
+
+The native-tab navigator lives in an `.ios.tsx` module. Web and Android resolve
+a safe fallback module that never imports React Navigation's unstable native
+tabs entrypoint, because that entrypoint throws when evaluated on web even if
+the rendered navigator would later select the drawer. The production web build
+also fails if that unsupported runtime is found in the exported JavaScript.
+
+The repository intentionally keeps its native iOS and Android projects rather
+than adopting CNG. Expo Doctor's app-config synchronization warning is disabled
+for that reason: SDK upgrades apply the generated template diff to both tracked
+projects and then regenerate CocoaPods/Gradle inputs while preserving signing,
+identifiers, callback schemes, and app resources.
+
+The native tab controller owns the bottom inset. Screens inside the main tab
+subtree omit their own bottom safe-area edge only while native tabs are active;
+Android, web, Expo Go, and standalone challenge/result routes retain their
+existing safe-area handling.
 
 ## Games Hub
 
@@ -104,8 +167,10 @@ Important behaviors:
 `GamesHomeScreen` presents one warm-white game tile per horizontal row on the
 orange Games surface. Each row retains the horizontal rail behavior for future
 expansion, but currently contains one tile and therefore has no practical
-sideways scroll. On web, the single tile is centred within the constrained app
-shell rather than sitting at the rail's leading edge. The Daily Quiz and career
+sideways scroll. Each single tile is centred in its row on web, iOS, and
+Android; web centres it within the 1200px gallery surface and lets it grow up
+to 760px, while native rails centre their narrower card within the device
+viewport. The Daily Quiz and career
 tiles are single press targets:
 available tiles start play, while completed tiles open their own cached recap.
 Their loading, unavailable, and completion states stay independent. The Daily

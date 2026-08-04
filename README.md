@@ -1,4 +1,4 @@
-# Pundit Trivia v2.2.0
+# Pundit Trivia v2.3.0
 
 Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScript, Netlify Functions, and CockroachDB.
 
@@ -27,12 +27,15 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 - Server-resolved challenge usernames and username-only persisted leaderboard ranking eligibility.
 - Stale-first cache hydration for quiz, result, profile, and leaderboard warm loads.
 - Forced friends-leaderboard refresh when League Tables gains focus or a friendship changes.
-- Mobile-first web layout that mirrors the native bottom-tab app shell.
+- Adaptive full-viewport web layout with readable content widths and a
+  Pundit-branded top header/right-side menu.
+- Native Apple tabs with SF Symbols on iOS and the existing JavaScript bottom
+  tabs on Android.
 - Date-aware daily leaderboard caches with forced background refresh after authenticated submissions.
 
 ## Versioning
 
-- Current app/docs version: `2.2.0`.
+- Current app/docs version: `2.3.0`.
 - `package.json`, `package-lock.json`, `app.json`, `app/constants/version.ts`,
   and native iOS/Android marketing versions must stay aligned.
 - Settings displays the app version from `APP_VERSION`.
@@ -161,12 +164,20 @@ npx eas-cli@latest env:set preview \
 npm run build:ios:simulator
 ```
 
-Simulator builds provide the native-app build gate when no paid Apple Developer
-team is available. Full Xcode is required to install and run the resulting app
-locally. Set the preview API URL to the current PR's Netlify Deploy Preview
-before each build so native and web testing exercise the same commit. EAS embeds
-`EXPO_PUBLIC_` values in the app bundle; an ignored local `.env` file is not
-available to the remote builder.
+The simulator and `development` profiles are development-client builds. They
+provide the native-app gate for the experimental Apple tabs and
+`react-native-screens` 4.25 when no paid Apple Developer team is available:
+
+```bash
+npm run build:ios:development
+```
+
+Expo Go deliberately uses the existing JavaScript tabs and is not the native-tab
+acceptance environment. Full Xcode is required to install and run a simulator
+artifact locally. Set the preview API URL to the current PR's Netlify Deploy
+Preview before each build so native and web testing exercise the same commit.
+EAS embeds `EXPO_PUBLIC_` values in the app bundle; an ignored local `.env` file
+is not available to the remote builder.
 
 Install a build on your own iPhone first:
 
@@ -174,10 +185,10 @@ Install a build on your own iPhone first:
 npm run build:ios:device
 ```
 
-The EAS dashboard build page will provide an install link/QR code. iOS device
-and TestFlight builds require a paid Apple Developer membership. For internal
-distribution, EAS may ask to register your device UDID and create ad hoc signing
-credentials.
+The `preview` profile remains a bundled, release-like build. The EAS dashboard
+build page will provide an install link/QR code. iOS device and TestFlight builds
+require a paid Apple Developer membership. For internal distribution, EAS may
+ask to register your device UDID and create ad hoc signing credentials.
 
 Send a build to TestFlight:
 

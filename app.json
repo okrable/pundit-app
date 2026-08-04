@@ -3,11 +3,10 @@
     "name": "pundit-temp",
     "slug": "pundit-temp",
     "scheme": "pundit-app",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -22,7 +21,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.pundittemp"
     },
@@ -31,7 +29,8 @@
     },
     "plugins": [
       "expo-secure-store",
-      "react-native-auth0"
+      "expo-font",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

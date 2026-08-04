@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   ScrollView,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +30,7 @@ import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { buildStreakStatus } from '../../shared/streak';
 import { getQuizDate } from '../utils/quizDate';
 import StreakIcon from '../components/StreakIcon';
+import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
 const EMPTY_STATS: UserStats = {
   streak: 0,
@@ -49,8 +51,16 @@ const EMPTY_STATS: UserStats = {
 };
 
 export default function MeScreen() {
-  const centeredProfileStyle = useCenteredWebStyle(webContentWidth.standard);
-  const { isCompactWidth } = useMobileLayoutMetrics();
+  const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
+  const centeredProfileStyle = useCenteredWebStyle(webContentWidth.quiz);
+  const { appWidth, isCompactWidth, screenPadding } = useMobileLayoutMetrics();
+  const settingsRight =
+    Platform.OS === 'web'
+      ? Math.max(
+          screenPadding,
+          (appWidth - webContentWidth.quiz) / 2 + screenPadding
+        )
+      : 16;
   const { stats, revalidate } = useProfileStore();
   const {
     user,
@@ -144,9 +154,9 @@ export default function MeScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={styles.container} edges={safeAreaEdges}>
         <TouchableOpacity
-          style={styles.settingsButton}
+          style={[styles.settingsButton, { right: settingsRight }]}
           onPress={() => setSettingsVisible(true)}
         >
           <Ionicons name="settings-sharp" size={24} color={theme.colors.textDark} />
@@ -196,9 +206,9 @@ export default function MeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       <TouchableOpacity
-        style={styles.settingsButton}
+        style={[styles.settingsButton, { right: settingsRight }]}
         onPress={() => setSettingsVisible(true)}
       >
         <Ionicons name="settings-sharp" size={24} color={theme.colors.textDark} />
@@ -209,6 +219,7 @@ export default function MeScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           isCompactWidth && styles.scrollContentCompact,
+          Platform.OS === 'web' && { paddingHorizontal: screenPadding },
           centeredProfileStyle,
         ]}
         showsVerticalScrollIndicator={false}
@@ -308,7 +319,6 @@ const styles = StyleSheet.create({
   settingsButton: {
     position: 'absolute',
     top: 8,
-    right: 16,
     zIndex: 10,
     padding: 8,
   },

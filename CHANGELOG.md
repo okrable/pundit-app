@@ -2,6 +2,32 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.3.0 - Adaptive web and native iOS navigation
+
+- Replaced the mobile-width browser shell and bottom tabs with a full-viewport
+  responsive web layout, centred content widths, and a global Pundit header
+  with an accessible right-side navigation drawer.
+- Added compact, tablet, and desktop gutters; widened the Games gallery,
+  challenge, leaderboard, profile, gameplay, and result surfaces according to
+  their reading needs.
+- Moved iOS to React Navigation's native Apple tab controller with SF Symbols
+  and automatic iPhone/iPad presentation while leaving Android's JavaScript
+  bottom tabs unchanged.
+- Upgraded the native runtime to Expo SDK 55, React Native 0.83, Reanimated
+  4.2, and Worklets 0.7 so iOS builds can use `react-native-screens` 4.25.
+  Expo Go and runtimes without `Tabs.Host` now fall back to the existing
+  JavaScript tabs instead of crashing. Worklets resolution and the Uni Sans
+  asset path are pinned so simulator builds load matching animation code and
+  retain the Pundit typography. The native-tab adapter now supplies Screens
+  4.25 with stable screen keys so switching iOS tabs cannot hit its nil-key
+  assertion. The native navigator is isolated to the iOS bundle so its
+  unsupported-platform guard cannot crash the responsive web app at startup;
+  web exports now verify that the native-tabs runtime was excluded.
+- Added a development-client EAS profile and aligned the tracked iOS and
+  Android native projects with the SDK 55 templates while preserving the
+  existing identifiers, signing settings, Auth0 callback scheme, and app
+  resources.
+
 ## v2.2.0 - Games hub and daily player journey
 
 - Renamed the Quiz tab to Games and added independently completed Daily Quiz

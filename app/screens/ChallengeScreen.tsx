@@ -18,14 +18,22 @@ import { useAuthStore } from '../state/useAuthStore';
 import { theme } from '../theme/theme';
 import ShareChallengeModal from '../components/ShareChallengeModal';
 import type { ChallengeHistoryItem } from '../types';
-import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
+import {
+  useCenteredWebStyle,
+  useMobileLayoutMetrics,
+  webContentWidth,
+} from '../components/ResponsiveLayout';
 import { acceptFriendLink } from '../services/api';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { buildShareUrl, normalizeSharedCode, resolveSharedCode } from '../services/sharedCode';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
+import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
 export default function ChallengeScreen() {
+  const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
   const centeredContentStyle = useCenteredWebStyle(webContentWidth.standard);
+  const { screenPadding, webLayout } = useMobileLayoutMetrics();
+  const useDesktopGrid = Platform.OS === 'web' && webLayout === 'desktop';
   const navigation = useNavigation<any>();
   const { user, isAuthenticated } = useAuthStore();
   const {
@@ -244,7 +252,7 @@ export default function ChallengeScreen() {
   // Guest users see sign-in prompt
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={styles.container} edges={safeAreaEdges}>
         <View style={styles.guestContainer}>
           <View style={styles.guestContent}>
             <Ionicons name="flash" size={64} color={theme.colors.accent} />
@@ -263,16 +271,31 @@ export default function ChallengeScreen() {
 
   // Authenticated users see full challenge UI
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.contentContainer, centeredContentStyle]}
+        contentContainerStyle={[
+          styles.contentContainer,
+          centeredContentStyle,
+          Platform.OS === 'web' && { paddingHorizontal: screenPadding },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Create/Active Challenge Section */}
-        <View style={styles.section}>
-          {activeChallenge ? (
-            <View style={styles.activeCard}>
+        <View
+          style={[
+            styles.primaryGrid,
+            useDesktopGrid && styles.primaryGridDesktop,
+          ]}
+        >
+          {/* Create/Active Challenge Section */}
+          <View
+            style={[
+              styles.section,
+              useDesktopGrid && styles.primaryGridSection,
+            ]}
+          >
+            {activeChallenge ? (
+              <View style={[styles.activeCard, useDesktopGrid && styles.primaryCardDesktop]}>
               <View style={styles.activeHeader}>
                 <Ionicons name="flash" size={24} color={theme.colors.accent} />
                 <Text style={styles.activeTitle}>Active Challenge</Text>
@@ -343,9 +366,9 @@ export default function ChallengeScreen() {
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          ) : (
-            <View style={styles.createCard}>
+              </View>
+            ) : (
+              <View style={[styles.createCard, useDesktopGrid && styles.primaryCardDesktop]}>
               <Ionicons name="flash-outline" size={32} color={theme.colors.accent} />
               <Text style={styles.createTitle}>Create a Challenge</Text>
               <Text style={styles.createSubtitle}>
@@ -362,13 +385,18 @@ export default function ChallengeScreen() {
                   <Text style={styles.createButtonText}>Create Challenge</Text>
                 )}
               </TouchableOpacity>
-            </View>
-          )}
-        </View>
+              </View>
+            )}
+          </View>
 
-        {/* Join Challenge Section */}
-        <View style={styles.section}>
-          <View style={styles.joinCard}>
+          {/* Join Challenge Section */}
+          <View
+            style={[
+              styles.section,
+              useDesktopGrid && styles.primaryGridSection,
+            ]}
+          >
+            <View style={[styles.joinCard, useDesktopGrid && styles.primaryCardDesktop]}>
             <View style={styles.joinHeader}>
               <Ionicons name="link-outline" size={24} color={theme.colors.primary} />
               <Text style={styles.joinTitle}>Enter a Code</Text>
@@ -400,6 +428,7 @@ export default function ChallengeScreen() {
                   <Text style={styles.joinButtonText}>Join</Text>
                 )}
               </TouchableOpacity>
+            </View>
             </View>
           </View>
         </View>
@@ -460,6 +489,24 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: theme.spacing.xl,
+  },
+  primaryGrid: {
+    width: '100%',
+  },
+  primaryGridDesktop: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: theme.spacing.xl,
+    marginBottom: theme.spacing.xl,
+  },
+  primaryGridSection: {
+    flex: 1,
+    minWidth: 0,
+    marginBottom: 0,
+  },
+  primaryCardDesktop: {
+    flex: 1,
+    minHeight: 250,
   },
   sectionTitle: {
     fontSize: 16,

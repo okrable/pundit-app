@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,14 +21,33 @@ import ManageFriendsModal from '../components/ManageFriendsModal';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import AuthSyncScreen from '../components/AuthSyncScreen';
 import { loginWithAuth0 } from '../services/authFlow';
-import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
+import {
+  useCenteredWebStyle,
+  useMobileLayoutMetrics,
+  webContentWidth,
+} from '../components/ResponsiveLayout';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { formatStreakLabel } from '../../shared/streak';
+import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
 type ViewMode = 'friends' | 'global';
 
 export default function LeaderboardScreen() {
+  const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
   const centeredContentStyle = useCenteredWebStyle(webContentWidth.standard);
+  const { appWidth, screenPadding } = useMobileLayoutMetrics();
+  const responsiveHorizontalPadding =
+    Platform.OS === 'web' ? { paddingHorizontal: screenPadding } : null;
+  const guestBannerWebStyle =
+    Platform.OS === 'web'
+      ? {
+          width: Math.min(
+            webContentWidth.standard,
+            appWidth - screenPadding * 2
+          ),
+          marginHorizontal: 0,
+        }
+      : null;
   const [viewMode, setViewMode] = useState<ViewMode>('friends');
   const [refreshing, setRefreshing] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
@@ -215,7 +235,13 @@ export default function LeaderboardScreen() {
     if (isAuthenticated || !isAuth0Available) return null;
 
     return (
-      <View style={[styles.guestBanner, centeredContentStyle]}>
+      <View
+        style={[
+          styles.guestBanner,
+          centeredContentStyle,
+          guestBannerWebStyle,
+        ]}
+      >
         <Text style={styles.guestBannerTitle}>Join our growing community!</Text>
         <Text style={styles.guestBannerText}>
           Log in or create a free account to compete with friends and track your stats.
@@ -261,7 +287,13 @@ export default function LeaderboardScreen() {
   );
 
   const renderPlaceholder = () => (
-    <View style={[styles.placeholderList, centeredContentStyle]}>
+    <View
+      style={[
+        styles.placeholderList,
+        centeredContentStyle,
+        responsiveHorizontalPadding,
+      ]}
+    >
       {[0, 1, 2].map((item) => (
         <View key={item} style={styles.placeholderCard}>
           <View style={styles.placeholderRank} />
@@ -285,10 +317,16 @@ export default function LeaderboardScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       {renderGuestBanner()}
 
-      <View style={[styles.header, centeredContentStyle]}>
+      <View
+        style={[
+          styles.header,
+          centeredContentStyle,
+          responsiveHorizontalPadding,
+        ]}
+      >
         <View style={styles.headerTop}>
           <Text style={styles.title}>Leaderboard</Text>
           {isAuthenticated && (
@@ -321,7 +359,11 @@ export default function LeaderboardScreen() {
           data={friendsLeaderboard}
           renderItem={renderFriendsItem}
           keyExtractor={(item) => item.userId}
-          contentContainerStyle={[styles.listContainer, centeredContentStyle]}
+          contentContainerStyle={[
+            styles.listContainer,
+            centeredContentStyle,
+            responsiveHorizontalPadding,
+          ]}
           ListEmptyComponent={renderFriendsEmptyState}
           refreshControl={
             <RefreshControl
@@ -336,7 +378,11 @@ export default function LeaderboardScreen() {
           data={globalLeaderboard}
           renderItem={renderGlobalItem}
           keyExtractor={(item) => item.userId}
-          contentContainerStyle={[styles.listContainer, centeredContentStyle]}
+          contentContainerStyle={[
+            styles.listContainer,
+            centeredContentStyle,
+            responsiveHorizontalPadding,
+          ]}
           ListEmptyComponent={renderGlobalEmptyState}
           refreshControl={
             <RefreshControl

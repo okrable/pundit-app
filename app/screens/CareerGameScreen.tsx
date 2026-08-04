@@ -23,12 +23,14 @@ import JourneyGraphic from '../components/JourneyGraphic';
 import CenteredWebContent, { webContentWidth } from '../components/ResponsiveLayout';
 import { matchesCareerAnswer } from '../../shared/careerAnswer';
 import { theme } from '../theme/theme';
+import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
 type Props = NativeStackScreenProps<GamesStackParamList, 'CareerGame'>;
 
 const logoImage = require('../../assets/logo/dark/pundit-black.png');
 
 export default function CareerGameScreen({ navigation }: Props) {
+  const safeAreaEdges = useMainTabSafeAreaEdges(['top', 'bottom']);
   const inputRef = useRef<TextInput>(null);
   const [guess, setGuess] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -89,8 +91,8 @@ export default function CareerGameScreen({ navigation }: Props) {
 
   if (result) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <CenteredWebContent maxWidth={webContentWidth.narrow} style={styles.resultContent}>
+      <SafeAreaView style={styles.container} edges={safeAreaEdges}>
+        <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.resultContent}>
           <Image source={logoImage} style={styles.resultLogo} resizeMode="contain" />
           <View style={styles.resultCard}>
             <View style={styles.resultTick}>
@@ -125,7 +127,7 @@ export default function CareerGameScreen({ navigation }: Props) {
 
   if (!game) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.container} edges={safeAreaEdges}>
         <View style={styles.centerState}>
           <JourneyGraphic />
           <Text style={styles.stateTitle}>
@@ -148,7 +150,7 @@ export default function CareerGameScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -158,7 +160,7 @@ export default function CareerGameScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <CenteredWebContent maxWidth={webContentWidth.standard} style={styles.content}>
+          <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Image source={logoImage} style={styles.logo} resizeMode="contain" />

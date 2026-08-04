@@ -1,7 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GamesNavigator from './GamesNavigator';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
@@ -14,7 +13,6 @@ const NATIVE_TAB_BAR_CONTENT_HEIGHT = 50;
 
 export default function BottomTabNavigator() {
   const insets = useSafeAreaInsets();
-  const isWeb = Platform.OS === 'web';
 
   return (
     <Tab.Navigator
@@ -34,9 +32,9 @@ export default function BottomTabNavigator() {
         tabBarStyle: {
           backgroundColor: theme.colors.white,
           borderTopColor: theme.colors.lightGray,
-          height: isWeb ? 66 : NATIVE_TAB_BAR_CONTENT_HEIGHT + insets.bottom,
-          paddingBottom: isWeb ? 8 : insets.bottom,
-          paddingTop: isWeb ? 6 : 4,
+          height: NATIVE_TAB_BAR_CONTENT_HEIGHT + insets.bottom,
+          paddingBottom: insets.bottom,
+          paddingTop: 4,
         },
         tabBarPosition: 'bottom',
         tabBarLabelStyle: {

@@ -27,7 +27,6 @@ The current mobile auth implementation uses Expo AuthSession with Authorization 
 - `expo-crypto`
 - `expo-web-browser`
 - `expo-secure-store`
-- `react-native-auth0` (native project configuration and callback handling)
 
 ## Key Files
 
@@ -78,8 +77,10 @@ https://deploy-preview-*--effervescent-tiramisu-8a2849.netlify.app
 The constrained Netlify wildcard is for non-production Deploy Previews only.
 Production uses the exact custom-domain URL.
 
-For Expo Go testing, also add the exact `exp://` callback and origin printed by
-the local Expo server. Do not use `localhost` for a physical device.
+For Expo Go convenience testing, also add the exact `exp://` callback and origin
+printed by the local Expo server. Do not use `localhost` for a physical device.
+Expo Go uses the JavaScript tab fallback; use an EAS development-client build
+for native-tab and release-path authentication acceptance.
 
 ## Environment Variables
 
@@ -182,8 +183,9 @@ Confirm Auth0 callback URLs include:
 - Web client: `https://deploy-preview-*--effervescent-tiramisu-8a2849.netlify.app/`
 - Native client: `pundit-app://callback`
 
-For Expo Go testing, add the exact LAN callback printed by Expo. For phone
-testing, do not use `localhost`; use Expo's LAN URL.
+For Expo Go convenience testing, add the exact LAN callback printed by Expo.
+For phone testing, do not use `localhost`; use Expo's LAN URL. Validate the
+native iOS callback in a development-client or preview build before release.
 
 ### Invalid Authorization Code
 
@@ -201,7 +203,9 @@ Common causes:
 - Refresh token rotation is disabled or misconfigured.
 - A stale local refresh token predates Auth0 setting changes.
 
-Fix Auth0 settings, sign out locally, force-close Expo Go, and log in again. Reinstall Expo Go only if stale local storage cannot be cleared.
+Fix Auth0 settings, sign out locally, force-close the current app runtime, and
+log in again. Reinstall the development client or Expo Go only if stale local
+storage cannot be cleared.
 
 ## Production Notes
 
