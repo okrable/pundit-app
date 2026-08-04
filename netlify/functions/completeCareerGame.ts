@@ -2,18 +2,17 @@ import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { requireCompletedIdentity } from './lib/identity';
 import { enforceRateLimit } from './lib/rateLimit';
-import { getCareerGameForDate } from './lib/careerGame';
+import {
+  getCareerGameForDate,
+  getCurrentCareerGameDate,
+} from './lib/careerGame';
+import { getQuizDate } from './lib/quizDate';
 import { matchesCareerAnswer } from '../../shared/careerAnswer';
 
 interface CompleteCareerGameRequest {
   userId: string;
   gameId: string;
   submittedAnswer: string;
-}
-
-function getGameDate(gameId: string): string | null {
-  const match = /^career-(\d{4}-\d{2}-\d{2})$/.exec(gameId);
-  return match?.[1] ?? null;
 }
 
 export const handler: Handler = async (event) => {
@@ -38,7 +37,9 @@ export const handler: Handler = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}') as Partial<CompleteCareerGameRequest>;
     const { userId, gameId, submittedAnswer } = body;
-    const gameDate = gameId ? getGameDate(gameId) : null;
+    const gameDate = gameId
+      ? getCurrentCareerGameDate(gameId, getQuizDate())
+      : null;
 
     if (
       !userId ||

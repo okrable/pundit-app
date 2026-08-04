@@ -55,7 +55,10 @@ import {
   matchesCareerAnswer,
   normalizeCareerAnswer,
 } from '../shared/careerAnswer';
-import { getCareerGameForDate } from '../netlify/functions/lib/careerGame';
+import {
+  getCareerGameForDate,
+  getCurrentCareerGameDate,
+} from '../netlify/functions/lib/careerGame';
 import { buildDailyQuizResponse } from '../netlify/functions/lib/dailyQuizResponse';
 import { getGamesHubCompletionState } from '../shared/gamesHub';
 
@@ -108,6 +111,31 @@ test('returns the temporary Anthony Gordon career fixture in display order', asy
       ['2023–2026', 'Newcastle United', 111, 24, 'Domestic', 3],
       ['2026–', 'Barcelona', 0, 0, 'Domestic', 4],
     ]
+  );
+});
+
+test('accepts career completion only for the current daily game', () => {
+  const currentDate = '2026-08-04';
+
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-08-04', currentDate),
+    currentDate
+  );
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-08-03', currentDate),
+    null
+  );
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-08-05', currentDate),
+    null
+  );
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-8-4', currentDate),
+    null
+  );
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-08-04-extra', currentDate),
+    null
   );
 });
 
