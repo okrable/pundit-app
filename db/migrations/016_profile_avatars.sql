@@ -44,7 +44,7 @@ WITH avatar_symbols AS (
 )
 UPDATE users
 SET avatar_id = avatar_symbols.ids[
-  1 + floor(random() * array_length(avatar_symbols.ids, 1))::INT
+  1 + floor(random() * array_length(avatar_symbols.ids, 1)::FLOAT)::INT
 ]
 FROM avatar_symbols
 WHERE users.avatar_id IS NULL;
