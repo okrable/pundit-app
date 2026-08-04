@@ -9,6 +9,8 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
   random defaults for established accounts and new signups.
 - Added avatar selection to username onboarding and the authenticated Me page.
 - Published saved avatars across friends and global leaderboard identities.
+- Returned the provisional player-journey gallery tile to Coming Soon without
+  artwork until it can be backed by live player data.
 
 ## v2.3.0 - Adaptive web and native iOS navigation
 

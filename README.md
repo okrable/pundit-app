@@ -7,8 +7,8 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 - Daily 5-question football quiz with typewriter prompt pacing.
 - Shared refreshed gameplay UI for daily quiz and challenge mode.
 - Reanimated question transitions, option reveal, circular timer, and answer reveal states.
-- Swipeable Games gallery with independently completed Daily Quiz and
-  player-journey tiles plus provisional coming-soon concepts.
+- Swipeable Games gallery with the playable Daily Quiz and provisional
+  player-journey, Starting XI, and Link Up concepts marked as coming soon.
 - Daily player journey with an illustrated career table, unlimited name guesses,
   spelling normalization, and separate guest/authenticated completion storage.
 - Timer starts only after the question and options are visible.

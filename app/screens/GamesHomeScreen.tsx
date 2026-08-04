@@ -13,13 +13,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import type { GamesStackParamList } from '../navigation/GamesNavigator';
 import { useQuizStore } from '../state/useQuizStore';
-import { useCareerGameStore } from '../state/useCareerGameStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
 import { getTodayQuizResult } from '../storage/quizStorage';
 import ComingSoonModal from '../components/ComingSoonModal';
 import GameGalleryTile from '../components/GameGalleryTile';
-import JourneyGraphic from '../components/JourneyGraphic';
 import CenteredWebContent, {
   useMobileLayoutMetrics,
   webContentWidth,
@@ -97,13 +95,6 @@ export default function GamesHomeScreen({ navigation }: Props) {
     setUserId,
     setCachedResult,
   } = useQuizStore();
-  const {
-    result: careerResult,
-    error: careerError,
-    setUserId: setCareerUserId,
-    hydrateFromCache: hydrateCareerResult,
-  } = useCareerGameStore();
-
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -115,10 +106,8 @@ export default function GamesHomeScreen({ navigation }: Props) {
             return;
           }
           setUserId(userId);
-          setCareerUserId(userId);
           const [quizResult] = await Promise.all([
             getTodayQuizResult(userId),
-            hydrateCareerResult(userId),
             fetchQuiz(),
           ]);
           if (active) {
@@ -137,10 +126,8 @@ export default function GamesHomeScreen({ navigation }: Props) {
       };
     }, [
       fetchQuiz,
-      hydrateCareerResult,
       isAuthenticated,
       setCachedResult,
-      setCareerUserId,
       setUserId,
       user,
     ])
@@ -169,13 +156,8 @@ export default function GamesHomeScreen({ navigation }: Props) {
     .join('');
   const quizCorrect = cachedResult?.answers.filter(Boolean).length ?? 0;
   const quizAvailable = Boolean(quiz?.questions.length);
-  const careerAvailable = Boolean(quiz?.careerGame);
   const isDailyPayloadLoading = isHubRefreshing || isQuizLoading;
-  const careerUnavailableError = careerError || quizError;
-  const hubState = getGamesHubCompletionState(
-    Boolean(cachedResult),
-    Boolean(careerResult)
-  );
+  const hubState = getGamesHubCompletionState(Boolean(cachedResult), false);
 
   const quizActionLabel =
     hubState.quiz === 'completed'
@@ -185,33 +167,15 @@ export default function GamesHomeScreen({ navigation }: Props) {
         : isDailyPayloadLoading
           ? 'Warming up'
           : 'Unavailable';
-  const careerActionLabel =
-    hubState.career === 'completed'
-      ? 'View result'
-      : careerAvailable
-        ? 'Start guessing'
-        : isDailyPayloadLoading
-          ? 'Warming up'
-          : 'Unavailable';
   const quizActionTone =
     quizAvailable || hubState.quiz === 'completed'
       ? 'primary'
       : quizError
         ? 'unavailable'
         : 'muted';
-  const careerActionTone =
-    careerAvailable || hubState.career === 'completed'
-      ? 'primary'
-      : careerUnavailableError
-        ? 'unavailable'
-        : 'muted';
-
   const quizDisabled =
     hubState.quiz !== 'completed' &&
     (!quizAvailable || isDailyPayloadLoading);
-  const careerDisabled =
-    hubState.career !== 'completed' &&
-    (!careerAvailable || isDailyPayloadLoading);
 
   return (
     <SafeAreaView style={styles.container} edges={safeAreaEdges}>
@@ -285,37 +249,11 @@ export default function GamesHomeScreen({ navigation }: Props) {
             <GameGalleryTile
               title="Whose journey is this?"
               description="Trace the clubs. Guess the player."
-              artwork={
-                <JourneyGraphic
-                  width={Math.min(360, Math.max(180, cardWidth - 64))}
-                />
-              }
-              artworkPlacement="wide"
-              actionLabel={careerActionLabel}
-              actionTone={careerActionTone}
-              showActionArrow={careerAvailable && !careerResult}
-              actionSummary={
-                careerResult ? (
-                  <View style={styles.playerFound}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={21}
-                      color={theme.colors.white}
-                    />
-                    <Text style={styles.playerFoundText}>Player found</Text>
-                  </View>
-                ) : careerUnavailableError ? (
-                  <Text style={styles.unavailableCopy}>Try again later</Text>
-                ) : undefined
-              }
+              badgeLabel="COMING SOON"
+              badgeTone="muted"
               width={cardWidth}
-              disabled={careerDisabled}
-              accessibilityHint={
-                hubState.career === 'completed'
-                  ? 'Opens today’s completed career result'
-                  : 'Starts today’s career game'
-              }
-              onPress={() => navigation.navigate('CareerGame')}
+              accessibilityHint="Shows a coming soon message"
+              onPress={() => setComingSoonTitle('Whose journey is this?')}
             />
           </GameRow>
 
@@ -403,17 +341,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 9,
     fontFamily: theme.fonts.gothamMedium,
-    color: theme.colors.white,
-  },
-  playerFound: {
-    minHeight: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  playerFoundText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.gothamBold,
     color: theme.colors.white,
   },
   unavailableCopy: {

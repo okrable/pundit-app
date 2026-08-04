@@ -92,14 +92,11 @@ existing safe-area handling.
 
 ## Games Hub
 
-The Games tab opens an internal stack and displays the Daily Quiz and player
-journey as independent mode components. Each component reads its own daily
-result: completing the quiz shows its score recap without disabling the career
-game, and finding the career player leaves an unplayed quiz available.
-
-The player journey uses the headline “Whose journey is this?”, the supporting
-copy “Trace the clubs. Guess the player.”, an illustrated How it works modal,
-and a responsive Years/Team/Apps/Goals card with unlimited unscored guesses.
+The Games tab opens an internal stack with the Daily Quiz as the current
+playable mode. The player journey remains implemented for future reuse but its
+gallery entry is a Coming Soon concept until live player data is connected. Its
+tile retains the headline “Whose journey is this?” and supporting copy “Trace
+the clubs. Guess the player.” without artwork or gameplay navigation.
 
 ## Daily Quiz Flow
 
@@ -170,18 +167,16 @@ expansion, but currently contains one tile and therefore has no practical
 sideways scroll. Each single tile is centred in its row on web, iOS, and
 Android; web centres it within the 1200px gallery surface and lets it grow up
 to 760px, while native rails centre their narrower card within the device
-viewport. The Daily Quiz and career
-tiles are single press targets:
-available tiles start play, while completed tiles open their own cached recap.
-Their loading, unavailable, and completion states stay independent. The Daily
-Quiz uses Uni Sans, its football treatment, and original tagline; the career
-tile uses the custom journey artwork. Both integrate their green action
-treatment into the card without creating a nested button.
+viewport. The Daily Quiz tile is a single press target: an available tile starts
+play and a completed tile opens its cached recap. It uses Uni Sans, its football
+treatment, and original tagline with its green action treatment integrated into
+the card rather than rendered as a nested button.
 
-The provisional Starting XI and The Link Up tiles use code-native icons and
-open one shared Coming Soon message. They do not add routes, stores,
-persistence, or API contracts. Rules components remain available to the game
-surfaces but are not entry points from the gallery.
+The provisional player journey, Starting XI, and The Link Up tiles open one
+shared Coming Soon message. The journey tile intentionally has no artwork;
+Starting XI and The Link Up retain their code-native icons. Rules and career
+components remain available to the game surfaces but are not entry points from
+the gallery.
 
 ### Profile and Leaderboards
 
