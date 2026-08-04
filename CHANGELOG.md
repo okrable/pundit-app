@@ -14,6 +14,8 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 - Added separate guest/authenticated career completion persistence, migration,
   retry, and server validation without changing quiz scores, streaks, profile
   aggregates, or leaderboards.
+- Prevented temporary Auth0 verification failures during background refreshes
+  from being presented as expired sessions or interrupting sign-in completion.
 
 ## v2.1.2 - Authentication and quiz sync hardening
 

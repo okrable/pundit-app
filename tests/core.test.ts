@@ -60,6 +60,10 @@ import {
   getCurrentCareerGameDate,
 } from '../netlify/functions/lib/careerGame';
 import { buildDailyQuizResponse } from '../netlify/functions/lib/dailyQuizResponse';
+import {
+  authorizeUser,
+  classifyAuth0VerificationFailure,
+} from '../netlify/functions/lib/auth';
 import { getGamesHubCompletionState } from '../shared/gamesHub';
 
 test('scores answers consistently across timer boundaries', () => {
@@ -192,6 +196,52 @@ test('keeps daily quiz and career completion states independent', () => {
     quiz: 'completed',
     career: 'completed',
   });
+});
+
+test('distinguishes rejected Auth0 tokens from temporary verification failures', () => {
+  assert.equal(classifyAuth0VerificationFailure(401), 'invalid');
+  assert.equal(classifyAuth0VerificationFailure(429), 'unavailable');
+  assert.equal(classifyAuth0VerificationFailure(500), 'unavailable');
+  assert.equal(classifyAuth0VerificationFailure(503), 'unavailable');
+  assert.equal(classifyAuth0VerificationFailure(undefined), 'unavailable');
+});
+
+test('keeps temporary Auth0 userinfo failures distinct from invalid tokens', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalDomain = process.env.AUTH0_DOMAIN;
+  const event = {
+    headers: { authorization: 'Bearer test-token' },
+  } as unknown as Parameters<typeof authorizeUser>[0];
+
+  process.env.AUTH0_DOMAIN = 'example.auth0.com';
+
+  try {
+    globalThis.fetch = async () => new Response(null, {
+      status: 429,
+      headers: { 'Retry-After': '10' },
+    });
+    const unavailable = await authorizeUser(event, 'auth0|player', {});
+    assert.equal(unavailable.response?.statusCode, 503);
+    assert.equal(unavailable.response?.headers?.['Retry-After'], '10');
+    assert.deepEqual(JSON.parse(unavailable.response?.body ?? '{}'), {
+      error: 'Authentication service temporarily unavailable',
+      code: 'AUTH_VERIFICATION_UNAVAILABLE',
+    });
+
+    globalThis.fetch = async () => new Response(null, { status: 401 });
+    const invalid = await authorizeUser(event, 'auth0|player', {});
+    assert.equal(invalid.response?.statusCode, 401);
+    assert.deepEqual(JSON.parse(invalid.response?.body ?? '{}'), {
+      error: 'Invalid or expired access token',
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalDomain === undefined) {
+      delete process.env.AUTH0_DOMAIN;
+    } else {
+      process.env.AUTH0_DOMAIN = originalDomain;
+    }
+  }
 });
 
 test('validates answer shape, bounds, and duplicates', () => {

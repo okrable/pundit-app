@@ -15,6 +15,24 @@ interface AuthorizeOptions {
   allowGuest?: boolean;
 }
 
+export type Auth0VerificationFailureKind = 'invalid' | 'unavailable';
+
+interface Auth0VerificationFailure {
+  kind: Auth0VerificationFailureKind;
+  upstreamStatus?: number;
+  retryAfter?: string;
+}
+
+type Auth0UserInfoResult =
+  | { user: Auth0UserInfo; failure: null }
+  | { user: null; failure: Auth0VerificationFailure };
+
+export function classifyAuth0VerificationFailure(
+  upstreamStatus?: number
+): Auth0VerificationFailureKind {
+  return upstreamStatus === 401 ? 'invalid' : 'unavailable';
+}
+
 function getBearerToken(event: HandlerEvent): string | null {
   const authHeader = event.headers.authorization || event.headers.Authorization;
   if (!authHeader) return null;
@@ -23,11 +41,14 @@ function getBearerToken(event: HandlerEvent): string | null {
   return match ? match[1] : null;
 }
 
-async function fetchAuth0UserInfo(accessToken: string): Promise<Auth0UserInfo | null> {
+async function fetchAuth0UserInfo(accessToken: string): Promise<Auth0UserInfoResult> {
   const auth0Domain = process.env.AUTH0_DOMAIN;
   if (!auth0Domain) {
     console.error('AUTH0_DOMAIN is not configured on server');
-    return null;
+    return {
+      user: null,
+      failure: { kind: 'unavailable' },
+    };
   }
 
   try {
@@ -38,12 +59,31 @@ async function fetchAuth0UserInfo(accessToken: string): Promise<Auth0UserInfo | 
     });
 
     if (!response.ok) {
-      return null;
+      const kind = classifyAuth0VerificationFailure(response.status);
+      console.warn('Auth0 userinfo verification failed', {
+        kind,
+        upstreamStatus: response.status,
+      });
+      return {
+        user: null,
+        failure: {
+          kind,
+          upstreamStatus: response.status,
+          retryAfter: response.headers.get('retry-after') || undefined,
+        },
+      };
     }
 
     const data = (await response.json()) as Auth0UserInfoPayload;
     if (!data.sub || typeof data.sub !== 'string') {
-      return null;
+      console.warn('Auth0 userinfo response did not include a valid subject');
+      return {
+        user: null,
+        failure: {
+          kind: 'unavailable',
+          upstreamStatus: response.status,
+        },
+      };
     }
 
     const verifiedEmail =
@@ -52,14 +92,20 @@ async function fetchAuth0UserInfo(accessToken: string): Promise<Auth0UserInfo | 
         : undefined;
 
     return {
-      sub: data.sub,
-      email: verifiedEmail,
-      name: typeof data.name === 'string' ? data.name : undefined,
-      picture: typeof data.picture === 'string' ? data.picture : undefined,
+      user: {
+        sub: data.sub,
+        email: verifiedEmail,
+        name: typeof data.name === 'string' ? data.name : undefined,
+        picture: typeof data.picture === 'string' ? data.picture : undefined,
+      },
+      failure: null,
     };
   } catch (error) {
     console.error('Auth0 token verification failed:', error);
-    return null;
+    return {
+      user: null,
+      failure: { kind: 'unavailable' },
+    };
   }
 }
 
@@ -84,18 +130,30 @@ export async function authorizeUser(
     };
   }
 
-  const userInfo = await fetchAuth0UserInfo(token);
-  if (!userInfo) {
+  const verification = await fetchAuth0UserInfo(token);
+  if (!verification.user) {
+    const isInvalidToken = verification.failure.kind === 'invalid';
+    const responseHeaders = verification.failure.retryAfter
+      ? { ...headers, 'Retry-After': verification.failure.retryAfter }
+      : headers;
     return {
       user: null,
       response: {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ error: 'Invalid or expired access token' }),
+        statusCode: isInvalidToken ? 401 : 503,
+        headers: responseHeaders,
+        body: JSON.stringify(
+          isInvalidToken
+            ? { error: 'Invalid or expired access token' }
+            : {
+                error: 'Authentication service temporarily unavailable',
+                code: 'AUTH_VERIFICATION_UNAVAILABLE',
+              }
+        ),
       },
     };
   }
 
+  const userInfo = verification.user;
   if (userInfo.sub !== expectedUserId) {
     return {
       user: null,

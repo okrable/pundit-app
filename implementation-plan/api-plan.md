@@ -7,6 +7,10 @@ All APIs are Netlify Functions under `/.netlify/functions/`.
 - Guest-compatible endpoints allow unauthenticated `guest_*` identities only where explicitly supported.
 - Protected flows require `Authorization: Bearer <access-token>`.
 - Server validates Auth0 tokens through `/userinfo` and enforces `token.sub === userId`.
+  A genuine upstream 401 is returned as an invalid-token 401; rate limits,
+  upstream failures, malformed responses, and network errors return a temporary
+  `AUTH_VERIFICATION_UNAVAILABLE` 503 so background refreshes cannot incorrectly
+  expire an otherwise valid client session.
 - `POST /syncIdentity` creates or refreshes the authenticated user record from verified Auth0 claims and returns username onboarding state.
 - Protected identity guards return `USERNAME_REQUIRED` when signup username onboarding is incomplete.
 - Current protected social endpoints invoke the shared identity guard; the
