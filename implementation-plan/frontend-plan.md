@@ -90,6 +90,10 @@ subtree omit their own bottom safe-area edge only while native tabs are active;
 Android, web, Expo Go, and standalone challenge/result routes retain their
 existing safe-area handling.
 
+The web navigation drawer keeps a dedicated authentication action anchored in
+its footer. Guests see Log In and authenticated players see Log Out; both use
+the centralized Auth0 flow and expose pending and retryable error states.
+
 ## Games Hub
 
 The Games tab opens an internal stack with the Daily Quiz as the current

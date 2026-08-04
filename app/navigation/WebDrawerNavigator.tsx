@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   StyleSheet,
@@ -22,6 +23,9 @@ import ChallengeScreen from '../screens/ChallengeScreen';
 import { theme } from '../theme/theme';
 import { webContentWidth } from '../components/ResponsiveLayout';
 import type { MainSectionParamList } from './MainNavigator';
+import { useAuthRequest } from '../services/auth0';
+import { loginWithAuth0, logoutWithAuth0 } from '../services/authFlow';
+import { useAuthStore } from '../state/useAuthStore';
 
 const Drawer = createDrawerNavigator<MainSectionParamList>();
 const whiteLogo = require('../../assets/logo/white/pundit-white.png');
@@ -87,6 +91,14 @@ function WebHeader({ title, onOpenMenu }: WebHeaderProps) {
 }
 
 function WebDrawerContent(props: DrawerContentComponentProps) {
+  const { isAuthenticated } = useAuthStore();
+  const [authPending, setAuthPending] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [loginRequest, , promptLogin] = useAuthRequest({
+    intent: 'login',
+    forceInteractive: true,
+  });
+
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -98,6 +110,32 @@ function WebDrawerContent(props: DrawerContentComponentProps) {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [props.navigation]);
 
+  const handleAuthAction = async () => {
+    setAuthPending(true);
+    setAuthError(null);
+    try {
+      if (isAuthenticated) {
+        await logoutWithAuth0();
+      } else {
+        if (!loginRequest) {
+          throw new Error('Login is not ready yet. Please try again.');
+        }
+        await loginWithAuth0({
+          intent: 'login',
+          request: loginRequest,
+          promptAsync: promptLogin,
+        });
+      }
+      props.navigation.closeDrawer();
+    } catch (error) {
+      setAuthError(
+        error instanceof Error ? error.message : 'Unable to update your session.'
+      );
+    } finally {
+      setAuthPending(false);
+    }
+  };
+
   return (
     <DrawerContentScrollView
       {...props}
@@ -108,6 +146,56 @@ function WebDrawerContent(props: DrawerContentComponentProps) {
         <Text style={styles.drawerEyebrow}>NAVIGATION</Text>
       </View>
       <DrawerItemList {...props} />
+      <View style={styles.drawerFooter}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isAuthenticated ? 'Log out' : 'Log in'}
+          accessibilityHint={
+            isAuthenticated
+              ? 'Ends your current Pundit session'
+              : 'Opens the Pundit login flow'
+          }
+          accessibilityState={{ disabled: authPending }}
+          disabled={authPending}
+          onPress={() => void handleAuthAction()}
+          style={({ pressed }) => [
+            styles.authButton,
+            isAuthenticated && styles.authButtonLoggedIn,
+            pressed && !authPending && styles.authButtonPressed,
+            authPending && styles.authButtonPending,
+          ]}
+        >
+          {authPending ? (
+            <ActivityIndicator
+              size="small"
+              color={
+                isAuthenticated ? theme.colors.textDark : theme.colors.white
+              }
+            />
+          ) : (
+            <Ionicons
+              name={isAuthenticated ? 'log-out-outline' : 'log-in-outline'}
+              size={21}
+              color={
+                isAuthenticated ? theme.colors.textDark : theme.colors.white
+              }
+            />
+          )}
+          <Text
+            style={[
+              styles.authButtonText,
+              isAuthenticated && styles.authButtonTextLoggedIn,
+            ]}
+          >
+            {isAuthenticated ? 'Log Out' : 'Log In'}
+          </Text>
+        </Pressable>
+        {authError ? (
+          <Text accessibilityRole="alert" style={styles.authError}>
+            {authError}
+          </Text>
+        ) : null}
+      </View>
     </DrawerContentScrollView>
   );
 }
@@ -264,5 +352,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.6,
     color: theme.colors.neutralDark,
+  },
+  drawerFooter: {
+    marginTop: 'auto',
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.lightGray,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
+  },
+  authButton: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  authButtonLoggedIn: {
+    backgroundColor: theme.colors.background,
+    borderColor: theme.colors.neutralDark,
+  },
+  authButtonPressed: {
+    opacity: 0.82,
+  },
+  authButtonPending: {
+    opacity: 0.68,
+  },
+  authButtonText: {
+    fontFamily: theme.fonts.gothamBold,
+    fontSize: 15,
+    color: theme.colors.white,
+  },
+  authButtonTextLoggedIn: {
+    color: theme.colors.textDark,
+  },
+  authError: {
+    marginTop: theme.spacing.sm,
+    fontFamily: theme.fonts.gothamBook,
+    fontSize: 12,
+    lineHeight: 17,
+    color: theme.colors.incorrect,
+    textAlign: 'center',
   },
 });

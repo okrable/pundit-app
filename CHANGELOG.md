@@ -11,6 +11,8 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 - Published saved avatars across friends and global leaderboard identities.
 - Returned the provisional player-journey gallery tile to Coming Soon without
   artwork until it can be backed by live player data.
+- Added a dedicated login/logout action to the footer of the web navigation
+  drawer.
 
 ## v2.3.0 - Adaptive web and native iOS navigation
 
