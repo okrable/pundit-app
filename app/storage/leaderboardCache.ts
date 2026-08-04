@@ -10,7 +10,7 @@ const GLOBAL_CACHE_STALE_MS = 5 * 60 * 1000;
 const GLOBAL_CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 const FRIENDS_CACHE_STALE_MS = 2 * 60 * 1000;
 const FRIENDS_CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
-const SOCIAL_CACHE_SCHEMA_VERSION = 2;
+const SOCIAL_CACHE_SCHEMA_VERSION = 3;
 
 function getGlobalLeaderboardKey(date: string): string {
   return `leaderboard_global_daily_${date}`;

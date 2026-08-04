@@ -17,6 +17,7 @@ export interface LeaderboardEntry {
   streak: number;
   rank: number | null;
   hasPlayedToday?: boolean;
+  avatarId: string | null;
 }
 
 interface LeaderboardRow {
@@ -27,6 +28,7 @@ interface LeaderboardRow {
   streak: number;
   rank: number | string | null;
   has_played_today?: boolean;
+  avatar_id: string | null;
 }
 
 export function parseLeaderboardPeriod(value: string | undefined): LeaderboardPeriod {
@@ -53,6 +55,7 @@ function mapLeaderboardRow(row: LeaderboardRow): LeaderboardEntry {
     streak: row.streak,
     rank: row.rank === null ? null : Number(row.rank),
     hasPlayedToday: Boolean(row.has_played_today),
+    avatarId: row.avatar_id,
   };
 }
 
@@ -66,6 +69,7 @@ export async function getGlobalLeaderboardRows(
       SELECT
         r.user_id,
         u.username,
+        u.avatar_id,
         r.score,
         1::INT as games_played,
         CASE
@@ -83,6 +87,7 @@ export async function getGlobalLeaderboardRows(
     SELECT
       user_id,
       username,
+      avatar_id,
       score,
       games_played,
       streak,
@@ -124,6 +129,7 @@ export async function getFriendsLeaderboardRows(
     SELECT
       u.id as user_id,
       u.username,
+      u.avatar_id,
       r.score,
       CASE WHEN r.score IS NULL THEN 0 ELSE 1 END as games_played,
       CASE

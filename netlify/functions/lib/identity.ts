@@ -5,6 +5,10 @@ import { chooseAvailableGeneratedUsername } from '../../../shared/username';
 import { chooseIdentityProvisioningAction } from '../../../shared/identityPolicy';
 import { authorizeUser, type Auth0UserInfo } from './auth';
 import { queryWithClient, withTransaction } from './db';
+import {
+  resolvePersistedAvatarId,
+  type AvatarId,
+} from '../../../shared/avatarCatalog';
 
 export type IdentityIntent = 'signup' | 'login' | 'restore';
 export type IdentityOnboardingStatus = 'username_required' | 'complete';
@@ -13,12 +17,14 @@ interface IdentityRow {
   id: string;
   username: string | null;
   onboarding_status: IdentityOnboardingStatus;
+  avatar_id: string | null;
 }
 
 export interface SyncedIdentity {
   username: string | null;
   usernameRequired: boolean;
   onboardingStatus: IdentityOnboardingStatus;
+  avatarId: AvatarId;
 }
 
 function getUsernameSuffixes(userId: string): string[] {
@@ -62,16 +68,18 @@ function isRetryableIdentityRace(error: unknown): boolean {
 
 async function updateVerifiedProfile(
   client: PoolClient,
-  user: Auth0UserInfo
+  user: Auth0UserInfo,
+  avatarId: AvatarId
 ): Promise<void> {
   await queryWithClient(
     client,
     `UPDATE users
      SET
        email = COALESCE($2, email),
-       avatar_url = COALESCE($3, avatar_url)
+       avatar_url = COALESCE($3, avatar_url),
+       avatar_id = $4
      WHERE id = $1`,
-    [user.sub, user.email || null, user.picture || null]
+    [user.sub, user.email || null, user.picture || null, avatarId]
   );
 }
 
@@ -82,13 +90,14 @@ async function syncIdentityRecordOnce(
   return withTransaction(async (client) => {
     const existing = await queryWithClient<IdentityRow>(
       client,
-      `SELECT id, username, onboarding_status
+      `SELECT id, username, onboarding_status, avatar_id
        FROM users
        WHERE id = $1
        FOR UPDATE`,
       [user.sub]
     );
     const current = existing[0];
+    const avatarId = resolvePersistedAvatarId(current?.avatar_id);
     const action = chooseIdentityProvisioningAction({
       hasUserRow: Boolean(current),
       hasUsername: Boolean(current?.username),
@@ -97,7 +106,7 @@ async function syncIdentityRecordOnce(
     });
 
     if (current) {
-      await updateVerifiedProfile(client, user);
+      await updateVerifiedProfile(client, user, avatarId);
 
       if (action === 'use_existing' && current.username) {
         if (current.onboarding_status !== 'complete') {
@@ -111,6 +120,7 @@ async function syncIdentityRecordOnce(
           username: current.username,
           usernameRequired: false,
           onboardingStatus: 'complete',
+          avatarId,
         };
       }
 
@@ -119,6 +129,7 @@ async function syncIdentityRecordOnce(
           username: null,
           usernameRequired: true,
           onboardingStatus: 'username_required',
+          avatarId,
         };
       }
 
@@ -138,6 +149,7 @@ async function syncIdentityRecordOnce(
         username: generated,
         usernameRequired: false,
         onboardingStatus: 'complete',
+        avatarId,
       };
     }
 
@@ -148,16 +160,18 @@ async function syncIdentityRecordOnce(
            id,
            email,
            avatar_url,
+           avatar_id,
            onboarding_status,
            created_at
          )
-         VALUES ($1, $2, $3, 'username_required', NOW())`,
-        [user.sub, user.email || null, user.picture || null]
+         VALUES ($1, $2, $3, $4, 'username_required', NOW())`,
+        [user.sub, user.email || null, user.picture || null, avatarId]
       );
       return {
         username: null,
         usernameRequired: true,
         onboardingStatus: 'username_required',
+        avatarId,
       };
     }
 
@@ -168,19 +182,21 @@ async function syncIdentityRecordOnce(
          id,
          email,
          avatar_url,
+         avatar_id,
          username,
          username_normalized,
          username_last_changed_at,
          onboarding_status,
          created_at
        )
-       VALUES ($1, $2, $3, $4, $4, NULL, 'complete', NOW())`,
-      [user.sub, user.email || null, user.picture || null, generated]
+       VALUES ($1, $2, $3, $4, $5, $5, NULL, 'complete', NOW())`,
+      [user.sub, user.email || null, user.picture || null, avatarId, generated]
     );
     return {
       username: generated,
       usernameRequired: false,
       onboardingStatus: 'complete',
+      avatarId,
     };
   });
 }

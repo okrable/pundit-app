@@ -1,0 +1,468 @@
+{
+  "version": 1,
+  "total": 58,
+  "masterSize": 1024,
+  "appSize": 256,
+  "circleDiameter": 940,
+  "colorSpace": "sRGB",
+  "assets": [
+    {
+      "id": "symbol-classic-leather-football",
+      "type": "symbol",
+      "label": "Classic leather football",
+      "master": "assets/avatars/masters/symbols/symbol-classic-leather-football.png",
+      "app": "assets/avatars/app/symbols/symbol-classic-leather-football.png"
+    },
+    {
+      "id": "symbol-modern-panelled-football",
+      "type": "symbol",
+      "label": "Modern panelled football",
+      "master": "assets/avatars/masters/symbols/symbol-modern-panelled-football.png",
+      "app": "assets/avatars/app/symbols/symbol-modern-panelled-football.png"
+    },
+    {
+      "id": "symbol-football-boot",
+      "type": "symbol",
+      "label": "Football boot",
+      "master": "assets/avatars/masters/symbols/symbol-football-boot.png",
+      "app": "assets/avatars/app/symbols/symbol-football-boot.png"
+    },
+    {
+      "id": "symbol-goalkeeper-glove",
+      "type": "symbol",
+      "label": "Goalkeeper glove",
+      "master": "assets/avatars/masters/symbols/symbol-goalkeeper-glove.png",
+      "app": "assets/avatars/app/symbols/symbol-goalkeeper-glove.png"
+    },
+    {
+      "id": "symbol-football-shirt",
+      "type": "symbol",
+      "label": "Shirt \u2014 green sash",
+      "master": "assets/avatars/masters/symbols/symbol-football-shirt.png",
+      "app": "assets/avatars/app/symbols/symbol-football-shirt.png"
+    },
+    {
+      "id": "symbol-football-shirt-black-white-stripes",
+      "type": "symbol",
+      "label": "Shirt \u2014 black/white stripes",
+      "master": "assets/avatars/masters/symbols/symbol-football-shirt-black-white-stripes.png",
+      "app": "assets/avatars/app/symbols/symbol-football-shirt-black-white-stripes.png"
+    },
+    {
+      "id": "symbol-football-shirt-all-white",
+      "type": "symbol",
+      "label": "Shirt \u2014 all white",
+      "master": "assets/avatars/masters/symbols/symbol-football-shirt-all-white.png",
+      "app": "assets/avatars/app/symbols/symbol-football-shirt-all-white.png"
+    },
+    {
+      "id": "symbol-football-shirt-all-red",
+      "type": "symbol",
+      "label": "Shirt \u2014 all red",
+      "master": "assets/avatars/masters/symbols/symbol-football-shirt-all-red.png",
+      "app": "assets/avatars/app/symbols/symbol-football-shirt-all-red.png"
+    },
+    {
+      "id": "symbol-football-shirt-blue-white-hoops",
+      "type": "symbol",
+      "label": "Shirt \u2014 blue/white hoops",
+      "master": "assets/avatars/masters/symbols/symbol-football-shirt-blue-white-hoops.png",
+      "app": "assets/avatars/app/symbols/symbol-football-shirt-blue-white-hoops.png"
+    },
+    {
+      "id": "symbol-supporter-scarf",
+      "type": "symbol",
+      "label": "Supporter scarf",
+      "master": "assets/avatars/masters/symbols/symbol-supporter-scarf.png",
+      "app": "assets/avatars/app/symbols/symbol-supporter-scarf.png"
+    },
+    {
+      "id": "symbol-referee-whistle",
+      "type": "symbol",
+      "label": "Referee whistle",
+      "master": "assets/avatars/masters/symbols/symbol-referee-whistle.png",
+      "app": "assets/avatars/app/symbols/symbol-referee-whistle.png"
+    },
+    {
+      "id": "symbol-tactics-board",
+      "type": "symbol",
+      "label": "Tactics board",
+      "master": "assets/avatars/masters/symbols/symbol-tactics-board.png",
+      "app": "assets/avatars/app/symbols/symbol-tactics-board.png"
+    },
+    {
+      "id": "symbol-trophy",
+      "type": "symbol",
+      "label": "Trophy",
+      "master": "assets/avatars/masters/symbols/symbol-trophy.png",
+      "app": "assets/avatars/app/symbols/symbol-trophy.png"
+    },
+    {
+      "id": "symbol-winners-medal",
+      "type": "symbol",
+      "label": "Winner's medal",
+      "master": "assets/avatars/masters/symbols/symbol-winners-medal.png",
+      "app": "assets/avatars/app/symbols/symbol-winners-medal.png"
+    },
+    {
+      "id": "symbol-corner-flag",
+      "type": "symbol",
+      "label": "Corner flag",
+      "master": "assets/avatars/masters/symbols/symbol-corner-flag.png",
+      "app": "assets/avatars/app/symbols/symbol-corner-flag.png"
+    },
+    {
+      "id": "symbol-goal-and-net",
+      "type": "symbol",
+      "label": "Goal and net",
+      "master": "assets/avatars/masters/symbols/symbol-goal-and-net.png",
+      "app": "assets/avatars/app/symbols/symbol-goal-and-net.png"
+    },
+    {
+      "id": "symbol-floodlights",
+      "type": "symbol",
+      "label": "Floodlights",
+      "master": "assets/avatars/masters/symbols/symbol-floodlights.png",
+      "app": "assets/avatars/app/symbols/symbol-floodlights.png"
+    },
+    {
+      "id": "symbol-stadium",
+      "type": "symbol",
+      "label": "Stadium",
+      "master": "assets/avatars/masters/symbols/symbol-stadium.png",
+      "app": "assets/avatars/app/symbols/symbol-stadium.png"
+    },
+    {
+      "id": "symbol-referee-cards",
+      "type": "symbol",
+      "label": "Referee cards",
+      "master": "assets/avatars/masters/symbols/symbol-referee-cards.png",
+      "app": "assets/avatars/app/symbols/symbol-referee-cards.png"
+    },
+    {
+      "id": "symbol-captains-armband",
+      "type": "symbol",
+      "label": "Captain's armband",
+      "master": "assets/avatars/masters/symbols/symbol-captains-armband.png",
+      "app": "assets/avatars/app/symbols/symbol-captains-armband.png"
+    },
+    {
+      "id": "symbol-match-stopwatch",
+      "type": "symbol",
+      "label": "Match stopwatch",
+      "master": "assets/avatars/masters/symbols/symbol-match-stopwatch.png",
+      "app": "assets/avatars/app/symbols/symbol-match-stopwatch.png"
+    },
+    {
+      "id": "symbol-match-ticket",
+      "type": "symbol",
+      "label": "Match ticket",
+      "master": "assets/avatars/masters/symbols/symbol-match-ticket.png",
+      "app": "assets/avatars/app/symbols/symbol-match-ticket.png"
+    },
+    {
+      "id": "symbol-turnstile",
+      "type": "symbol",
+      "label": "Turnstile",
+      "master": "assets/avatars/masters/symbols/symbol-turnstile.png",
+      "app": "assets/avatars/app/symbols/symbol-turnstile.png"
+    },
+    {
+      "id": "symbol-pundit-microphone",
+      "type": "symbol",
+      "label": "Pundit microphone",
+      "master": "assets/avatars/masters/symbols/symbol-pundit-microphone.png",
+      "app": "assets/avatars/app/symbols/symbol-pundit-microphone.png"
+    },
+    {
+      "id": "symbol-commentary-headphones",
+      "type": "symbol",
+      "label": "Commentary headphones",
+      "master": "assets/avatars/masters/symbols/symbol-commentary-headphones.png",
+      "app": "assets/avatars/app/symbols/symbol-commentary-headphones.png"
+    },
+    {
+      "id": "symbol-match-day-pie",
+      "type": "symbol",
+      "label": "Match-day pie",
+      "master": "assets/avatars/masters/symbols/symbol-match-day-pie.png",
+      "app": "assets/avatars/app/symbols/symbol-match-day-pie.png"
+    },
+    {
+      "id": "symbol-away-day-coach",
+      "type": "symbol",
+      "label": "Away-day coach",
+      "master": "assets/avatars/masters/symbols/symbol-away-day-coach.png",
+      "app": "assets/avatars/app/symbols/symbol-away-day-coach.png"
+    },
+    {
+      "id": "symbol-football-programme",
+      "type": "symbol",
+      "label": "Football programme",
+      "master": "assets/avatars/masters/symbols/symbol-football-programme.png",
+      "app": "assets/avatars/app/symbols/symbol-football-programme.png"
+    },
+    {
+      "id": "symbol-manager-side-profile",
+      "type": "symbol",
+      "label": "Manager \u2014 side profile",
+      "master": "assets/avatars/masters/symbols/symbol-manager-side-profile.png",
+      "app": "assets/avatars/app/symbols/symbol-manager-side-profile.png"
+    },
+    {
+      "id": "symbol-goalkeeper-diving",
+      "type": "symbol",
+      "label": "Goalkeeper diving",
+      "master": "assets/avatars/masters/symbols/symbol-goalkeeper-diving.png",
+      "app": "assets/avatars/app/symbols/symbol-goalkeeper-diving.png"
+    },
+    {
+      "id": "symbol-dugout",
+      "type": "symbol",
+      "label": "Dugout",
+      "master": "assets/avatars/masters/symbols/symbol-dugout.png",
+      "app": "assets/avatars/app/symbols/symbol-dugout.png"
+    },
+    {
+      "id": "symbol-training-cone",
+      "type": "symbol",
+      "label": "Training cone",
+      "master": "assets/avatars/masters/symbols/symbol-training-cone.png",
+      "app": "assets/avatars/app/symbols/symbol-training-cone.png"
+    },
+    {
+      "id": "letter-a",
+      "type": "letter",
+      "label": "A",
+      "background": "#C3DDCE",
+      "masterPng": "assets/avatars/masters/letters/letter-a.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-a.svg",
+      "app": "assets/avatars/app/letters/letter-a.png"
+    },
+    {
+      "id": "letter-b",
+      "type": "letter",
+      "label": "B",
+      "background": "#D9E8D7",
+      "masterPng": "assets/avatars/masters/letters/letter-b.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-b.svg",
+      "app": "assets/avatars/app/letters/letter-b.png"
+    },
+    {
+      "id": "letter-c",
+      "type": "letter",
+      "label": "C",
+      "background": "#D8DFC2",
+      "masterPng": "assets/avatars/masters/letters/letter-c.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-c.svg",
+      "app": "assets/avatars/app/letters/letter-c.png"
+    },
+    {
+      "id": "letter-d",
+      "type": "letter",
+      "label": "D",
+      "background": "#EDC8BE",
+      "masterPng": "assets/avatars/masters/letters/letter-d.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-d.svg",
+      "app": "assets/avatars/app/letters/letter-d.png"
+    },
+    {
+      "id": "letter-e",
+      "type": "letter",
+      "label": "E",
+      "background": "#F2C9AA",
+      "masterPng": "assets/avatars/masters/letters/letter-e.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-e.svg",
+      "app": "assets/avatars/app/letters/letter-e.png"
+    },
+    {
+      "id": "letter-f",
+      "type": "letter",
+      "label": "F",
+      "background": "#D7C4B7",
+      "masterPng": "assets/avatars/masters/letters/letter-f.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-f.svg",
+      "app": "assets/avatars/app/letters/letter-f.png"
+    },
+    {
+      "id": "letter-g",
+      "type": "letter",
+      "label": "G",
+      "background": "#E7D3B0",
+      "masterPng": "assets/avatars/masters/letters/letter-g.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-g.svg",
+      "app": "assets/avatars/app/letters/letter-g.png"
+    },
+    {
+      "id": "letter-h",
+      "type": "letter",
+      "label": "H",
+      "background": "#F3EBDD",
+      "masterPng": "assets/avatars/masters/letters/letter-h.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-h.svg",
+      "app": "assets/avatars/app/letters/letter-h.png"
+    },
+    {
+      "id": "letter-i",
+      "type": "letter",
+      "label": "I",
+      "background": "#C3DDCE",
+      "masterPng": "assets/avatars/masters/letters/letter-i.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-i.svg",
+      "app": "assets/avatars/app/letters/letter-i.png"
+    },
+    {
+      "id": "letter-j",
+      "type": "letter",
+      "label": "J",
+      "background": "#D9E8D7",
+      "masterPng": "assets/avatars/masters/letters/letter-j.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-j.svg",
+      "app": "assets/avatars/app/letters/letter-j.png"
+    },
+    {
+      "id": "letter-k",
+      "type": "letter",
+      "label": "K",
+      "background": "#D8DFC2",
+      "masterPng": "assets/avatars/masters/letters/letter-k.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-k.svg",
+      "app": "assets/avatars/app/letters/letter-k.png"
+    },
+    {
+      "id": "letter-l",
+      "type": "letter",
+      "label": "L",
+      "background": "#EDC8BE",
+      "masterPng": "assets/avatars/masters/letters/letter-l.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-l.svg",
+      "app": "assets/avatars/app/letters/letter-l.png"
+    },
+    {
+      "id": "letter-m",
+      "type": "letter",
+      "label": "M",
+      "background": "#F2C9AA",
+      "masterPng": "assets/avatars/masters/letters/letter-m.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-m.svg",
+      "app": "assets/avatars/app/letters/letter-m.png"
+    },
+    {
+      "id": "letter-n",
+      "type": "letter",
+      "label": "N",
+      "background": "#D7C4B7",
+      "masterPng": "assets/avatars/masters/letters/letter-n.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-n.svg",
+      "app": "assets/avatars/app/letters/letter-n.png"
+    },
+    {
+      "id": "letter-o",
+      "type": "letter",
+      "label": "O",
+      "background": "#E7D3B0",
+      "masterPng": "assets/avatars/masters/letters/letter-o.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-o.svg",
+      "app": "assets/avatars/app/letters/letter-o.png"
+    },
+    {
+      "id": "letter-p",
+      "type": "letter",
+      "label": "P",
+      "background": "#F3EBDD",
+      "masterPng": "assets/avatars/masters/letters/letter-p.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-p.svg",
+      "app": "assets/avatars/app/letters/letter-p.png"
+    },
+    {
+      "id": "letter-q",
+      "type": "letter",
+      "label": "Q",
+      "background": "#C3DDCE",
+      "masterPng": "assets/avatars/masters/letters/letter-q.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-q.svg",
+      "app": "assets/avatars/app/letters/letter-q.png"
+    },
+    {
+      "id": "letter-r",
+      "type": "letter",
+      "label": "R",
+      "background": "#D9E8D7",
+      "masterPng": "assets/avatars/masters/letters/letter-r.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-r.svg",
+      "app": "assets/avatars/app/letters/letter-r.png"
+    },
+    {
+      "id": "letter-s",
+      "type": "letter",
+      "label": "S",
+      "background": "#D8DFC2",
+      "masterPng": "assets/avatars/masters/letters/letter-s.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-s.svg",
+      "app": "assets/avatars/app/letters/letter-s.png"
+    },
+    {
+      "id": "letter-t",
+      "type": "letter",
+      "label": "T",
+      "background": "#EDC8BE",
+      "masterPng": "assets/avatars/masters/letters/letter-t.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-t.svg",
+      "app": "assets/avatars/app/letters/letter-t.png"
+    },
+    {
+      "id": "letter-u",
+      "type": "letter",
+      "label": "U",
+      "background": "#F2C9AA",
+      "masterPng": "assets/avatars/masters/letters/letter-u.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-u.svg",
+      "app": "assets/avatars/app/letters/letter-u.png"
+    },
+    {
+      "id": "letter-v",
+      "type": "letter",
+      "label": "V",
+      "background": "#D7C4B7",
+      "masterPng": "assets/avatars/masters/letters/letter-v.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-v.svg",
+      "app": "assets/avatars/app/letters/letter-v.png"
+    },
+    {
+      "id": "letter-w",
+      "type": "letter",
+      "label": "W",
+      "background": "#E7D3B0",
+      "masterPng": "assets/avatars/masters/letters/letter-w.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-w.svg",
+      "app": "assets/avatars/app/letters/letter-w.png"
+    },
+    {
+      "id": "letter-x",
+      "type": "letter",
+      "label": "X",
+      "background": "#F3EBDD",
+      "masterPng": "assets/avatars/masters/letters/letter-x.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-x.svg",
+      "app": "assets/avatars/app/letters/letter-x.png"
+    },
+    {
+      "id": "letter-y",
+      "type": "letter",
+      "label": "Y",
+      "background": "#C3DDCE",
+      "masterPng": "assets/avatars/masters/letters/letter-y.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-y.svg",
+      "app": "assets/avatars/app/letters/letter-y.png"
+    },
+    {
+      "id": "letter-z",
+      "type": "letter",
+      "label": "Z",
+      "background": "#D9E8D7",
+      "masterPng": "assets/avatars/masters/letters/letter-z.png",
+      "masterSvg": "assets/avatars/masters/letters/letter-z.svg",
+      "app": "assets/avatars/app/letters/letter-z.png"
+    }
+  ]
+}

@@ -21,13 +21,15 @@ db/
 │   ├── 012_identity_onboarding.sql
 │   ├── 013_social_backend_alignment.sql
 │   ├── 014_streak_projection_backfill.sql
-│   └── 015_career_game_results.sql
+│   ├── 015_career_game_results.sql
+│   └── 016_profile_avatars.sql
 ├── audits/
 │   ├── identity_onboarding_pre.sql
 │   ├── identity_onboarding.sql
 │   ├── social_backend_pre.sql
 │   ├── social_backend.sql
-│   └── streak_projection.sql
+│   ├── streak_projection.sql
+│   └── profile_avatars.sql
 ├── queries/
 └── README.md
 ```
@@ -55,7 +57,12 @@ cockroach sql --url "$DATABASE_URL" < db/migrations/012_identity_onboarding.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/013_social_backend_alignment.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/014_streak_projection_backfill.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/015_career_game_results.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/016_profile_avatars.sql
 ```
+
+Immediately after migration 016, run `npm run audit:profile-avatars`. The audit
+validates every stored ID against the checked-in avatar manifest; before the
+updated client is released, its letter-avatar count should also be zero.
 
 ## Tables Overview
 
@@ -85,6 +92,8 @@ The `pu_player_ques` table is the existing daily quiz source table and is not ma
 - Daily results are authoritative for streaks; `users.streak` and `last_played`
   are rebuilt projections for compatible, efficient reads.
 - Authenticated identity synchronization owns user-row creation and username onboarding.
+- Every authenticated identity receives a validated static `avatar_id`;
+  migration 016 and identity sync fill missing values from the football symbols.
 - `onboarding_status = 'complete'` requires a canonical public username.
 - Challenge W/L/D counters live on `users`.
 - Challenge participant usernames are retained as compatibility snapshots while reads resolve current usernames from `users`.

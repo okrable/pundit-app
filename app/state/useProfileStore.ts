@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getTodayResult, getUserStats } from '../services/api';
+import { getTodayResult, getUserStats, updateAvatar } from '../services/api';
 import { CacheEnvelope, QuizResult, QuizResultImmediate, UserStats } from '../types';
 import { getCachedUserStats, setCachedUserStats } from '../storage/profileCache';
 import { getTodayQuizResult } from '../storage/quizStorage';
@@ -7,6 +7,7 @@ import { useAuthStore } from './useAuthStore';
 import { logError, logInfo } from '../services/debugLog';
 import { getQuizDate } from '../utils/quizDate';
 import { buildStreakStatus } from '../../shared/streak';
+import type { AvatarId } from '../../shared/avatarCatalog';
 
 const GUEST_STATS: UserStats = {
   streak: 0,
@@ -36,6 +37,7 @@ interface ProfileState {
   hydrateFromCache: (userId: string) => Promise<void>;
   revalidate: (userId: string) => Promise<void>;
   applyServerStats: (stats: UserStats) => Promise<void>;
+  saveAvatar: (avatarId: AvatarId) => Promise<AvatarId>;
   markPlayedToday: (result: QuizResultImmediate | QuizResult, userId: string) => Promise<void>;
   reset: () => void;
 }
@@ -177,6 +179,42 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       statsCache: refreshedCache,
       error: null,
     });
+  },
+
+  saveAvatar: async (avatarId) => {
+    const startedAuthState = useAuthStore.getState();
+    const userId = startedAuthState.user?.sub;
+    const authStateVersion = startedAuthState.authStateVersion;
+    if (!userId || !startedAuthState.token) {
+      throw new Error('Your session is no longer available.');
+    }
+
+    const response = await updateAvatar(userId, avatarId);
+    if (!response.success || !response.profile?.avatarId) {
+      throw new Error(response.error || 'Unable to save your avatar.');
+    }
+
+    const latestAuthState = useAuthStore.getState();
+    if (
+      latestAuthState.authStateVersion !== authStateVersion ||
+      latestAuthState.user?.sub !== userId
+    ) {
+      throw new Error('Your session changed. Please try again.');
+    }
+
+    const confirmedAvatarId = response.profile.avatarId;
+    await latestAuthState.applyAvatar(confirmedAvatarId);
+    const currentStats = get().statsUserId === userId ? get().stats : null;
+    if (currentStats) {
+      const nextStats = { ...currentStats, avatarId: confirmedAvatarId };
+      await setCachedUserStats(userId, nextStats);
+      const refreshedCache = await getCachedUserStats(userId);
+      if (useAuthStore.getState().user?.sub === userId) {
+        set({ stats: nextStats, statsCache: refreshedCache, error: null });
+      }
+    }
+
+    return confirmedAvatarId;
   },
 
   markPlayedToday: async (result: QuizResultImmediate | QuizResult, userId: string) => {

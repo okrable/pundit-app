@@ -84,12 +84,15 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - Daily leaderboards rank a single `quiz_date` by score, then earliest submission time, then user id.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
 - `users.username` is the canonical public identity for persisted social data.
+- `users.avatar_id` is the canonical static avatar identity. New and legacy
+  accounts receive a football-symbol default before players may choose any
+  symbol or letter avatar.
 - `friendships` stores one ordered `(user_a, user_b)` row that is visible to both players.
 - New `friend_links` rows are reusable for seven days; legacy rows remain single-use.
 - Challenge username columns are compatibility snapshots. API reads prefer the current `users.username`.
 - Deprecated display-name response fields contain usernames during the installed-client transition.
-- New client contracts use `PublicPlayer { userId, username, avatarUrl? }`.
-- Auth storage persists `username`, `usernameRequired`, and `onboardingStatus`;
+- New client contracts use `PublicPlayer { userId, username, avatarId?, avatarUrl? }`.
+- Auth storage persists `username`, `usernameRequired`, `onboardingStatus`, and `avatarId`;
   missing legacy metadata is resynchronized before navigation.
 
 ## Streak Status

@@ -1,4 +1,4 @@
-# Pundit Trivia v2.3.0
+# Pundit Trivia v2.4.0
 
 Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScript, Netlify Functions, and CockroachDB.
 
@@ -7,8 +7,8 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 - Daily 5-question football quiz with typewriter prompt pacing.
 - Shared refreshed gameplay UI for daily quiz and challenge mode.
 - Reanimated question transitions, option reveal, circular timer, and answer reveal states.
-- Swipeable Games gallery with independently completed Daily Quiz and
-  player-journey tiles plus provisional coming-soon concepts.
+- Swipeable Games gallery with the playable Daily Quiz and provisional
+  player-journey, Starting XI, and Link Up concepts marked as coming soon.
 - Daily player journey with an illustrated career table, unlimited name guesses,
   spelling normalization, and separate guest/authenticated completion storage.
 - Timer starts only after the question and options are visible.
@@ -21,6 +21,8 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 - Centralized auth flow with login, quiz reconciliation, and first data prefetch behind a loading interstitial.
 - Blocking, resumable username onboarding before authenticated players enter the app.
 - Username-only Me profile and public identity; usernames are permanent after selection.
+- Persisted Pundit avatars with random football-symbol defaults, onboarding
+  selection, Me-page editing, and friends/global leaderboard visibility.
 - Results-backed current streak status with active, at-risk, and inactive states.
 - Canonical server-side username identities, with legacy display-name fields retained temporarily for installed-client compatibility.
 - Daily global leaderboard, mutual friendships with reusable seven-day invite links, and async challenge mode.
@@ -35,7 +37,7 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 
 ## Versioning
 
-- Current app/docs version: `2.3.0`.
+- Current app/docs version: `2.4.0`.
 - `package.json`, `package-lock.json`, `app.json`, `app/constants/version.ts`,
   and native iOS/Android marketing versions must stay aligned.
 - Settings displays the app version from `APP_VERSION`.

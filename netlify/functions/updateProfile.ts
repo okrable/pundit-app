@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
+import { isAvatarId } from '../../shared/avatarCatalog';
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
 
@@ -24,7 +25,7 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const { userId, displayName } = JSON.parse(event.body || '{}');
+    const { userId, displayName, avatarId } = JSON.parse(event.body || '{}');
 
     if (!userId) {
       return {
@@ -46,6 +47,40 @@ export const handler: Handler = async (event) => {
     const authError = await assertAuthorizedUser(event, userId, headers, { allowGuest: false });
     if (authError) {
       return authError;
+    }
+
+    if (avatarId !== undefined) {
+      if (!isAvatarId(avatarId)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ success: false, error: 'Invalid avatar' }),
+        };
+      }
+
+      const updated = await query<{ avatar_id: string }>(
+        `UPDATE users
+         SET avatar_id = $2
+         WHERE id = $1
+         RETURNING avatar_id`,
+        [userId, avatarId]
+      );
+      if (!updated[0]) {
+        return {
+          statusCode: 404,
+          headers,
+          body: JSON.stringify({ success: false, error: 'User not found' }),
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          profile: { avatarId: updated[0].avatar_id },
+        }),
+      };
     }
 
     // Validate display name if provided

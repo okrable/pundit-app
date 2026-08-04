@@ -2410,7 +2410,7 @@ PODS:
 
 DEPENDENCIES:
   - EXApplication (from `../node_modules/expo-auth-session/node_modules/expo-application/ios`)
-  - EXConstants (from `../node_modules/expo-auth-session/node_modules/expo-constants/ios`)
+  - EXConstants (from `../node_modules/expo-constants/ios`)
   - EXJSONUtils (from `../node_modules/expo-json-utils/ios`)
   - EXManifests (from `../node_modules/expo-manifests/ios`)
   - Expo (from `../node_modules/expo`)
@@ -2520,7 +2520,7 @@ EXTERNAL SOURCES:
   EXApplication:
     :path: "../node_modules/expo-auth-session/node_modules/expo-application/ios"
   EXConstants:
-    :path: "../node_modules/expo-auth-session/node_modules/expo-constants/ios"
+    :path: "../node_modules/expo-constants/ios"
   EXJSONUtils:
     :path: "../node_modules/expo-json-utils/ios"
   EXManifests:

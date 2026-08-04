@@ -191,6 +191,7 @@ export default function LeaderboardScreen() {
         <Avatar
           userId={item.userId}
           username={item.username}
+          avatarId={item.avatarId}
           size="md"
         />
         <View style={styles.playerInfo}>
@@ -218,6 +219,7 @@ export default function LeaderboardScreen() {
       <Avatar
         userId={item.userId}
         username={item.username}
+        avatarId={item.avatarId}
         size="md"
       />
       <View style={styles.playerInfo}>

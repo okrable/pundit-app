@@ -18,6 +18,7 @@ import {
   RemoveFriendResponse,
   FriendsLeaderboardResponse,
 } from '../types';
+import type { AvatarId } from '../../shared/avatarCatalog';
 import { useAuthStore } from '../state/useAuthStore';
 import { logError, logInfo, logWarn } from './debugLog';
 import { getQuizDate } from '../utils/quizDate';
@@ -420,10 +421,30 @@ export async function checkUsername(username: string): Promise<CheckUsernameResp
   return fetchApi<CheckUsernameResponse>(`/checkUsername?username=${encodeURIComponent(username)}`);
 }
 
-export async function setUsername(userId: string, username: string): Promise<SetUsernameResponse> {
+export async function setUsername(
+  userId: string,
+  username: string,
+  avatarId?: AvatarId
+): Promise<SetUsernameResponse> {
   return fetchApi<SetUsernameResponse>('/setUsername', {
     method: 'POST',
-    body: JSON.stringify({ userId, username }),
+    body: JSON.stringify({ userId, username, avatarId }),
+  });
+}
+
+export interface UpdateAvatarResponse {
+  success: boolean;
+  profile?: { avatarId: AvatarId };
+  error?: string;
+}
+
+export async function updateAvatar(
+  userId: string,
+  avatarId: AvatarId
+): Promise<UpdateAvatarResponse> {
+  return fetchApi<UpdateAvatarResponse>('/updateProfile', {
+    method: 'POST',
+    body: JSON.stringify({ userId, avatarId }),
   });
 }
 

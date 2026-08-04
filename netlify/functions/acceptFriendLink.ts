@@ -123,10 +123,11 @@ export const handler: Handler = async (event) => {
         id: string;
         username: string | null;
         avatar_url: string | null;
+        avatar_id: string | null;
         onboarding_status: string;
       }>(
         client,
-        `SELECT id, username, avatar_url, onboarding_status
+        `SELECT id, username, avatar_url, avatar_id, onboarding_status
          FROM users
          WHERE id = $1`,
         [link.user_id]
@@ -173,6 +174,7 @@ export const handler: Handler = async (event) => {
             userId: inviter.id,
             username: inviter.username,
             avatarUrl: inviter.avatar_url,
+            avatarId: inviter.avatar_id,
           },
         };
       }
@@ -211,6 +213,7 @@ export const handler: Handler = async (event) => {
           userId: inviter.id,
           username: inviter.username,
           avatarUrl: inviter.avatar_url,
+          avatarId: inviter.avatar_id,
         },
       };
     });

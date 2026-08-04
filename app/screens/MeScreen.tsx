@@ -31,6 +31,8 @@ import { buildStreakStatus } from '../../shared/streak';
 import { getQuizDate } from '../utils/quizDate';
 import StreakIcon from '../components/StreakIcon';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
+import AvatarPickerModal from '../components/AvatarPickerModal';
+import { useLeaderboardStore } from '../state/useLeaderboardStore';
 
 const EMPTY_STATS: UserStats = {
   streak: 0,
@@ -61,7 +63,8 @@ export default function MeScreen() {
           (appWidth - webContentWidth.quiz) / 2 + screenPadding
         )
       : 16;
-  const { stats, revalidate } = useProfileStore();
+  const { stats, revalidate, saveAvatar } = useProfileStore();
+  const applyLeaderboardAvatar = useLeaderboardStore((state) => state.applyAvatar);
   const {
     user,
     isAuthenticated,
@@ -71,6 +74,7 @@ export default function MeScreen() {
   const [authLoadingIntent, setAuthLoadingIntent] = useState<'signup' | 'login' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
 
   const [signupRequest, , promptSignup] = useAuthRequest({
     intent: 'signup',
@@ -131,6 +135,7 @@ export default function MeScreen() {
   };
 
   const localStats = stats ?? EMPTY_STATS;
+  const currentAvatarId = user?.avatarId ?? localStats.avatarId;
   const currentQuizDate = getQuizDate();
   const streakStatus =
     localStats.streakStatus.asOfQuizDate === currentQuizDate
@@ -237,12 +242,20 @@ export default function MeScreen() {
             isCompactWidth && styles.profileSectionCompact,
           ]}
         >
-          <Avatar
-            userId={user?.sub || ''}
-            username={localStats.username || user?.username}
-            imageUrl={user?.picture}
-            size="lg"
-          />
+          <TouchableOpacity
+            onPress={() => currentAvatarId && setAvatarPickerVisible(true)}
+            disabled={!currentAvatarId}
+            accessibilityRole="button"
+            accessibilityLabel="Edit avatar"
+          >
+            <Avatar
+              userId={user?.sub || ''}
+              username={localStats.username || user?.username}
+              avatarId={currentAvatarId}
+              imageUrl={user?.picture}
+              size="lg"
+            />
+          </TouchableOpacity>
           <View style={styles.profileIdentity}>
             <Text
               style={[styles.username, isCompactWidth && styles.usernameCompact]}
@@ -306,6 +319,19 @@ export default function MeScreen() {
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
       />
+
+      {currentAvatarId && user?.sub ? (
+        <AvatarPickerModal
+          visible={avatarPickerVisible}
+          currentAvatarId={currentAvatarId}
+          onClose={() => setAvatarPickerVisible(false)}
+          onConfirm={async (avatarId) => {
+            const confirmedAvatarId = await saveAvatar(avatarId);
+            await applyLeaderboardAvatar(user.sub, confirmedAvatarId);
+            setAvatarPickerVisible(false);
+          }}
+        />
+      ) : null}
 
     </SafeAreaView>
   );

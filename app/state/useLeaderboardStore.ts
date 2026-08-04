@@ -17,6 +17,7 @@ import { isResourceStale } from '../storage/resourceCache';
 import { useAuthStore } from './useAuthStore';
 import { logError, logInfo, logWarn } from '../services/debugLog';
 import { getQuizDate } from '../utils/quizDate';
+import type { AvatarId } from '../../shared/avatarCatalog';
 
 interface RevalidateOptions {
   force?: boolean;
@@ -45,6 +46,7 @@ interface LeaderboardState {
     options?: PrefetchOptions
   ) => Promise<void>;
   invalidateFriends: (userId: string) => Promise<void>;
+  applyAvatar: (userId: string, avatarId: AvatarId) => Promise<void>;
   reset: () => void;
 }
 
@@ -80,6 +82,7 @@ function buildSelfOnlyFriendsResponse(userId: string): FriendsLeaderboardRespons
         streak: 0,
         rank: null,
         hasPlayedToday: false,
+        avatarId: authUser?.avatarId ?? null,
       },
     ],
     totalFriends: 0,
@@ -300,6 +303,44 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
     }
 
     await get().revalidateFriends(userId, { force: true });
+  },
+
+  applyAvatar: async (userId, avatarId) => {
+    const state = get();
+    const friendsLeaderboard = state.friendsLeaderboard.map((entry) =>
+      entry.userId === userId ? { ...entry, avatarId } : entry
+    );
+    const globalLeaderboard = state.globalLeaderboard.map((entry) =>
+      entry.userId === userId ? { ...entry, avatarId } : entry
+    );
+    const friendsCache = state.friendsCache
+      ? {
+          ...state.friendsCache,
+          data: {
+            ...state.friendsCache.data,
+            leaderboard: state.friendsCache.data.leaderboard.map((entry) =>
+              entry.userId === userId ? { ...entry, avatarId } : entry
+            ),
+          },
+        }
+      : null;
+    const globalCache = state.globalCache
+      ? {
+          ...state.globalCache,
+          data: {
+            ...state.globalCache.data,
+            leaderboard: state.globalCache.data.leaderboard.map((entry) =>
+              entry.userId === userId ? { ...entry, avatarId } : entry
+            ),
+          },
+        }
+      : null;
+
+    set({ friendsLeaderboard, globalLeaderboard, friendsCache, globalCache });
+    await Promise.all([
+      friendsCache ? setCachedFriendsLeaderboard(userId, friendsCache.data) : Promise.resolve(),
+      globalCache ? setCachedGlobalLeaderboard(globalCache.data) : Promise.resolve(),
+    ]);
   },
 
   reset: () => set({
