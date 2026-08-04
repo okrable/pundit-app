@@ -1,5 +1,15 @@
 import type { CareerGame } from '../../../app/types';
 
+const CAREER_GAME_ID_PATTERN = /^career-(\d{4}-\d{2}-\d{2})$/;
+
+export function getCurrentCareerGameDate(
+  gameId: string,
+  currentDate: string
+): string | null {
+  const match = CAREER_GAME_ID_PATTERN.exec(gameId);
+  return match?.[1] === currentDate ? currentDate : null;
+}
+
 export async function getCareerGameForDate(
   date: string,
   _language = 'uk'
