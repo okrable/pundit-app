@@ -4,6 +4,7 @@ import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { useProfileStore } from '../state/useProfileStore';
 import { useQuizStore } from '../state/useQuizStore';
 import { useChallengeStore } from '../state/useChallengeStore';
+import { useCareerGameStore } from '../state/useCareerGameStore';
 import { logError, logInfo, logWarn } from './debugLog';
 import { isIdentityActivationCurrent } from '../../shared/clientIdentityPolicy';
 
@@ -41,6 +42,7 @@ export async function resolveEffectiveUserId(): Promise<string> {
 export async function hydrateDailyLoopFromCache(userId: string): Promise<void> {
   logInfo('dailyLoop.cache.hydrate.start', { userId });
   useQuizStore.getState().setUserId(userId);
+  useCareerGameStore.getState().setUserId(userId);
   await Promise.all([
     useQuizStore.getState().hydrateFromCache(userId).then(() => {
       logInfo('dailyLoop.cache.hydrate.quiz.success', { userId });
@@ -50,6 +52,9 @@ export async function hydrateDailyLoopFromCache(userId: string): Promise<void> {
     }),
     useLeaderboardStore.getState().hydrateFromCache(userId).then(() => {
       logInfo('dailyLoop.cache.hydrate.leaderboard.success', { userId });
+    }),
+    useCareerGameStore.getState().hydrateFromCache(userId).then(() => {
+      logInfo('dailyLoop.cache.hydrate.career.success', { userId });
     }),
   ]);
   logInfo('dailyLoop.cache.hydrate.success', { userId });
@@ -91,6 +96,7 @@ export async function prefetchDailyLoop(options?: string | PrefetchOptions): Pro
   if (shouldRunProtected) {
     tasks.push(useQuizStore.getState().retryPendingSubmission());
     tasks.push(useChallengeStore.getState().retryPendingSubmission(effectiveUserId));
+    tasks.push(useCareerGameStore.getState().retryPendingSubmission(effectiveUserId));
     tasks.push(useProfileStore.getState().revalidate(effectiveUserId));
   }
 
@@ -143,6 +149,8 @@ export async function syncAuthenticatedSession({
 
     try {
       await useQuizStore.getState().reconcileIdentity(userId, userProfile);
+      assertCurrentSession();
+      await useCareerGameStore.getState().reconcileIdentity(userId);
       assertCurrentSession();
       await prefetchDailyLoop({ userId, mode: 'bootstrap-auth' });
       assertCurrentSession();

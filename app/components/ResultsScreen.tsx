@@ -19,7 +19,7 @@ const celebrationImage = require('../../assets/images/Asset 9.png');
 interface ResultsScreenProps {
   result: QuizResultImmediate;
   quiz: Quiz;
-  onPlayAgain: () => void;
+  onReturnToGames: () => void;
 }
 
 interface SummaryAnswer {
@@ -28,7 +28,11 @@ interface SummaryAnswer {
   isCorrect: boolean;
 }
 
-export default function ResultsScreen({ result, quiz }: ResultsScreenProps) {
+export default function ResultsScreen({
+  result,
+  quiz,
+  onReturnToGames,
+}: ResultsScreenProps) {
   const summaryAnswers = useMemo<SummaryAnswer[]>(
     () =>
       result.answers.map((answer, index) => {
@@ -121,9 +125,14 @@ export default function ResultsScreen({ result, quiz }: ResultsScreenProps) {
           {syncMessage ? <Text style={styles.syncText}>{syncMessage}</Text> : null}
         </View>
 
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare} activeOpacity={0.86}>
-          <Text style={styles.shareButtonText}>Share result</Text>
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleShare} activeOpacity={0.86}>
+            <Text style={styles.secondaryButtonText}>Share result</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.shareButton} onPress={onReturnToGames} activeOpacity={0.86}>
+            <Text style={styles.shareButtonText}>Back to Games</Text>
+          </TouchableOpacity>
+        </View>
       </CenteredWebContent>
     </SafeAreaView>
   );
@@ -277,5 +286,28 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.white,
+  },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+  },
+  secondaryButton: {
+    minWidth: 140,
+    minHeight: 44,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D9D0C1',
+    backgroundColor: theme.colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.lg,
+  },
+  secondaryButtonText: {
+    fontSize: 15,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
   },
 });

@@ -16,9 +16,13 @@ import { formatStreakLabel } from '../../shared/streak';
 
 interface CompletedQuizScreenProps {
   result: CachedQuizResult;
+  onReturnToGames?: () => void;
 }
 
-export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps) {
+export default function CompletedQuizScreen({
+  result,
+  onReturnToGames,
+}: CompletedQuizScreenProps) {
   const { width } = useWindowDimensions();
   // Convert boolean array directly to emojis
   const emojis = result.answers.map(isCorrect => isCorrect ? '⚽️' : '❌').join('');
@@ -66,6 +70,11 @@ export default function CompletedQuizScreen({ result }: CompletedQuizScreenProps
           <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
             <Text style={styles.shareButtonText}>Share</Text>
           </TouchableOpacity>
+          {onReturnToGames ? (
+            <TouchableOpacity style={styles.gamesButton} onPress={onReturnToGames}>
+              <Text style={styles.gamesButtonText}>Back to Games</Text>
+            </TouchableOpacity>
+          ) : null}
         </CenteredWebContent>
       </SafeAreaView>
     </View>
@@ -142,5 +151,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.white,
+  },
+  gamesButton: {
+    marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.xl,
+    alignSelf: 'center',
+    backgroundColor: theme.colors.background,
+  },
+  gamesButtonText: {
+    fontSize: 14,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
   },
 });

@@ -27,6 +27,17 @@ Bottom tabs:
 - League Tables
 - Me
 
+## Games Hub
+
+The Games tab opens an internal stack and displays the Daily Quiz and player
+journey as independent mode components. Each component reads its own daily
+result: completing the quiz shows its score recap without disabling the career
+game, and finding the career player leaves an unplayed quiz available.
+
+The player journey uses the headline “Whose journey is this?”, the supporting
+copy “Trace the clubs. Guess the player.”, an illustrated How it works modal,
+and a responsive Years/Team/Apps/Goals card with unlimited unscored guesses.
+
 ## Daily Quiz Flow
 
 ```text
@@ -88,6 +99,25 @@ Important behaviors:
 - Guest results can be migrated/adopted after login when no authenticated result already exists.
 - Reconciliation resets transient play UI so stale in-progress questions do not flash.
 
+### Games Gallery
+
+`GamesHomeScreen` presents one warm-white game tile per horizontal row on the
+orange Games surface. Each row retains the horizontal rail behavior for future
+expansion, but currently contains one tile and therefore has no practical
+sideways scroll. On web, the single tile is centred within the constrained app
+shell rather than sitting at the rail's leading edge. The Daily Quiz and career
+tiles are single press targets:
+available tiles start play, while completed tiles open their own cached recap.
+Their loading, unavailable, and completion states stay independent. The Daily
+Quiz uses Uni Sans, its football treatment, and original tagline; the career
+tile uses the custom journey artwork. Both integrate their green action
+treatment into the card without creating a nested button.
+
+The provisional Starting XI and The Link Up tiles use code-native icons and
+open one shared Coming Soon message. They do not add routes, stores,
+persistence, or API contracts. Rules components remain available to the game
+surfaces but are not entry points from the gallery.
+
 ### Profile and Leaderboards
 
 `useProfileStore` and `useLeaderboardStore` render cached data first and
@@ -97,8 +127,9 @@ changes mid-flight. Friends data is forcibly revalidated after accept/remove
 mutations and whenever League Tables gains navigation focus, so remote
 acceptances do not wait for cache expiry.
 
-Profile and leaderboard resources use social cache schema 2. Old social
-payloads are removed lazily while quiz and result storage keeps schema 1.
+Profile and leaderboard resources use dedicated social cache schemas. The daily
+payload uses quiz cache schema 2 so clients refresh for `careerGame`, while
+stored quiz and career results remain separate and are not cleared.
 
 ## Settings
 

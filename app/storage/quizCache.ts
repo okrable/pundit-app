@@ -10,6 +10,7 @@ import {
 const QUIZ_CACHE_PREFIX = 'quiz_';
 const QUIZ_CACHE_STALE_MS = 6 * 60 * 60 * 1000;
 const QUIZ_CACHE_EXPIRY_MS = 36 * 60 * 60 * 1000;
+const QUIZ_CACHE_SCHEMA_VERSION = 2;
 
 function getQuizCacheKey(date: string): string {
   return `${QUIZ_CACHE_PREFIX}${date}`;
@@ -21,7 +22,9 @@ export async function getCachedQuiz(date: string): Promise<Quiz | null> {
 }
 
 export async function getCachedQuizEntry(date: string): Promise<CacheEnvelope<Quiz> | null> {
-  return getCachedResource<Quiz>(getQuizCacheKey(date));
+  return getCachedResource<Quiz>(getQuizCacheKey(date), {
+    schemaVersion: QUIZ_CACHE_SCHEMA_VERSION,
+  });
 }
 
 export function isQuizCacheStale(cache: CacheEnvelope<Quiz> | null): boolean {
@@ -33,6 +36,7 @@ export async function setCachedQuiz(date: string, quiz: Quiz): Promise<void> {
     staleInMs: QUIZ_CACHE_STALE_MS,
     expiresInMs: QUIZ_CACHE_EXPIRY_MS,
     scopeKey: date,
+    schemaVersion: QUIZ_CACHE_SCHEMA_VERSION,
   });
 }
 

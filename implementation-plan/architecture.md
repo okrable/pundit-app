@@ -18,6 +18,17 @@
 - Authenticated results submit to the server; guest results stay local until login migration/adoption.
 - Cached same-day results prevent replay and show the completed state on warm opens.
 
+### Daily Career Game
+
+- Ships beside the quiz in the combined daily payload through a replaceable
+  career source adapter.
+- Matches full names, configured aliases, and surnames through shared
+  client/server normalization.
+- Persists completion through separate local keys and `career_game_results`;
+  it never changes quiz or profile aggregates.
+- Uses a date-scoped Anthony Gordon fixture until the upstream datasource is
+  available.
+
 ### Challenge Mode
 
 - Async 1v1 challenge lifecycle: create, join, play, submit, reveal, revoke, and history.

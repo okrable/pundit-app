@@ -10,6 +10,9 @@
 ### Daily Quiz
 
 - [x] Daily quiz fetch, local cache, and same-day result cache.
+- [x] Games hub with independent Daily Quiz and player-journey results.
+- [x] Temporary date-scoped Anthony Gordon career fixture behind a replaceable
+  daily source adapter.
 - [x] One-question-at-a-time gameplay.
 - [x] Typewriter prompt pacing and delayed answer-option reveal.
 - [x] Timer starts only after the prompt/options are visible.

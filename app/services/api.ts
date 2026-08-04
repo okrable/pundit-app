@@ -9,6 +9,7 @@ import {
   UserProfile,
   AnswerWithTiming,
   CheckUsernameResponse,
+  CareerGameResult,
   SetUsernameResponse,
   SyncIdentityResponse,
   CreateFriendLinkResponse,
@@ -362,6 +363,33 @@ export async function getUserStats(userId: string): Promise<UserStats> {
 
 export async function getTodayResult(userId: string): Promise<QuizResult | null> {
   const response = await fetchApi<{ result: QuizResult | null }>(`/getTodayResult?userId=${userId}`);
+  return response.result;
+}
+
+export async function getTodayCareerGameResult(
+  userId: string
+): Promise<CareerGameResult | null> {
+  const response = await fetchApi<{ result: CareerGameResult | null }>(
+    `/getTodayCareerGameResult?userId=${encodeURIComponent(userId)}`
+  );
+  return response.result;
+}
+
+export async function completeCareerGame(
+  gameId: string,
+  userId: string,
+  submittedAnswer: string
+): Promise<CareerGameResult> {
+  const response = await fetchApi<{ result: CareerGameResult }>(
+    '/completeCareerGame',
+    {
+      method: 'POST',
+      body: JSON.stringify({ gameId, userId, submittedAnswer }),
+    },
+    {
+      timeoutMs: SUBMIT_QUIZ_TIMEOUT_MS,
+    }
+  );
   return response.result;
 }
 

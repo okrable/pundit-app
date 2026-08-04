@@ -1,0 +1,396 @@
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+import type { GamesStackParamList } from '../navigation/GamesNavigator';
+import { useQuizStore } from '../state/useQuizStore';
+import { useCareerGameStore } from '../state/useCareerGameStore';
+import { useAuthStore } from '../state/useAuthStore';
+import { getUserId } from '../storage/userStorage';
+import { getTodayQuizResult } from '../storage/quizStorage';
+import ComingSoonModal from '../components/ComingSoonModal';
+import GameGalleryTile from '../components/GameGalleryTile';
+import JourneyGraphic from '../components/JourneyGraphic';
+import CenteredWebContent, {
+  useMobileLayoutMetrics,
+  webContentWidth,
+} from '../components/ResponsiveLayout';
+import { theme } from '../theme/theme';
+import { getGamesHubCompletionState } from '../../shared/gamesHub';
+
+type Props = NativeStackScreenProps<GamesStackParamList, 'GamesHome'>;
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+interface ConceptGame {
+  title: string;
+  description: string;
+  iconName: IconName;
+}
+
+const whiteLogo = require('../../assets/logo/white/pundit-white.png');
+
+const conceptGames: ConceptGame[] = [
+  {
+    title: 'Starting XI',
+    description: 'Build the team from eleven clues.',
+    iconName: 'people-outline',
+  },
+  {
+    title: 'The Link Up',
+    description: 'Find what connects the players.',
+    iconName: 'link-outline',
+  },
+];
+
+interface GameRowProps {
+  cardWidth: number;
+  children: React.ReactNode;
+}
+
+function GameRow({ cardWidth, children }: GameRowProps) {
+  return (
+    <View style={styles.gameRow}>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        directionalLockEnabled
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        disableIntervalMomentum
+        snapToAlignment="start"
+        snapToInterval={cardWidth + theme.spacing.md}
+        contentContainerStyle={[
+          styles.railContent,
+          Platform.OS === 'web' && styles.webRailContent,
+        ]}
+      >
+        {children}
+      </ScrollView>
+    </View>
+  );
+}
+
+export default function GamesHomeScreen({ navigation }: Props) {
+  const [comingSoonTitle, setComingSoonTitle] = useState<string | null>(null);
+  const [isHubRefreshing, setIsHubRefreshing] = useState(true);
+  const { appWidth, screenPadding } = useMobileLayoutMetrics();
+  const { user, isAuthenticated } = useAuthStore();
+  const {
+    quiz,
+    cachedResult,
+    quizError,
+    isQuizLoading,
+    fetchQuiz,
+    setUserId,
+    setCachedResult,
+  } = useQuizStore();
+  const {
+    result: careerResult,
+    error: careerError,
+    setUserId: setCareerUserId,
+    hydrateFromCache: hydrateCareerResult,
+  } = useCareerGameStore();
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const refresh = async () => {
+        setIsHubRefreshing(true);
+        try {
+          const userId = isAuthenticated && user ? user.sub : await getUserId();
+          if (!active) {
+            return;
+          }
+          setUserId(userId);
+          setCareerUserId(userId);
+          const [quizResult] = await Promise.all([
+            getTodayQuizResult(userId),
+            hydrateCareerResult(userId),
+            fetchQuiz(),
+          ]);
+          if (active) {
+            setCachedResult(quizResult);
+          }
+        } finally {
+          if (active) {
+            setIsHubRefreshing(false);
+          }
+        }
+      };
+
+      void refresh();
+      return () => {
+        active = false;
+      };
+    }, [
+      fetchQuiz,
+      hydrateCareerResult,
+      isAuthenticated,
+      setCachedResult,
+      setCareerUserId,
+      setUserId,
+      user,
+    ])
+  );
+
+  const cardWidth = useMemo(() => {
+    const availableWidth = appWidth - screenPadding * 2;
+    return Math.min(360, Math.max(246, Math.round(availableWidth * 0.86)));
+  }, [appWidth, screenPadding]);
+
+  const quizEmojis = cachedResult?.answers
+    .map((isCorrect) => (isCorrect ? '⚽️' : '❌'))
+    .join('');
+  const quizCorrect = cachedResult?.answers.filter(Boolean).length ?? 0;
+  const quizAvailable = Boolean(quiz?.questions.length);
+  const careerAvailable = Boolean(quiz?.careerGame);
+  const isDailyPayloadLoading = isHubRefreshing || isQuizLoading;
+  const careerUnavailableError = careerError || quizError;
+  const hubState = getGamesHubCompletionState(
+    Boolean(cachedResult),
+    Boolean(careerResult)
+  );
+
+  const quizActionLabel =
+    hubState.quiz === 'completed'
+      ? 'View recap'
+      : quizAvailable
+        ? 'Kick Off'
+        : isDailyPayloadLoading
+          ? 'Warming up'
+          : 'Unavailable';
+  const careerActionLabel =
+    hubState.career === 'completed'
+      ? 'View result'
+      : careerAvailable
+        ? 'Start guessing'
+        : isDailyPayloadLoading
+          ? 'Warming up'
+          : 'Unavailable';
+  const quizActionTone =
+    quizAvailable || hubState.quiz === 'completed'
+      ? 'primary'
+      : quizError
+        ? 'unavailable'
+        : 'muted';
+  const careerActionTone =
+    careerAvailable || hubState.career === 'completed'
+      ? 'primary'
+      : careerUnavailableError
+        ? 'unavailable'
+        : 'muted';
+
+  const quizDisabled =
+    hubState.quiz !== 'completed' &&
+    (!quizAvailable || isDailyPayloadLoading);
+  const careerDisabled =
+    hubState.career !== 'completed' &&
+    (!careerAvailable || isDailyPayloadLoading);
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+      >
+        <CenteredWebContent maxWidth={webContentWidth.narrow}>
+          <View style={[styles.headerRow, { paddingHorizontal: screenPadding }]}>
+            <Image source={whiteLogo} style={styles.headerLogo} resizeMode="contain" />
+            <Text style={styles.gamesLabel}>GAMES</Text>
+          </View>
+
+          <GameRow cardWidth={cardWidth}>
+            <GameGalleryTile
+              title="PUNDIT"
+              titleVariant="pundit"
+              description="5 Questions. Don’t bottle it."
+              artwork={
+                <View style={styles.punditFootball}>
+                  <Ionicons
+                    name="football"
+                    size={42}
+                    color={theme.colors.white}
+                  />
+                </View>
+              }
+              actionLabel={quizActionLabel}
+              actionTone={quizActionTone}
+              showActionArrow={quizAvailable && !cachedResult}
+              actionSummary={
+                cachedResult ? (
+                  <View style={styles.quizSummary}>
+                    <Text style={styles.quizScore}>
+                      {cachedResult.score} pts
+                    </Text>
+                    <Text style={styles.quizRecap}>
+                      {quizEmojis} · {quizCorrect}/{cachedResult.totalQuestions}
+                    </Text>
+                  </View>
+                ) : quizError ? (
+                  <Text style={styles.unavailableCopy}>Try again later</Text>
+                ) : undefined
+              }
+              width={cardWidth}
+              disabled={quizDisabled}
+              accessibilityHint={
+                hubState.quiz === 'completed'
+                  ? 'Opens today’s quiz recap'
+                  : 'Starts today’s five-question quiz'
+              }
+              onPress={() =>
+                navigation.navigate(
+                  'DailyQuiz',
+                  hubState.quiz === 'completed' ? undefined : { autoStart: true }
+                )
+              }
+            />
+          </GameRow>
+
+          <GameRow cardWidth={cardWidth}>
+            <GameGalleryTile
+              title="Whose journey is this?"
+              description="Trace the clubs. Guess the player."
+              artwork={
+                <JourneyGraphic
+                  width={Math.min(220, Math.max(180, cardWidth - 64))}
+                />
+              }
+              artworkPlacement="wide"
+              actionLabel={careerActionLabel}
+              actionTone={careerActionTone}
+              showActionArrow={careerAvailable && !careerResult}
+              actionSummary={
+                careerResult ? (
+                  <View style={styles.playerFound}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={21}
+                      color={theme.colors.white}
+                    />
+                    <Text style={styles.playerFoundText}>Player found</Text>
+                  </View>
+                ) : careerUnavailableError ? (
+                  <Text style={styles.unavailableCopy}>Try again later</Text>
+                ) : undefined
+              }
+              width={cardWidth}
+              disabled={careerDisabled}
+              accessibilityHint={
+                hubState.career === 'completed'
+                  ? 'Opens today’s completed career result'
+                  : 'Starts today’s career game'
+              }
+              onPress={() => navigation.navigate('CareerGame')}
+            />
+          </GameRow>
+
+          {conceptGames.map((game) => (
+            <GameRow key={game.title} cardWidth={cardWidth}>
+              <GameGalleryTile
+                {...game}
+                badgeLabel="COMING SOON"
+                badgeTone="muted"
+                width={cardWidth}
+                accessibilityHint="Shows a coming soon message"
+                onPress={() => setComingSoonTitle(game.title)}
+              />
+            </GameRow>
+          ))}
+        </CenteredWebContent>
+      </ScrollView>
+
+      <ComingSoonModal
+        title={comingSoonTitle}
+        onClose={() => setComingSoonTitle(null)}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.accent,
+  },
+  scrollContent: {
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.xxl,
+  },
+  headerRow: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.sm,
+  },
+  headerLogo: {
+    width: 112,
+    height: 38,
+  },
+  gamesLabel: {
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.background,
+    letterSpacing: 2,
+  },
+  gameRow: {
+    marginTop: theme.spacing.md,
+  },
+  railContent: {
+    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+  },
+  webRailContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  punditFootball: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: theme.colors.primary,
+  },
+  quizSummary: {
+    alignItems: 'flex-end',
+  },
+  quizScore: {
+    fontSize: 16,
+    fontFamily: theme.fonts.gothamBlack,
+    color: theme.colors.white,
+  },
+  quizRecap: {
+    marginTop: 2,
+    fontSize: 9,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.white,
+  },
+  playerFound: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  playerFoundText: {
+    fontSize: 12,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.white,
+  },
+  unavailableCopy: {
+    fontSize: 11,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.incorrect,
+  },
+});

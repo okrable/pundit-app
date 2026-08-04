@@ -20,7 +20,8 @@ db/
 │   ├── 011_anonymous_analytics.sql
 │   ├── 012_identity_onboarding.sql
 │   ├── 013_social_backend_alignment.sql
-│   └── 014_streak_projection_backfill.sql
+│   ├── 014_streak_projection_backfill.sql
+│   └── 015_career_game_results.sql
 ├── audits/
 │   ├── identity_onboarding_pre.sql
 │   ├── identity_onboarding.sql
@@ -53,6 +54,7 @@ cockroach sql --url "$DATABASE_URL" < db/migrations/011_anonymous_analytics.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/012_identity_onboarding.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/013_social_backend_alignment.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/014_streak_projection_backfill.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/015_career_game_results.sql
 ```
 
 ## Tables Overview
@@ -61,6 +63,7 @@ cockroach sql --url "$DATABASE_URL" < db/migrations/014_streak_projection_backfi
 |-------|---------|
 | `users` | User profiles, aggregate stats, streaks, usernames, challenge counters |
 | `results` | Authenticated daily quiz submissions |
+| `career_game_results` | Independent authenticated daily career-game completion |
 | `leagues` | Legacy/private league definitions |
 | `league_members` | Legacy/private league memberships |
 | `online_games` | Legacy multiplayer game sessions |
@@ -75,6 +78,8 @@ The `pu_player_ques` table is the existing daily quiz source table and is not ma
 ## Current App Semantics
 
 - Authenticated daily quiz results persist in `results`.
+- Authenticated career-game completion persists separately in
+  `career_game_results` and does not update quiz aggregates.
 - Guest daily results are local-only until login migration/adoption.
 - User aggregate stats are server-authoritative for authenticated users.
 - Daily results are authoritative for streaks; `users.streak` and `last_played`
@@ -93,6 +98,7 @@ The `pu_player_ques` table is the existing daily quiz source table and is not ma
 ```text
 users
   ├── results
+  ├── career_game_results
   ├── leagues
   ├── league_members
   ├── online_games

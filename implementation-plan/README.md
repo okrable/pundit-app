@@ -41,6 +41,10 @@ In plain English, this work delivered four connected changes:
 - Daily 5-question football quiz with local-first play and same-day replay prevention.
 - Refreshed shared gameplay UI for daily quiz and challenge mode.
 - Typewriter question pacing, delayed option reveal, timer start after full reveal, and content-only question transitions.
+- Games landing page with independent Daily Quiz and player-journey completion
+  cards, score recap, and career result restoration.
+- Responsive Years/Team/Apps/Goals player journey with unlimited normalized
+  name guesses and illustrated rules.
 - Smooth circular timer with numeric seconds, urgency styling, and post-zero minimum-score behavior.
 - Suspense-based answer reveal with locked/correct/incorrect message pairs.
 - Immediate daily summary screen with final score, answer recap, and native text sharing.

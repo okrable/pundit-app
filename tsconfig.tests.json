@@ -12,6 +12,9 @@
     "shared/**/*.ts",
     "app/services/sharedCode.ts",
     "app/utils/quizDate.ts",
+    "netlify/functions/lib/careerGame.ts",
+    "netlify/functions/lib/dailyQuizResponse.ts",
+    "netlify/functions/lib/auth.ts",
     "netlify/functions/lib/challengeIdentity.ts",
     "netlify/functions/lib/siteUrl.ts"
   ]

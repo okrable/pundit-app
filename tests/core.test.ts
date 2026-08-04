@@ -51,6 +51,20 @@ import {
   isQuizSubmissionCurrent,
   isTransientQuizSubmissionFailure,
 } from '../shared/quizSync';
+import {
+  matchesCareerAnswer,
+  normalizeCareerAnswer,
+} from '../shared/careerAnswer';
+import {
+  getCareerGameForDate,
+  getCurrentCareerGameDate,
+} from '../netlify/functions/lib/careerGame';
+import { buildDailyQuizResponse } from '../netlify/functions/lib/dailyQuizResponse';
+import {
+  authorizeUser,
+  classifyAuth0VerificationFailure,
+} from '../netlify/functions/lib/auth';
+import { getGamesHubCompletionState } from '../shared/gamesHub';
 
 test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(undefined), 60);
@@ -59,6 +73,175 @@ test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(8_000), 60);
   assert.equal(calculateQuizPoints(4_000), 40);
   assert.equal(calculateQuizPoints(0), 20);
+});
+
+test('matches career answers with configured names and conservative spelling tolerance', () => {
+  const answerKey = {
+    canonicalName: 'Anthony Gordon',
+    acceptedAliases: ['Anthony M. Gordon'],
+    acceptedSurnames: ['Gordon', 'Van der Vaart'],
+  };
+
+  assert.equal(normalizeCareerAnswer('  ÁNTHONY-GORDON  '), 'anthony gordon');
+  assert.equal(matchesCareerAnswer('Anthony Gordon', answerKey), true);
+  assert.equal(matchesCareerAnswer('gordon', answerKey), true);
+  assert.equal(matchesCareerAnswer('van-der-vaart', answerKey), true);
+  assert.equal(matchesCareerAnswer('Anthony Gordn', answerKey), true);
+  assert.equal(matchesCareerAnswer('Gordn', answerKey), false);
+  assert.equal(matchesCareerAnswer('Anthony Jordan', answerKey), false);
+  assert.equal(matchesCareerAnswer('   ', answerKey), false);
+});
+
+test('returns the temporary Anthony Gordon career fixture in display order', async () => {
+  const game = await getCareerGameForDate('2026-07-27', 'uk');
+
+  assert.equal(game.id, 'career-2026-07-27');
+  assert.equal(game.date, '2026-07-27');
+  assert.equal(game.number, undefined);
+  assert.equal(game.canonicalName, 'Anthony Gordon');
+  assert.deepEqual(game.acceptedSurnames, ['Gordon']);
+  assert.deepEqual(
+    game.career.map((row) => [
+      row.years,
+      row.team,
+      row.appearances,
+      row.goals,
+      row.category,
+      row.rank,
+    ]),
+    [
+      ['2017–2023', 'Everton', 65, 7, 'Domestic', 1],
+      ['2021', '→ Preston North End (loan)', 11, 0, 'Domestic', 2],
+      ['2023–2026', 'Newcastle United', 111, 24, 'Domestic', 3],
+      ['2026–', 'Barcelona', 0, 0, 'Domestic', 4],
+    ]
+  );
+});
+
+test('accepts career completion only for the current daily game', () => {
+  const currentDate = '2026-08-04';
+
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-08-04', currentDate),
+    currentDate
+  );
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-08-03', currentDate),
+    null
+  );
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-08-05', currentDate),
+    null
+  );
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-8-4', currentDate),
+    null
+  );
+  assert.equal(
+    getCurrentCareerGameDate('career-2026-08-04-extra', currentDate),
+    null
+  );
+});
+
+test('adds the career game without changing daily quiz root fields', async () => {
+  const careerGame = await getCareerGameForDate('2026-07-27', 'uk');
+  const response = buildDailyQuizResponse(
+    '2026-07-27',
+    [
+      {
+        question_id: 'question-1',
+        question: 'Who is this player?',
+        player_name: 'Correct Player',
+        player_0: 'First Player',
+        player_1: 'Correct Player',
+        player_2: 'Third Player',
+        player_3: 'Fourth Player',
+      },
+    ],
+    careerGame
+  );
+
+  assert.equal(response.id, 'quiz-2026-07-27');
+  assert.equal(response.date, '2026-07-27');
+  assert.deepEqual(response.questions, [
+    {
+      id: 'question-1',
+      prompt: 'Who is this player?',
+      options: [
+        'First Player',
+        'Correct Player',
+        'Third Player',
+        'Fourth Player',
+      ],
+      correctOptionIndex: 1,
+    },
+  ]);
+  assert.equal(response.careerGame, careerGame);
+});
+
+test('keeps daily quiz and career completion states independent', () => {
+  assert.deepEqual(getGamesHubCompletionState(false, false), {
+    quiz: 'available',
+    career: 'available',
+  });
+  assert.deepEqual(getGamesHubCompletionState(true, false), {
+    quiz: 'completed',
+    career: 'available',
+  });
+  assert.deepEqual(getGamesHubCompletionState(false, true), {
+    quiz: 'available',
+    career: 'completed',
+  });
+  assert.deepEqual(getGamesHubCompletionState(true, true), {
+    quiz: 'completed',
+    career: 'completed',
+  });
+});
+
+test('distinguishes rejected Auth0 tokens from temporary verification failures', () => {
+  assert.equal(classifyAuth0VerificationFailure(401), 'invalid');
+  assert.equal(classifyAuth0VerificationFailure(429), 'unavailable');
+  assert.equal(classifyAuth0VerificationFailure(500), 'unavailable');
+  assert.equal(classifyAuth0VerificationFailure(503), 'unavailable');
+  assert.equal(classifyAuth0VerificationFailure(undefined), 'unavailable');
+});
+
+test('keeps temporary Auth0 userinfo failures distinct from invalid tokens', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalDomain = process.env.AUTH0_DOMAIN;
+  const event = {
+    headers: { authorization: 'Bearer test-token' },
+  } as unknown as Parameters<typeof authorizeUser>[0];
+
+  process.env.AUTH0_DOMAIN = 'example.auth0.com';
+
+  try {
+    globalThis.fetch = async () => new Response(null, {
+      status: 429,
+      headers: { 'Retry-After': '10' },
+    });
+    const unavailable = await authorizeUser(event, 'auth0|player', {});
+    assert.equal(unavailable.response?.statusCode, 503);
+    assert.equal(unavailable.response?.headers?.['Retry-After'], '10');
+    assert.deepEqual(JSON.parse(unavailable.response?.body ?? '{}'), {
+      error: 'Authentication service temporarily unavailable',
+      code: 'AUTH_VERIFICATION_UNAVAILABLE',
+    });
+
+    globalThis.fetch = async () => new Response(null, { status: 401 });
+    const invalid = await authorizeUser(event, 'auth0|player', {});
+    assert.equal(invalid.response?.statusCode, 401);
+    assert.deepEqual(JSON.parse(invalid.response?.body ?? '{}'), {
+      error: 'Invalid or expired access token',
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalDomain === undefined) {
+      delete process.env.AUTH0_DOMAIN;
+    } else {
+      process.env.AUTH0_DOMAIN = originalDomain;
+    }
+  }
 });
 
 test('validates answer shape, bounds, and duplicates', () => {
@@ -394,7 +577,7 @@ test('formats only canonical usernames or explicit legacy labels', () => {
   assert.equal(formatPublicPlayerName(null, null, 'Opponent'), 'Opponent');
 });
 
-test('upgrades social cache schemas without invalidating version-one quiz resources', () => {
+test('compares resource cache schemas without cross-resource assumptions', () => {
   assert.equal(isCacheSchemaCurrent(1, 1), true);
   assert.equal(isCacheSchemaCurrent(1, 2), false);
   assert.equal(isCacheSchemaCurrent(2, 2), true);

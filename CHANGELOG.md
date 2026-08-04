@@ -2,6 +2,21 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.2.0 - Games hub and daily player journey
+
+- Renamed the Quiz tab to Games and added independently completed Daily Quiz
+  and career-game tiles with cached recaps in a one-game-per-row gallery
+  alongside Starting XI and The Link Up concepts. Playable tiles retain their
+  own Pundit typography, artwork, and green matchday actions.
+- Added an unlimited-guess player journey using career appearances and goals,
+  tolerant name matching, illustrated rules, and a temporary Anthony Gordon
+  fixture pending the upstream datasource.
+- Added separate guest/authenticated career completion persistence, migration,
+  retry, and server validation without changing quiz scores, streaks, profile
+  aggregates, or leaderboards.
+- Prevented temporary Auth0 verification failures during background refreshes
+  from being presented as expired sessions or interrupting sign-in completion.
+
 ## v2.1.2 - Authentication and quiz sync hardening
 
 - Removed duplicate post-login identity activation and restricted username

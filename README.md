@@ -1,4 +1,4 @@
-# Pundit Trivia v2.1.0
+# Pundit Trivia v2.2.0
 
 Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScript, Netlify Functions, and CockroachDB.
 
@@ -7,6 +7,10 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 - Daily 5-question football quiz with typewriter prompt pacing.
 - Shared refreshed gameplay UI for daily quiz and challenge mode.
 - Reanimated question transitions, option reveal, circular timer, and answer reveal states.
+- Swipeable Games gallery with independently completed Daily Quiz and
+  player-journey tiles plus provisional coming-soon concepts.
+- Daily player journey with an illustrated career table, unlimited name guesses,
+  spelling normalization, and separate guest/authenticated completion storage.
 - Timer starts only after the question and options are visible.
 - Players can still answer after the timer reaches zero; correct post-zero answers receive the minimum score.
 - Compact post-quiz daily summary with final score, answer recap, and native text sharing.
@@ -28,7 +32,7 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 
 ## Versioning
 
-- Current app/docs version: `2.1.0`.
+- Current app/docs version: `2.2.0`.
 - `package.json`, `package-lock.json`, `app.json`, `app/constants/version.ts`,
   and native iOS/Android marketing versions must stay aligned.
 - Settings displays the app version from `APP_VERSION`.
@@ -209,8 +213,10 @@ pundit-app/
 ## Daily Quiz Flow
 
 1. App hydrates cached daily-loop resources.
-2. Games tab shows welcome, completed, or reconciliation/loading state.
-3. Question prompt types out intentionally before answer options appear.
+2. Games tab shows independent launch or recap components for the Daily Quiz
+   and player journey.
+3. Kick Off enters the existing Daily Quiz directly; the question prompt types
+   out intentionally before answer options appear.
 4. Timer starts after all options are visible.
 5. Answer tap locks the choice, pauses briefly, reveals correctness, then transitions to the next question.
 6. After the fifth answer, the app durably saves the result, updates the
@@ -239,7 +245,8 @@ Netlify Functions live under `/.netlify/functions/`.
 
 Core groups:
 
-- Daily quiz: `getDailyQuiz`, `submitQuiz`, `getTodayResult`, `migrateGuestResult`
+- Daily games: `getDailyQuiz`, `submitQuiz`, `getTodayResult`,
+  `completeCareerGame`, `getTodayCareerGameResult`, `migrateGuestResult`
 - Identity/profile: `syncIdentity`, `getUserStats`, `updateProfile`, `checkUsername`, `setUsername`
 - Leaderboards: `getLeaderboard`, `getFriendsLeaderboard`
 - Friends: `createFriendLink`, `acceptFriendLink`, `getFriends`, `removeFriend`

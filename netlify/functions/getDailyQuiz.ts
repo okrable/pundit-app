@@ -2,19 +2,17 @@ import { Handler } from '@netlify/functions';
 import { query } from './lib/db';
 import { getQuizDate } from './lib/quizDate';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
+import { getCareerGameForDate } from './lib/careerGame';
+import {
+  buildDailyQuizResponse,
+  DailyQuizQuestionRow,
+} from './lib/dailyQuizResponse';
 
-interface QuizQuestion {
+interface QuizQuestion extends DailyQuizQuestionRow {
   date: string | null;
   language: string | null;
   rank: number | null;
-  question_id: string;
-  question: string | null;
   player_id: string | null;
-  player_name: string | null;
-  player_0: string | null;
-  player_1: string | null;
-  player_2: string | null;
-  player_3: string | null;
 }
 
 export const handler: Handler = async (event) => {
@@ -66,21 +64,12 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const formattedQuiz = {
-      id: `quiz-${targetDate}`,
-      date: targetDate,
-      questions: questions.map((q) => {
-        const options = [q.player_0, q.player_1, q.player_2, q.player_3].filter(Boolean);
-        const correctIndex = options.findIndex((opt) => opt === q.player_name);
-
-        return {
-          id: q.question_id,
-          prompt: q.question || '',
-          options,
-          correctOptionIndex: correctIndex >= 0 ? correctIndex : undefined,
-        };
-      }),
-    };
+    const careerGame = await getCareerGameForDate(targetDate, language);
+    const formattedQuiz = buildDailyQuizResponse(
+      targetDate,
+      questions,
+      careerGame
+    );
 
     logRequestEnd({ endpoint: 'getDailyQuiz', requestId }, Date.now() - requestStartedAt, 200);
     return {
