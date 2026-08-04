@@ -6,6 +6,7 @@ import { useAuthStore } from '../state/useAuthStore';
 import { trackAnalyticsEvent } from './analytics';
 import { setUsername as setUsernameApi, syncIdentity } from './api';
 import type { SetUsernameResponse } from '../types';
+import type { AvatarId } from '../../shared/avatarCatalog';
 import {
   buildIdentityActivationKey,
   isIdentityActivationCurrent,
@@ -129,7 +130,8 @@ export async function activateAuthenticatedSession({
 }
 
 export async function completeUsernameOnboarding(
-  username: string
+  username: string,
+  avatarId: AvatarId
 ): Promise<SetUsernameResponse> {
   const authState = useAuthStore.getState();
   const userId = authState.user?.sub;
@@ -138,8 +140,8 @@ export async function completeUsernameOnboarding(
   }
 
   const authStateVersion = authState.authStateVersion;
-  const response = await setUsernameApi(userId, username);
-  if (!response.success || !response.username) {
+  const response = await setUsernameApi(userId, username, avatarId);
+  if (!response.success || !response.username || !response.avatarId) {
     return response;
   }
 
@@ -154,6 +156,7 @@ export async function completeUsernameOnboarding(
     username: response.username,
     usernameRequired: false,
     onboardingStatus: 'complete',
+    avatarId: response.avatarId,
   });
   if (!isCurrentActivation(userId, authStateVersion)) {
     return { success: false, error: 'Your session changed. Please try again.' };

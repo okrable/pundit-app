@@ -4,20 +4,26 @@ import { authorizeUser } from './lib/auth';
 import { enforceRateLimit } from './lib/rateLimit';
 import { syncIdentityRecord } from './lib/identity';
 import { chooseUsernameAssignmentAction } from '../../shared/identityPolicy';
+import { isAvatarId, type AvatarId } from '../../shared/avatarCatalog';
 
 // Username validation rules (same as checkUsername)
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$/;
 const MIN_LENGTH = 3;
 const MAX_LENGTH = 20;
 
-async function assignUsernameOnce(userId: string, normalized: string) {
+async function assignUsernameOnce(
+  userId: string,
+  normalized: string,
+  requestedAvatarId?: AvatarId
+) {
   return withTransaction(async (client) => {
     const users = await queryWithClient<{
       username: string | null;
       onboarding_status: 'username_required' | 'complete';
+      avatar_id: string | null;
     }>(
       client,
-      `SELECT username, onboarding_status
+      `SELECT username, onboarding_status, avatar_id
        FROM users
        WHERE id = $1
        FOR UPDATE`,
@@ -35,34 +41,40 @@ async function assignUsernameOnce(userId: string, normalized: string) {
     });
 
     if (action !== 'assign') {
-      return { action, username: current.username };
+      return { action, username: current.username, avatarId: current.avatar_id };
     }
 
-    const updated = await queryWithClient<{ username: string }>(
+    const avatarId = requestedAvatarId ?? current.avatar_id;
+    if (!isAvatarId(avatarId)) {
+      throw new Error('Identity synchronization did not assign an avatar');
+    }
+
+    const updated = await queryWithClient<{ username: string; avatar_id: string }>(
       client,
       `UPDATE users
        SET
          username = $2,
          username_normalized = $2,
+         avatar_id = $3,
          onboarding_status = 'complete'
        WHERE id = $1
          AND username IS NULL
          AND onboarding_status = 'username_required'
-       RETURNING username`,
-      [userId, normalized]
+       RETURNING username, avatar_id`,
+      [userId, normalized, avatarId]
     );
 
     if (!updated[0]) {
       throw new Error('Username assignment lost its identity lock');
     }
-    return { action, username: updated[0].username };
+    return { action, username: updated[0].username, avatarId: updated[0].avatar_id };
   });
 }
 
-async function assignUsername(userId: string, normalized: string) {
+async function assignUsername(userId: string, normalized: string, avatarId?: AvatarId) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await assignUsernameOnce(userId, normalized);
+      return await assignUsernameOnce(userId, normalized, avatarId);
     } catch (error) {
       const code =
         error && typeof error === 'object' && 'code' in error
@@ -97,7 +109,7 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const { userId, username } = JSON.parse(event.body || '{}');
+    const { userId, username, avatarId } = JSON.parse(event.body || '{}');
 
     if (!userId || !username) {
       return {
@@ -113,6 +125,14 @@ export const handler: Handler = async (event) => {
         statusCode: 403,
         headers,
         body: JSON.stringify({ success: false, error: 'Sign in to set a username' }),
+      };
+    }
+
+    if (avatarId !== undefined && !isAvatarId(avatarId)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ success: false, error: 'Invalid avatar' }),
       };
     }
 
@@ -146,6 +166,7 @@ export const handler: Handler = async (event) => {
           body: JSON.stringify({
             success: true,
             username: syncedIdentity.username,
+            avatarId: syncedIdentity.avatarId,
           }),
         };
       }
@@ -197,7 +218,7 @@ export const handler: Handler = async (event) => {
     }
 
     try {
-      const assignment = await assignUsername(userId, normalized);
+      const assignment = await assignUsername(userId, normalized, avatarId);
 
       if (assignment.action === 'immutable') {
         return {
@@ -217,6 +238,7 @@ export const handler: Handler = async (event) => {
         body: JSON.stringify({
           success: true,
           username: assignment.username,
+          avatarId: assignment.avatarId,
         }),
       };
     } catch (err: any) {

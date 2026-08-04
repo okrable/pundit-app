@@ -136,6 +136,7 @@ export default function ManageFriendsModal({
       <Avatar
         userId={item.id}
         username={item.username}
+        avatarId={item.avatarId}
         imageUrl={item.avatarUrl}
         size="md"
       />

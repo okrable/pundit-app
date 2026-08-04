@@ -1,4 +1,5 @@
 import type { StreakStatus } from '../../shared/streak';
+import type { AvatarId } from '../../shared/avatarCatalog';
 
 export interface Question {
   id: string;
@@ -104,6 +105,7 @@ export interface PublicPlayer {
   userId: string;
   username: string;
   avatarUrl?: string | null;
+  avatarId?: AvatarId | null;
 }
 
 export interface LeaderboardEntry {
@@ -115,6 +117,7 @@ export interface LeaderboardEntry {
   gamesPlayed: number;
   streak: number;
   rank: number;
+  avatarId?: AvatarId | null;
 }
 
 export interface GlobalLeaderboardResponse {
@@ -136,6 +139,7 @@ export interface UserStats {
   createdAt: string | null;
   canChangeUsername: boolean;
   usernameChangeAvailableAt: string | null;
+  avatarId?: AvatarId | null;
 }
 
 export interface UserProfile {
@@ -153,6 +157,7 @@ export interface CheckUsernameResponse {
 export interface SetUsernameResponse {
   success: boolean;
   username?: string;
+  avatarId?: AvatarId;
   code?: 'USERNAME_IMMUTABLE';
   error?: string;
 }
@@ -163,6 +168,7 @@ export interface SyncIdentityResponse {
   username: string | null;
   usernameRequired: boolean;
   onboardingStatus: IdentityOnboardingStatus;
+  avatarId: AvatarId;
 }
 
 // Challenge Mode Types
@@ -297,6 +303,7 @@ export interface Friend {
   displayName: string | null;
   username: string;
   avatarUrl: string | null;
+  avatarId?: AvatarId | null;
   streak: number;
   friendSince: string;
 }
@@ -311,6 +318,7 @@ export interface FriendsLeaderboardEntry {
   streak: number;
   rank: number | null;
   hasPlayedToday: boolean;
+  avatarId?: AvatarId | null;
 }
 
 export interface FriendsLeaderboardResponse {

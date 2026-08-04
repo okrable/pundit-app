@@ -20,6 +20,7 @@ import {
   ClientIdentityStatus,
   resolveStoredIdentityStatus,
 } from '../../shared/clientIdentityPolicy';
+import type { AvatarId } from '../../shared/avatarCatalog';
 
 interface User {
   sub: string;
@@ -29,6 +30,7 @@ interface User {
   username?: string;
   usernameRequired?: boolean;
   onboardingStatus?: 'username_required' | 'complete';
+  avatarId?: AvatarId;
 }
 
 interface AuthState {
@@ -52,6 +54,7 @@ interface AuthState {
   setAuthResult: (token: string, user: User, refreshToken?: string) => Promise<void>;
   beginIdentitySync: (source: 'login' | 'restore') => void;
   applyIdentity: (identity: SyncIdentityResponse) => Promise<void>;
+  applyAvatar: (avatarId: AvatarId) => Promise<void>;
   failIdentitySync: (message: string) => void;
   requireUsernameOnboarding: () => void;
   beginAuthSync: (source: 'login' | 'restore') => void;
@@ -123,6 +126,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             username: storedUserInfo.username,
             usernameRequired: storedUserInfo.usernameRequired,
             onboardingStatus: storedUserInfo.onboardingStatus,
+            avatarId: storedUserInfo.avatarId,
           },
           token: null,
           isAuthenticated: true,
@@ -216,6 +220,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       username: user.username,
       usernameRequired: user.usernameRequired,
       onboardingStatus: user.onboardingStatus,
+      avatarId: user.avatarId,
     });
   },
 
@@ -236,6 +241,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       username: identity.username || undefined,
       usernameRequired: identity.usernameRequired,
       onboardingStatus: identity.onboardingStatus,
+      avatarId: identity.avatarId,
     };
     set({
       user: updatedUser,
@@ -250,6 +256,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       username: updatedUser.username,
       usernameRequired: updatedUser.usernameRequired,
       onboardingStatus: updatedUser.onboardingStatus,
+      avatarId: updatedUser.avatarId,
+    });
+  },
+
+  applyAvatar: async (avatarId) => {
+    const currentUser = get().user;
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, avatarId };
+    set({ user: updatedUser });
+    await storeUserInfo({
+      sub: updatedUser.sub,
+      email: updatedUser.email,
+      name: updatedUser.name,
+      picture: updatedUser.picture,
+      username: updatedUser.username,
+      usernameRequired: updatedUser.usernameRequired,
+      onboardingStatus: updatedUser.onboardingStatus,
+      avatarId: updatedUser.avatarId,
     });
   },
 
@@ -452,6 +476,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           username: storedUserInfo?.username,
           usernameRequired: storedUserInfo?.usernameRequired,
           onboardingStatus: storedUserInfo?.onboardingStatus,
+          avatarId: storedUserInfo?.avatarId,
         },
         isAuthenticated: true,
         authStatus: 'authenticated',

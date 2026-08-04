@@ -1,6 +1,6 @@
 {
   "name": "pundit-temp",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -18,6 +18,7 @@
     "log:dev:mobile": "node scripts/run-with-log.js -- npm run dev:mobile",
     "seed:demo-leaderboard": "node scripts/seed-demo-leaderboard.js",
     "inspect:leaderboard-performance": "node scripts/inspect-leaderboard-performance.js",
+    "audit:profile-avatars": "node scripts/audit-profile-avatars.js",
     "repair:total-correct": "node scripts/repair-total-correct.js",
     "eas:login": "npx eas-cli@latest login",
     "build:ios:simulator": "npx eas-cli@latest build --platform ios --profile ios-simulator",

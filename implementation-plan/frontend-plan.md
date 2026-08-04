@@ -192,9 +192,13 @@ changes mid-flight. Friends data is forcibly revalidated after accept/remove
 mutations and whenever League Tables gains navigation focus, so remote
 acceptances do not wait for cache expiry.
 
-Profile and leaderboard resources use dedicated social cache schemas. The daily
-payload uses quiz cache schema 2 so clients refresh for `careerGame`, while
-stored quiz and career results remain separate and are not cleared.
+Profile resources use cache schema 4 and leaderboard resources use social
+cache schema 3. Old payloads are removed lazily while quiz and result storage
+remains separate. The daily quiz payload uses cache schema 2 for `careerGame`.
+Username onboarding previews the server-assigned football
+avatar and opens the shared 58-avatar picker. The authenticated Me avatar opens
+the same picker and saves server-confirmed changes into profile and leaderboard
+caches.
 
 ## Settings
 

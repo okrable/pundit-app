@@ -77,6 +77,7 @@ export const handler: Handler = async (event) => {
       display_name: string | null;
       created_at: string;
       last_played: string | null;
+      avatar_id: string | null;
     }>(
       `SELECT
         streak,
@@ -88,6 +89,7 @@ export const handler: Handler = async (event) => {
         username,
         display_name,
         created_at,
+        avatar_id,
         last_played::TEXT as last_played
       FROM users
       WHERE id = $1`,
@@ -144,6 +146,7 @@ export const handler: Handler = async (event) => {
         username: userStats.username,
         displayName: userStats.display_name,
         createdAt: userStats.created_at,
+        avatarId: userStats.avatar_id,
         canChangeUsername: false,
         usernameChangeAvailableAt: null,
       }),

@@ -33,17 +33,19 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `POST /updateProfile`
 - `GET /checkUsername`
 - `POST /setUsername`
-- `updateProfile` and display-name response fields remain old-client
-  compatibility surfaces; v2 does not call or render them.
-- `setUsername` assigns only an incomplete identity. Same-value retries are
-  idempotent and later changes return `USERNAME_IMMUTABLE`.
+- `updateProfile` persists a validated Pundit `avatarId`; its display-name path
+  remains an old-client compatibility surface.
+- `setUsername` atomically confirms the incomplete identity's username and
+  selected avatar. Same-value retries are idempotent and later username changes
+  return `USERNAME_IMMUTABLE`.
 
 ## Leaderboard APIs
 
 - `GET /getLeaderboard?period=daily&limit=100`
 - `GET /getFriendsLeaderboard?userId=...&period=daily`
 - Legacy `period=weekly` requests are tolerated and return daily leaderboard data.
-- Leaderboard responses include `period`, `quizDate`, and ranked entries.
+- Leaderboard responses include `period`, `quizDate`, ranked entries, and each
+  player's current `avatarId`.
 - Global leaderboards are public to guests and authenticated users; persisted rankings include completed authenticated username identities only.
 - Friends leaderboards require a completed username identity and include the current user plus friends, with unplayed users shown unranked.
 - `username` is the canonical name. Deprecated `displayName` fields temporarily contain the username for installed-client compatibility.
@@ -72,7 +74,7 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - Removal deletes that one ordered row, returns idempotent success when an
   earlier slow request already completed, and uses the longer social-mutation
   client timeout.
-- Friend responses use `PublicPlayer { userId, username, avatarUrl? }`; deprecated name/id aliases remain during the compatibility window.
+- Friend responses use `PublicPlayer { userId, username, avatarId?, avatarUrl? }`; deprecated name/id aliases remain during the compatibility window.
 
 ## Operational Instrumentation
 

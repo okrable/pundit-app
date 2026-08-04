@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { theme } from '../theme/theme';
+import { AVATAR_ASSETS } from '../constants/avatarAssets';
+import { isAvatarId, type AvatarId } from '../../shared/avatarCatalog';
 
 interface AvatarProps {
   userId: string;
   username?: string | null;
   imageUrl?: string | null;
+  avatarId?: AvatarId | string | null;
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
@@ -45,11 +48,22 @@ export default function Avatar({
   userId,
   username,
   imageUrl,
+  avatarId,
   size = 'md',
 }: AvatarProps) {
   const pixelSize = SIZES[size];
   const fontSize = pixelSize * 0.4;
   const backgroundColor = getAvatarColor(userId);
+
+  if (isAvatarId(avatarId)) {
+    return (
+      <Image
+        source={AVATAR_ASSETS[avatarId]}
+        style={{ width: pixelSize, height: pixelSize }}
+        resizeMode="contain"
+      />
+    );
+  }
 
   // If we have an image URL, render the image
   if (imageUrl) {

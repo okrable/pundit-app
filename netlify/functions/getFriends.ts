@@ -56,6 +56,7 @@ export const handler: Handler = async (event) => {
       id: string;
       username: string;
       avatar_url: string | null;
+      avatar_id: string | null;
       streak: number;
       friend_since: string;
     }>(
@@ -63,6 +64,7 @@ export const handler: Handler = async (event) => {
         u.id,
         u.username,
         u.avatar_url,
+        u.avatar_id,
         CASE
           WHEN u.last_played IN ($2::DATE, $3::DATE) THEN u.streak
           ELSE 0
@@ -85,6 +87,7 @@ export const handler: Handler = async (event) => {
       id: f.id,
       username: f.username,
       avatarUrl: f.avatar_url,
+      avatarId: f.avatar_id,
       streak: f.streak,
       friendSince: f.friend_since,
       // Deprecated compatibility field for installed clients.

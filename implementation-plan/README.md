@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.1.2 authentication and quiz sync hardening
+> Last updated: v2.4.0 Pundit avatar personalisation
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -34,6 +34,11 @@ In plain English, this work delivered four connected changes:
    publishes and persists an optimistic streak before a retryable background
    submission.
 
+6. **v2.4.0 — avatar personalisation:** every authenticated player receives a
+   persisted football-symbol avatar, can choose from the full 58-avatar Pundit
+   library during onboarding or from Me, and publishes that avatar through
+   friends and global leaderboards.
+
 ## Product Status Snapshot
 
 ### Delivered
@@ -51,6 +56,8 @@ In plain English, this work delivered four connected changes:
 - Cached completed screen for already-played daily state.
 - Guest mode with local-only daily results.
 - Auth0 accounts with blocking username onboarding, username-only Me profile, and settings.
+- Persisted Pundit avatar assignment, onboarding selection, Me-page editing,
+  and public friends/leaderboard rendering.
 - Verified identity synchronization and canonical server-side usernames.
 - Mutual ordered friendships with reusable seven-day invite links and retry-safe removal.
 - Server-resolved username identities across friends, persisted leaderboards, and challenges.

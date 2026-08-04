@@ -8,6 +8,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,19 +21,32 @@ import {
 import { trackAnalyticsEvent } from '../services/analytics';
 import { useAuthStore } from '../state/useAuthStore';
 import { theme } from '../theme/theme';
+import Avatar from './Avatar';
+import AvatarPickerModal from './AvatarPickerModal';
+import type { AvatarId } from '../../shared/avatarCatalog';
 
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$/;
 const MIN_LENGTH = 3;
 const MAX_LENGTH = 20;
 
 export default function UsernameOnboardingScreen() {
-  const { identityStatus, identityError, authSyncError } = useAuthStore();
+  const { user, identityStatus, identityError, authSyncError } = useAuthStore();
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [selectedAvatarId, setSelectedAvatarId] = useState<AvatarId | null>(
+    user?.avatarId ?? null
+  );
+  const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
+
+  useEffect(() => {
+    if (user?.avatarId) {
+      setSelectedAvatarId(user.avatarId);
+    }
+  }, [user?.avatarId]);
 
   useEffect(() => {
     if (identityStatus === 'username_required') {
@@ -92,11 +106,11 @@ export default function UsernameOnboardingScreen() {
   }, [identityStatus, input, validateFormat]);
 
   const handleSubmit = async () => {
-    if (!isAvailable || isChecking || isSubmitting) return;
+    if (!isAvailable || isChecking || isSubmitting || !selectedAvatarId) return;
     setIsSubmitting(true);
     setError(null);
     try {
-      const result = await completeUsernameOnboarding(input);
+      const result = await completeUsernameOnboarding(input, selectedAvatarId);
       if (!result.success) {
         setError(result.error || 'Unable to set your username');
         if (result.code !== 'USERNAME_IMMUTABLE') {
@@ -142,7 +156,9 @@ export default function UsernameOnboardingScreen() {
 
   const showUsernameForm = identityStatus === 'username_required';
   const showLoading = identityStatus === 'syncing';
-  const canSubmit = Boolean(isAvailable && !isChecking && !isSubmitting);
+  const canSubmit = Boolean(
+    isAvailable && !isChecking && !isSubmitting && selectedAvatarId
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -150,10 +166,30 @@ export default function UsernameOnboardingScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <View style={styles.content}>
-          <View style={styles.icon}>
-            <Ionicons name="person-circle-outline" size={58} color={theme.colors.accent} />
-          </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.content}>
+          {showUsernameForm && selectedAvatarId ? (
+            <TouchableOpacity
+              style={styles.avatarChoice}
+              onPress={() => setAvatarPickerVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Choose your avatar"
+            >
+              <Avatar userId={user?.sub ?? ''} avatarId={selectedAvatarId} size="xl" />
+              <View style={styles.avatarEditBadge}>
+                <Ionicons name="pencil" size={15} color={theme.colors.white} />
+              </View>
+              <Text style={styles.chooseAvatarText}>Choose avatar</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.icon}>
+              <Ionicons name="person-circle-outline" size={58} color={theme.colors.accent} />
+            </View>
+          )}
           <Text style={styles.title}>
             {showUsernameForm ? 'Choose your username' : 'Finish setting up your account'}
           </Text>
@@ -232,8 +268,22 @@ export default function UsernameOnboardingScreen() {
           >
             <Text style={styles.signOutText}>Sign out</Text>
           </TouchableOpacity>
-        </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
+      {selectedAvatarId ? (
+        <AvatarPickerModal
+          visible={avatarPickerVisible}
+          currentAvatarId={selectedAvatarId}
+          title="Choose Avatar"
+          confirmLabel="Done"
+          onClose={() => setAvatarPickerVisible(false)}
+          onConfirm={(avatarId) => {
+            setSelectedAvatarId(avatarId);
+            setAvatarPickerVisible(false);
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -245,7 +295,11 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: theme.spacing.xl,
   },
   content: {
     width: '100%',
@@ -257,6 +311,30 @@ const styles = StyleSheet.create({
   icon: {
     alignItems: 'center',
     marginBottom: theme.spacing.md,
+  },
+  avatarChoice: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    top: 76,
+    right: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+  },
+  chooseAvatarText: {
+    marginTop: theme.spacing.sm,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.primary,
+    fontSize: 14,
   },
   title: {
     fontFamily: theme.fonts.gothamBlack,

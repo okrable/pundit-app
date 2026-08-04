@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { AvatarId } from '../../shared/avatarCatalog';
 
 const REFRESH_TOKEN_KEY = 'pundit_refresh_token';
 const USER_INFO_KEY = 'pundit_user_info';
@@ -18,6 +19,7 @@ export interface StoredUserInfo {
   username?: string;
   usernameRequired?: boolean;
   onboardingStatus?: 'username_required' | 'complete';
+  avatarId?: AvatarId;
 }
 
 export async function storeRefreshToken(token: string): Promise<void> {

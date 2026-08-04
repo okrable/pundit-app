@@ -69,6 +69,35 @@ import {
   getNativeTabsFallbackReason,
   selectMainNavigator,
 } from '../shared/navigationPolicy';
+import {
+  AVATAR_DEFINITIONS,
+  SYMBOL_AVATAR_DEFINITIONS,
+  chooseRandomSymbolAvatarId,
+  isAvatarId,
+  resolvePersistedAvatarId,
+} from '../shared/avatarCatalog';
+
+test('validates the complete avatar catalogue', () => {
+  assert.equal(AVATAR_DEFINITIONS.length, 58);
+  assert.equal(SYMBOL_AVATAR_DEFINITIONS.length, 32);
+  assert.equal(new Set(AVATAR_DEFINITIONS.map(({ id }) => id)).size, 58);
+  assert.equal(isAvatarId('symbol-stadium'), true);
+  assert.equal(isAvatarId('letter-z'), true);
+  assert.equal(isAvatarId('letter-aa'), false);
+  assert.equal(isAvatarId(null), false);
+});
+
+test('chooses automatic avatars only from football symbols', () => {
+  const first = chooseRandomSymbolAvatarId(0);
+  const last = chooseRandomSymbolAvatarId(1);
+  assert.equal(first, SYMBOL_AVATAR_DEFINITIONS[0].id);
+  assert.equal(last, SYMBOL_AVATAR_DEFINITIONS[31].id);
+  assert.equal(first.startsWith('symbol-'), true);
+  assert.equal(last.startsWith('symbol-'), true);
+  assert.equal(chooseRandomSymbolAvatarId(Number.NaN), first);
+  assert.equal(resolvePersistedAvatarId('symbol-stadium', 0), 'symbol-stadium');
+  assert.equal(resolvePersistedAvatarId(null, 0), first);
+});
 
 test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(undefined), 60);

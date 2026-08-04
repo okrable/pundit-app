@@ -2,6 +2,14 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.4.0 - Pundit avatar personalisation
+
+- Added a 58-avatar Pundit collection with football-symbol and letter choices.
+- Assigned every authenticated player a persisted football avatar, including
+  random defaults for established accounts and new signups.
+- Added avatar selection to username onboarding and the authenticated Me page.
+- Published saved avatars across friends and global leaderboard identities.
+
 ## v2.3.0 - Adaptive web and native iOS navigation
 
 - Replaced the mobile-width browser shell and bottom tabs with a full-viewport
