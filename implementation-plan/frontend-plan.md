@@ -73,6 +73,12 @@ line. iOS selects native tabs only when it is not running in Expo Go and the
 uses the existing JavaScript bottom tabs. Native-tab acceptance therefore
 requires an EAS development-client or preview build, not Expo Go.
 
+The native-tab navigator lives in an `.ios.tsx` module. Web and Android resolve
+a safe fallback module that never imports React Navigation's unstable native
+tabs entrypoint, because that entrypoint throws when evaluated on web even if
+the rendered navigator would later select the drawer. The production web build
+also fails if that unsupported runtime is found in the exported JavaScript.
+
 The repository intentionally keeps its native iOS and Android projects rather
 than adopting CNG. Expo Doctor's app-config synchronization warning is disabled
 for that reason: SDK upgrades apply the generated template diff to both tracked

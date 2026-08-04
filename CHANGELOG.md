@@ -20,7 +20,9 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
   asset path are pinned so simulator builds load matching animation code and
   retain the Pundit typography. The native-tab adapter now supplies Screens
   4.25 with stable screen keys so switching iOS tabs cannot hit its nil-key
-  assertion.
+  assertion. The native navigator is isolated to the iOS bundle so its
+  unsupported-platform guard cannot crash the responsive web app at startup;
+  web exports now verify that the native-tabs runtime was excluded.
 - Added a development-client EAS profile and aligned the tracked iOS and
   Android native projects with the SDK 55 templates while preserving the
   existing identifiers, signing settings, Auth0 callback scheme, and app
