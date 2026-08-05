@@ -90,9 +90,11 @@ subtree omit their own bottom safe-area edge only while native tabs are active;
 Android, web, Expo Go, and standalone challenge/result routes retain their
 existing safe-area handling.
 
-The web navigation drawer keeps a dedicated authentication action anchored in
-its footer. Guests see Log In and authenticated players see Log Out; both use
-the centralized Auth0 flow and expose pending and retryable error states.
+The web navigation drawer keeps dedicated authentication actions anchored in
+its footer. Guests see separate Create Account and Log In actions so new
+players enter username/avatar onboarding while returning players retain the
+login path. Authenticated players see Log Out. All actions use the centralized
+Auth0 flow and expose pending and retryable error states.
 
 ## Games Hub
 

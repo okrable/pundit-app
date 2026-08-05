@@ -91,9 +91,15 @@ function WebHeader({ title, onOpenMenu }: WebHeaderProps) {
 }
 
 function WebDrawerContent(props: DrawerContentComponentProps) {
-  const { isAuthenticated } = useAuthStore();
-  const [authPending, setAuthPending] = useState(false);
+  const { isAuthenticated, forceInteractiveAuth } = useAuthStore();
+  const [authPendingIntent, setAuthPendingIntent] = useState<
+    'signup' | 'login' | 'logout' | null
+  >(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [signupRequest, , promptSignup] = useAuthRequest({
+    intent: 'signup',
+    forceInteractive: forceInteractiveAuth,
+  });
   const [loginRequest, , promptLogin] = useAuthRequest({
     intent: 'login',
     forceInteractive: true,
@@ -110,13 +116,13 @@ function WebDrawerContent(props: DrawerContentComponentProps) {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [props.navigation]);
 
-  const handleAuthAction = async () => {
-    setAuthPending(true);
+  const handleAuthAction = async (intent: 'signup' | 'login' | 'logout') => {
+    setAuthPendingIntent(intent);
     setAuthError(null);
     try {
-      if (isAuthenticated) {
+      if (intent === 'logout') {
         await logoutWithAuth0();
-      } else {
+      } else if (intent === 'login') {
         if (!loginRequest) {
           throw new Error('Login is not ready yet. Please try again.');
         }
@@ -125,6 +131,15 @@ function WebDrawerContent(props: DrawerContentComponentProps) {
           request: loginRequest,
           promptAsync: promptLogin,
         });
+      } else {
+        if (!signupRequest) {
+          throw new Error('Account creation is not ready yet. Please try again.');
+        }
+        await loginWithAuth0({
+          intent: 'signup',
+          request: signupRequest,
+          promptAsync: promptSignup,
+        });
       }
       props.navigation.closeDrawer();
     } catch (error) {
@@ -132,9 +147,11 @@ function WebDrawerContent(props: DrawerContentComponentProps) {
         error instanceof Error ? error.message : 'Unable to update your session.'
       );
     } finally {
-      setAuthPending(false);
+      setAuthPendingIntent(null);
     }
   };
+
+  const authPending = authPendingIntent !== null;
 
   return (
     <DrawerContentScrollView
@@ -147,49 +164,89 @@ function WebDrawerContent(props: DrawerContentComponentProps) {
       </View>
       <DrawerItemList {...props} />
       <View style={styles.drawerFooter}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isAuthenticated ? 'Log out' : 'Log in'}
-          accessibilityHint={
-            isAuthenticated
-              ? 'Ends your current Pundit session'
-              : 'Opens the Pundit login flow'
-          }
-          accessibilityState={{ disabled: authPending }}
-          disabled={authPending}
-          onPress={() => void handleAuthAction()}
-          style={({ pressed }) => [
-            styles.authButton,
-            isAuthenticated && styles.authButtonLoggedIn,
-            pressed && !authPending && styles.authButtonPressed,
-            authPending && styles.authButtonPending,
-          ]}
-        >
-          {authPending ? (
-            <ActivityIndicator
-              size="small"
-              color={
-                isAuthenticated ? theme.colors.textDark : theme.colors.white
-              }
-            />
-          ) : (
-            <Ionicons
-              name={isAuthenticated ? 'log-out-outline' : 'log-in-outline'}
-              size={21}
-              color={
-                isAuthenticated ? theme.colors.textDark : theme.colors.white
-              }
-            />
-          )}
-          <Text
-            style={[
-              styles.authButtonText,
-              isAuthenticated && styles.authButtonTextLoggedIn,
+        {isAuthenticated ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Log out"
+            accessibilityHint="Ends your current Pundit session"
+            accessibilityState={{ disabled: authPending }}
+            disabled={authPending}
+            onPress={() => void handleAuthAction('logout')}
+            style={({ pressed }) => [
+              styles.authButton,
+              styles.authButtonLoggedIn,
+              pressed && !authPending && styles.authButtonPressed,
+              authPending && styles.authButtonPending,
             ]}
           >
-            {isAuthenticated ? 'Log Out' : 'Log In'}
-          </Text>
-        </Pressable>
+            {authPendingIntent === 'logout' ? (
+              <ActivityIndicator size="small" color={theme.colors.textDark} />
+            ) : (
+              <Ionicons
+                name="log-out-outline"
+                size={21}
+                color={theme.colors.textDark}
+              />
+            )}
+            <Text style={[styles.authButtonText, styles.authButtonTextLoggedIn]}>
+              Log Out
+            </Text>
+          </Pressable>
+        ) : (
+          <View style={styles.guestAuthActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Create account"
+              accessibilityHint="Starts Pundit account creation and profile setup"
+              accessibilityState={{ disabled: authPending }}
+              disabled={authPending}
+              onPress={() => void handleAuthAction('signup')}
+              style={({ pressed }) => [
+                styles.authButton,
+                pressed && !authPending && styles.authButtonPressed,
+                authPending && styles.authButtonPending,
+              ]}
+            >
+              {authPendingIntent === 'signup' ? (
+                <ActivityIndicator size="small" color={theme.colors.white} />
+              ) : (
+                <Ionicons
+                  name="person-add-outline"
+                  size={21}
+                  color={theme.colors.white}
+                />
+              )}
+              <Text style={styles.authButtonText}>Create Account</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Log in"
+              accessibilityHint="Logs in to an existing Pundit account"
+              accessibilityState={{ disabled: authPending }}
+              disabled={authPending}
+              onPress={() => void handleAuthAction('login')}
+              style={({ pressed }) => [
+                styles.authButton,
+                styles.authButtonLoggedIn,
+                pressed && !authPending && styles.authButtonPressed,
+                authPending && styles.authButtonPending,
+              ]}
+            >
+              {authPendingIntent === 'login' ? (
+                <ActivityIndicator size="small" color={theme.colors.textDark} />
+              ) : (
+                <Ionicons
+                  name="log-in-outline"
+                  size={21}
+                  color={theme.colors.textDark}
+                />
+              )}
+              <Text style={[styles.authButtonText, styles.authButtonTextLoggedIn]}>
+                Log In
+              </Text>
+            </Pressable>
+          </View>
+        )}
         {authError ? (
           <Text accessibilityRole="alert" style={styles.authError}>
             {authError}
@@ -360,6 +417,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.xl,
+  },
+  guestAuthActions: {
+    gap: theme.spacing.sm,
   },
   authButton: {
     minHeight: 50,
