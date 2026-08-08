@@ -348,6 +348,22 @@ export interface AcceptFriendLinkResponse {
   error?: string;
 }
 
+export type FriendInvitePreviewState =
+  | 'available'
+  | 'already_friends'
+  | 'self'
+  | 'expired'
+  | 'used'
+  | 'inviter_unavailable';
+
+export interface FriendInvitePreviewResponse {
+  code: string;
+  inviter: PublicPlayer | null;
+  expiresAt: string;
+  canAccept: boolean;
+  state: FriendInvitePreviewState;
+}
+
 export interface GetFriendsResponse {
   friends: Friend[];
 }

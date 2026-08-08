@@ -9,6 +9,8 @@ import ChallengeResultsScreen from './app/screens/ChallengeResultsScreen';
 import useFonts from './app/hooks/useFonts';
 import useAuthInit from './app/hooks/useAuthInit';
 import useDeepLinkHandler from './app/hooks/useDeepLinkHandler';
+import SharedLinkAcceptanceModal from './app/components/SharedLinkAcceptanceModal';
+import { SharedLinkProvider } from './app/context/SharedLinkContext';
 import useAppBootstrap from './app/hooks/useAppBootstrap';
 import BootstrapScreen from './app/components/BootstrapScreen';
 import { prefetchDailyLoop } from './app/services/dailyLoop';
@@ -76,8 +78,7 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, AppError
 
 // Separate component to use hooks that need navigation context
 function AppContent() {
-  // Handle deep links for friend invites
-  useDeepLinkHandler({
+  const sharedLink = useDeepLinkHandler({
     onChallengeJoined: React.useCallback(() => {
       if (navigationRef.isReady()) {
         navigationRef.navigate('ChallengeQuiz');
@@ -104,8 +105,15 @@ function AppContent() {
     };
   }, []);
 
+  const navigateToMainSection = React.useCallback((screen: 'Me' | 'League Tables') => {
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('Main', { screen });
+    }
+  }, []);
+
   return (
-    <Stack.Navigator
+    <SharedLinkProvider value={{ openSharedAction: sharedLink.openAction }}>
+      <Stack.Navigator
       screenOptions={{
         headerStyle: {
           backgroundColor: theme.colors.accent,
@@ -140,7 +148,26 @@ function AppContent() {
           gestureEnabled: false,
         }}
       />
-    </Stack.Navigator>
+      </Stack.Navigator>
+      <SharedLinkAcceptanceModal
+        visible={sharedLink.visible}
+        action={sharedLink.pendingAction}
+        phase={sharedLink.phase}
+        preview={sharedLink.preview}
+        message={sharedLink.message}
+        onAccept={() => void sharedLink.accept()}
+        onDismiss={() => void sharedLink.dismiss()}
+        onRetry={sharedLink.retry}
+        onSignIn={() => {
+          sharedLink.deferForSignIn();
+          navigateToMainSection('Me');
+        }}
+        onViewFriends={() => {
+          void sharedLink.dismiss();
+          navigateToMainSection('League Tables');
+        }}
+      />
+    </SharedLinkProvider>
   );
 }
 

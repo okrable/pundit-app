@@ -34,6 +34,7 @@ import {
 import {
   canReuseFriendLink,
   decideFriendLinkAcceptance,
+  decideFriendInvitePreview,
   normalizeSocialCode,
   orderFriendshipPair,
 } from '../shared/socialPolicy';
@@ -745,6 +746,40 @@ test('orders mutual friendships and reuses only active reusable links', () => {
       usedBy: null,
     }),
     'expired'
+  );
+
+  assert.equal(
+    decideFriendInvitePreview({
+      isExpired: false,
+      isSelf: false,
+      inviterAvailable: true,
+      alreadyFriends: false,
+      isReusable: true,
+      usedBy: null,
+    }),
+    'available'
+  );
+  assert.equal(
+    decideFriendInvitePreview({
+      isExpired: false,
+      isSelf: false,
+      inviterAvailable: true,
+      alreadyFriends: true,
+      isReusable: false,
+      usedBy: 'auth0|first-user',
+    }),
+    'already_friends'
+  );
+  assert.equal(
+    decideFriendInvitePreview({
+      isExpired: false,
+      isSelf: false,
+      inviterAvailable: false,
+      alreadyFriends: false,
+      isReusable: true,
+      usedBy: null,
+    }),
+    'inviter_unavailable'
   );
 });
 

@@ -10,6 +10,9 @@
 - Both players submit answers asynchronously.
 - Results are revealed as win/loss/draw when both complete.
 - Users can view active challenge and recent challenge history.
+- Shared links open a challenger preview and claim the opponent slot only when
+  the recipient selects **Accept & Play**. Signed-out recipients resume the
+  pending invitation after authentication and identity synchronization.
 - Challenge W/L/D counters are persisted for authenticated users.
 - Challenge play uses the same refreshed `QuestionCard` gameplay UI as the daily quiz.
 - Create/join/submit/history require a completed authenticated username
@@ -34,11 +37,20 @@
 - Client screens/components: `ChallengeScreen`, `ChallengeQuizScreen`, `ChallengeResultsScreen`, sharing modals, and shared `QuestionCard`.
 - Data model: `challenges` table plus challenge stat columns on `users`.
 
+## Current Social Entry Points
+
+- Challenge contains challenge creation, active-challenge actions, and
+  six-character challenge-code entry only.
+- League Tables exposes a labelled **Add Friends** action. Its Friends sheet
+  supports reusable invite-link sharing, eight-character friend-code entry,
+  and friendship management.
+- Incoming friend and challenge links share one review flow with explicit
+  loading, accepting, success, unavailable, and retry states.
+
 ## Follow-Up Improvements
 
-1. Improve deep-link UX reliability and attribution.
-2. Expand lifecycle observability.
-3. Add operational alerts and anomaly detection on top of the shipped
+1. Expand lifecycle observability beyond client debug events.
+2. Add operational alerts and anomaly detection on top of the shipped
    database-backed challenge rate limits and structured logs.
-4. Add notifications and richer historical challenge summaries when evidence
+3. Add notifications and richer historical challenge summaries when evidence
    supports them.

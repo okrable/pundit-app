@@ -35,3 +35,27 @@ export function decideFriendLinkAcceptance(input: {
   if (!input.isReusable && input.usedBy) return 'used_legacy';
   return 'create_friendship';
 }
+
+export type FriendInvitePreviewDecision =
+  | 'available'
+  | 'already_friends'
+  | 'self'
+  | 'expired'
+  | 'used'
+  | 'inviter_unavailable';
+
+export function decideFriendInvitePreview(input: {
+  isExpired: boolean;
+  isSelf: boolean;
+  inviterAvailable: boolean;
+  alreadyFriends: boolean;
+  isReusable: boolean;
+  usedBy: string | null;
+}): FriendInvitePreviewDecision {
+  if (input.isExpired) return 'expired';
+  if (input.isSelf) return 'self';
+  if (!input.inviterAvailable) return 'inviter_unavailable';
+  if (input.alreadyFriends) return 'already_friends';
+  if (!input.isReusable && input.usedBy) return 'used';
+  return 'available';
+}

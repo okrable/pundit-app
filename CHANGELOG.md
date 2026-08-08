@@ -2,6 +2,17 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.5.0 - Social invitations and challenge UX
+
+- Added review-and-accept journeys for friend and challenge links, including
+  visible processing, retryable errors, unavailable-link explanations, and
+  pending invitations that resume after sign-in.
+- Replaced the subtle League Tables friends icon with a labelled Add Friends
+  action and brought friend-code entry into the friends management sheet.
+- Refocused Challenge on creating, joining, and acting on challenges, with
+  friend invitations kept in League Tables and cancellation progress made
+  explicit.
+
 ## v2.4.0 - Pundit avatar personalisation
 
 - Added a 58-avatar Pundit collection with football-symbol and letter choices.

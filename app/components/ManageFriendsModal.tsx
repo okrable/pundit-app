@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +22,8 @@ import Avatar from './Avatar';
 import ShareFriendLinkModal from './ShareFriendLinkModal';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { formatStreakLabel } from '../../shared/streak';
+import { normalizeSharedCode, resolveSharedCode } from '../services/sharedCode';
+import { useSharedLinkFlow } from '../context/SharedLinkContext';
 
 interface ManageFriendsModalProps {
   visible: boolean;
@@ -34,11 +37,14 @@ export default function ManageFriendsModal({
   onFriendsChanged,
 }: ManageFriendsModalProps) {
   const { user } = useAuthStore();
+  const { openSharedAction } = useSharedLinkFlow();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [generatingLink, setGeneratingLink] = useState(false);
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState('');
+  const [openingInvite, setOpeningInvite] = useState(false);
 
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false);
@@ -85,6 +91,22 @@ export default function ManageFriendsModal({
       Alert.alert('Error', 'Failed to generate invite link. Please try again.');
     } finally {
       setGeneratingLink(false);
+    }
+  };
+
+  const handleEnterInvite = async () => {
+    const action = resolveSharedCode(inviteCode);
+    if (action.kind !== 'friendInvite') {
+      Alert.alert('Invalid Code', 'Enter an 8-character friend invite code.');
+      return;
+    }
+    setOpeningInvite(true);
+    try {
+      setInviteCode('');
+      onClose();
+      await openSharedAction(action);
+    } finally {
+      setOpeningInvite(false);
     }
   };
 
@@ -188,6 +210,10 @@ export default function ManageFriendsModal({
 
         {/* Invite Section */}
         <View style={styles.inviteSection}>
+          <Text style={styles.actionTitle}>Add friends</Text>
+          <Text style={styles.actionDescription}>
+            Share your invite link or enter a code someone sent you.
+          </Text>
           <TouchableOpacity
             style={styles.inviteButton}
             onPress={handleGenerateLink}
@@ -202,6 +228,34 @@ export default function ManageFriendsModal({
               </>
             )}
           </TouchableOpacity>
+          <View style={styles.codeRow}>
+            <TextInput
+              style={styles.codeInput}
+              placeholder="Friend code"
+              placeholderTextColor={theme.colors.mediumGray}
+              value={inviteCode}
+              onChangeText={(value) => setInviteCode(normalizeSharedCode(value))}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={8}
+              accessibilityLabel="Friend invite code"
+            />
+            <TouchableOpacity
+              style={[
+                styles.codeButton,
+                (inviteCode.length !== 8 || openingInvite) && styles.buttonDisabled,
+              ]}
+              onPress={() => void handleEnterInvite()}
+              disabled={inviteCode.length !== 8 || openingInvite}
+              accessibilityState={{ disabled: inviteCode.length !== 8 || openingInvite, busy: openingInvite }}
+            >
+              {openingInvite ? (
+                <ActivityIndicator size="small" color={theme.colors.white} />
+              ) : (
+                <Text style={styles.codeButtonText}>Review</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Friends List */}
@@ -276,6 +330,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
   },
+  actionTitle: {
+    fontSize: 17,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.textDark,
+    marginBottom: theme.spacing.xs,
+  },
+  actionDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    marginBottom: theme.spacing.md,
+  },
   inviteButton: {
     backgroundColor: theme.colors.primary,
     paddingVertical: theme.spacing.md,
@@ -284,6 +351,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: theme.spacing.sm,
+  },
+  codeRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  codeInput: {
+    flex: 1,
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: theme.colors.lightGray,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.white,
+    paddingHorizontal: theme.spacing.md,
+    fontFamily: theme.fonts.gothamMedium,
+    color: theme.colors.textDark,
+    letterSpacing: 1.5,
+  },
+  codeButton: {
+    minWidth: 92,
+    minHeight: 46,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.md,
+  },
+  buttonDisabled: { opacity: 0.5 },
+  codeButtonText: {
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.white,
+    fontSize: 14,
   },
   inviteButtonText: {
     color: theme.colors.white,
