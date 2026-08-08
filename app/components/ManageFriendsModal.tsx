@@ -252,7 +252,7 @@ export default function ManageFriendsModal({
               {openingInvite ? (
                 <ActivityIndicator size="small" color={theme.colors.white} />
               ) : (
-                <Text style={styles.codeButtonText}>Review</Text>
+                <Text style={styles.codeButtonText}>Add</Text>
               )}
             </TouchableOpacity>
           </View>
