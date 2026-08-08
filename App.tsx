@@ -105,10 +105,12 @@ function AppContent() {
     };
   }, []);
 
-  const navigateToMainSection = React.useCallback((screen: 'Me' | 'League Tables') => {
+  const navigateToMainSection = React.useCallback((screen: 'Me' | 'League Tables'): boolean => {
     if (navigationRef.isReady()) {
       navigationRef.navigate('Main', { screen });
+      return true;
     }
+    return false;
   }, []);
 
   return (
@@ -163,8 +165,16 @@ function AppContent() {
           navigateToMainSection('Me');
         }}
         onViewFriends={() => {
-          void sharedLink.dismiss();
-          navigateToMainSection('League Tables');
+          if (!navigateToMainSection('League Tables')) {
+            void sharedLink.dismiss();
+            return;
+          }
+
+          // Keep the modal covering the previous tab until the programmatic
+          // navigation has committed, then begin its fade-out over League Tables.
+          requestAnimationFrame(() => {
+            void sharedLink.dismiss();
+          });
         }}
       />
     </SharedLinkProvider>
