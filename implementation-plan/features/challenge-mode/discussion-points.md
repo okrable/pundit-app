@@ -13,6 +13,10 @@ Current challenge mode is shipped. Future discussion should focus on hardening a
 ## Open Topics
 
 - Deeper link attribution and server-side funnel reporting.
+- App Store Universal Links for the public friend and challenge URLs. This is
+  deferred until the final Apple Team ID, bundle identifier, Associated
+  Domains entitlement, provisioning, and production association file can be
+  configured and tested together.
 - Challenge expiry/revoke messaging.
 - Alert thresholds and anomaly detection on top of the existing
   database-backed challenge rate limits.

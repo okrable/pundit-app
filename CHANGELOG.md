@@ -12,6 +12,11 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 - Refocused Challenge on creating, joining, and acting on challenges, with
   friend invitations kept in League Tables and cancellation progress made
   explicit.
+- Aligned the committed iOS and Android native projects with v2.5.0 and added
+  iOS safe-area handling for the invitation review sheet.
+- Documented Universal Links as an App Store readiness goal; public invite
+  links continue to use the web app until Apple signing and domain association
+  are configured.
 
 ## v2.4.0 - Pundit avatar personalisation
 

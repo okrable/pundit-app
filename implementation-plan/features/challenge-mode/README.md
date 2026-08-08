@@ -54,3 +54,26 @@
    database-backed challenge rate limits and structured logs.
 3. Add notifications and richer historical challenge summaries when evidence
    supports them.
+
+## App Store Universal Links Goal
+
+The current native contract uses the registered custom scheme:
+
+- `pundit-app://add-friend/{code}`
+- `pundit-app://challenge/{code}`
+
+Public `https://pundittrivia.com/f/*` and `/c/*` links continue to open the web
+app. Before an iOS App Store launch, add Universal Links so those HTTPS links
+open the installed app and retain the existing web fallback when it is absent.
+
+That launch-readiness change must:
+
+- enable the Associated Domains capability for `applinks:pundittrivia.com`;
+- publish a valid `apple-app-site-association` file covering `/f/*` and `/c/*`;
+- bind the final Apple Team ID and App Store bundle identifier;
+- update signing and provisioning while preserving the custom scheme;
+- validate installed-app cold/warm handoff, signed-out persistence, malformed
+  links, and browser fallback.
+
+This work is deliberately deferred until the final App Store identity, Apple
+signing capability, and production-domain configuration are available.

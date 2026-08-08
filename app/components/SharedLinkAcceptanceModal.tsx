@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Avatar from './Avatar';
 import { theme } from '../theme/theme';
 import type {
@@ -43,6 +44,7 @@ export default function SharedLinkAcceptanceModal({
   onSignIn,
   onViewFriends,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const isFriend = action?.kind === 'friendInvite';
   const friendPreview = preview?.kind === 'friendInvite' ? preview.data : null;
   const challengePreview = preview?.kind === 'challenge' ? preview.data : null;
@@ -60,7 +62,11 @@ export default function SharedLinkAcceptanceModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
       <View style={styles.overlay}>
         <View
-          style={[styles.sheet, Platform.OS === 'web' && styles.sheetWeb]}
+          style={[
+            styles.sheet,
+            { paddingBottom: Math.max(theme.spacing.xxl, insets.bottom + theme.spacing.lg) },
+            Platform.OS === 'web' && styles.sheetWeb,
+          ]}
           accessibilityViewIsModal
         >
           <TouchableOpacity
@@ -189,7 +195,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: theme.borderRadius.xl,
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xxl,
-    paddingBottom: theme.spacing.xxl,
     alignItems: 'center',
   },
   sheetWeb: {
