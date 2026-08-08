@@ -330,13 +330,16 @@ export default function LeaderboardScreen() {
         ]}
       >
         <View style={styles.headerTop}>
-          <Text style={styles.title}>Leaderboard</Text>
-          {isAuthenticated && (
+          <Text style={styles.title}>League Tables</Text>
+          {isAuthenticated && isFriendsView && (
             <TouchableOpacity
               style={styles.manageFriendsButton}
               onPress={() => setShowManageFriends(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Add friends"
             >
-              <Ionicons name="people" size={22} color={theme.colors.primary} />
+              <Ionicons name="person-add" size={18} color={theme.colors.white} />
+              <Text style={styles.manageFriendsButtonText}>Add Friends</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -432,7 +435,19 @@ const styles = StyleSheet.create({
     color: theme.colors.textDark,
   },
   manageFriendsButton: {
-    padding: theme.spacing.xs,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary,
+  },
+  manageFriendsButtonText: {
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.white,
   },
   segmentedControl: {
     flexDirection: 'row',

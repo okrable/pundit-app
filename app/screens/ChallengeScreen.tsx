@@ -23,9 +23,8 @@ import {
   useMobileLayoutMetrics,
   webContentWidth,
 } from '../components/ResponsiveLayout';
-import { acceptFriendLink } from '../services/api';
-import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { buildShareUrl, normalizeSharedCode, resolveSharedCode } from '../services/sharedCode';
+import { useSharedLinkFlow } from '../context/SharedLinkContext';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
@@ -35,6 +34,7 @@ export default function ChallengeScreen() {
   const { screenPadding, webLayout } = useMobileLayoutMetrics();
   const useDesktopGrid = Platform.OS === 'web' && webLayout === 'desktop';
   const navigation = useNavigation<any>();
+  const { openSharedAction } = useSharedLinkFlow();
   const { user, isAuthenticated } = useAuthStore();
   const {
     activeChallenge,
@@ -43,7 +43,6 @@ export default function ChallengeScreen() {
     fetchUserChallenges,
     createChallenge,
     revokeChallenge,
-    joinChallenge,
     error,
     clearError,
   } = useChallengeStore();
@@ -54,6 +53,7 @@ export default function ChallengeScreen() {
   const [createdShareUrl, setCreatedShareUrl] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const userId = isAuthenticated && user ? user.sub : null;
 
@@ -102,11 +102,14 @@ export default function ChallengeScreen() {
           text: 'Yes, Cancel',
           style: 'destructive',
           onPress: async () => {
+            setIsCancelling(true);
             try {
               await revokeChallenge(userId);
               await fetchUserChallenges(userId);
             } catch (err) {
               Alert.alert('Error', 'Failed to cancel challenge');
+            } finally {
+              setIsCancelling(false);
             }
           },
         },
@@ -119,29 +122,15 @@ export default function ChallengeScreen() {
     const action = resolveSharedCode(joinCode);
 
     if (action.kind === 'invalid') {
-      Alert.alert('Invalid Code', 'Enter a 6-character challenge code or an 8-character friend invite code.');
+      Alert.alert('Invalid Code', 'Enter a 6-character challenge code.');
       return;
     }
 
     setIsJoining(true);
     clearError();
     try {
-      if (action.kind === 'friendInvite') {
-        const response = await acceptFriendLink(action.code, userId);
-        if (response.success) {
-          await useLeaderboardStore.getState().invalidateFriends(userId);
-          const friendName = response.friendUsername
-            ? response.friendUsername
-            : 'your friend';
-          Alert.alert(
-            'Friend Added',
-            `You and ${friendName} are now connected. Check your friends leaderboard.`,
-            [{ text: 'OK' }]
-          );
-          setJoinCode('');
-        } else {
-          Alert.alert('Could Not Add Friend', response.error || 'Please try again.');
-        }
+      if (action.kind !== 'challenge') {
+        Alert.alert('Invalid Code', 'Friend invite codes are entered from League Tables.');
         return;
       }
 
@@ -150,9 +139,8 @@ export default function ChallengeScreen() {
         return;
       }
 
-      await joinChallenge(action.code, userId);
       setJoinCode('');
-      navigation.navigate('ChallengeQuiz');
+      await openSharedAction(action);
     } catch (err) {
       const message = err instanceof Error ? err.message : error || 'Failed to process code';
       Alert.alert('Error', message);
@@ -360,17 +348,22 @@ export default function ChallengeScreen() {
                   <Text style={styles.shareButtonText}>Share</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.cancelButton}
+                  style={[styles.cancelButton, isCancelling && styles.joinButtonDisabled]}
                   onPress={handleRevokeChallenge}
+                  disabled={isCancelling}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  {isCancelling ? (
+                    <ActivityIndicator size="small" color={theme.colors.incorrect} />
+                  ) : (
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  )}
                 </TouchableOpacity>
               </View>
               </View>
             ) : (
               <View style={[styles.createCard, useDesktopGrid && styles.primaryCardDesktop]}>
               <Ionicons name="flash-outline" size={32} color={theme.colors.accent} />
-              <Text style={styles.createTitle}>Create a Challenge</Text>
+              <Text style={styles.createTitle}>Start a Challenge</Text>
               <Text style={styles.createSubtitle}>
                 Challenge a friend to today's quiz!
               </Text>
@@ -399,10 +392,10 @@ export default function ChallengeScreen() {
             <View style={[styles.joinCard, useDesktopGrid && styles.primaryCardDesktop]}>
             <View style={styles.joinHeader}>
               <Ionicons name="link-outline" size={24} color={theme.colors.primary} />
-              <Text style={styles.joinTitle}>Enter a Code</Text>
+              <Text style={styles.joinTitle}>Join a Challenge</Text>
             </View>
             <Text style={styles.joinSubtitle}>
-              Use a challenge code or friend invite code
+              Enter the six-character code a friend shared with you
             </Text>
             <View style={styles.joinInputRow}>
               <TextInput
@@ -411,7 +404,7 @@ export default function ChallengeScreen() {
                 placeholderTextColor={theme.colors.mediumGray}
                 value={joinCode}
                 onChangeText={(text) => setJoinCode(normalizeSharedCode(text))}
-                maxLength={8}
+                maxLength={6}
                 autoCapitalize="characters"
               />
               <TouchableOpacity

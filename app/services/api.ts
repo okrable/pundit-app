@@ -14,6 +14,7 @@ import {
   SyncIdentityResponse,
   CreateFriendLinkResponse,
   AcceptFriendLinkResponse,
+  FriendInvitePreviewResponse,
   GetFriendsResponse,
   RemoveFriendResponse,
   FriendsLeaderboardResponse,
@@ -475,6 +476,15 @@ export async function acceptFriendLink(
     method: 'POST',
     body: JSON.stringify({ code, userId }),
   });
+}
+
+export async function getFriendInvite(
+  code: string,
+  userId: string
+): Promise<FriendInvitePreviewResponse> {
+  return fetchApi<FriendInvitePreviewResponse>(
+    `/getFriendInvite?code=${encodeURIComponent(code)}&userId=${encodeURIComponent(userId)}`
+  );
 }
 
 export async function getFriends(userId: string): Promise<GetFriendsResponse> {
