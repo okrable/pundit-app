@@ -2,6 +2,13 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.6.0 - Refined quiz scoring and perfect-score celebration
+
+- Limited 100 points to the first countdown second, then added finer 10-point
+  scoring bands shared by daily quiz and challenge mode.
+- Kept post-zero answers available with a new 10-point minimum for correct answers.
+- Added a reduced-motion-aware fireworks celebration to immediate perfect daily results.
+
 ## v2.5.0 - Social invitations and challenge UX
 
 - Added review-and-accept journeys for friend and challenge links, including
@@ -17,7 +24,6 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 - Documented Universal Links as an App Store readiness goal; public invite
   links continue to use the web app until Apple signing and domain association
   are configured.
-
 ## v2.4.0 - Pundit avatar personalisation
 
 - Added a 58-avatar Pundit collection with football-symbol and letter choices.

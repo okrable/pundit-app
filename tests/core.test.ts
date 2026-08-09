@@ -102,11 +102,25 @@ test('chooses automatic avatars only from football symbols', () => {
 
 test('scores answers consistently across timer boundaries', () => {
   assert.equal(calculateQuizPoints(undefined), 60);
-  assert.equal(calculateQuizPoints(16_000), 100);
-  assert.equal(calculateQuizPoints(12_000), 80);
-  assert.equal(calculateQuizPoints(8_000), 60);
-  assert.equal(calculateQuizPoints(4_000), 40);
-  assert.equal(calculateQuizPoints(0), 20);
+
+  const expectedPointsBySecond = [
+    10, 10, 10, 10,
+    20, 20,
+    30, 30,
+    40, 40,
+    50, 50,
+    60, 60,
+    70, 70,
+    80, 80,
+    90, 90,
+    100,
+  ];
+
+  expectedPointsBySecond.forEach((expectedPoints, secondsRemaining) => {
+    assert.equal(calculateQuizPoints(secondsRemaining * 1000), expectedPoints);
+  });
+
+  assert.equal(calculateQuizPoints(-1_000), 10);
 });
 
 test('matches career answers with configured names and conservative spelling tolerance', () => {

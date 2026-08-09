@@ -130,7 +130,8 @@ Current behavior:
 - Prompt uses the intentional typewriter effect.
 - Answer options fade in one by one after typing completes.
 - Timer starts only once the prompt and options are visible.
-- Timer remains at zero and allows an answer; correct post-zero answers receive minimum score.
+- Timer remains at zero and allows an answer; correct post-zero answers receive 10 points.
+- The first countdown second awards 100 points, followed by two-second 10-point bands down to the minimum.
 - Answer tap locks options, shows a short suspense beat, then reveals correctness.
 - Locked/correct/incorrect message copy is selected as linked pairs by index.
 - Correct answer reveal uses repeated pulse; wrong answers do not shake.

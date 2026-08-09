@@ -8,7 +8,7 @@
 - Games hub with independent Daily Quiz and daily player-journey completion.
 - Daily career card with unlimited name guesses and separate guest/authenticated
   result persistence.
-- Speed-based scoring with post-zero minimum score for correct answers.
+- Speed-based 10-point scoring bands with a 10-point post-zero minimum for correct answers.
 - Daily summary immediately after play and completed state on return.
 - Guest play with local-only daily result storage.
 - Auth0 sign-in, blocking username onboarding, permanent canonical usernames,

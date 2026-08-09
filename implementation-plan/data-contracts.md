@@ -56,7 +56,8 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 
 - timer starts after the prompt/options finish revealing;
 - answers at zero are valid;
-- correct post-zero answers receive the minimum score;
+- correct answers score 100 while the countdown is 20, then drop in 10-point bands;
+- correct post-zero answers receive the 10-point minimum;
 - incorrect answers score zero.
 
 ## Result Persistence

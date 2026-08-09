@@ -19,6 +19,6 @@
 ## Current Caveats
 
 - Guest users do not receive long-term profile/social persistence before login.
-- Time-based scoring is active; product copy and analytics should treat zero-timer correct answers as minimum-score answers.
+- Time-based scoring is active; product copy and analytics should treat zero-timer correct answers as 10-point minimum-score answers.
 - Submit endpoints use database-backed fixed-window rate limits; alerting and
   anomaly reporting remain operational follow-up work.

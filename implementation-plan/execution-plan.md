@@ -17,7 +17,7 @@
 - [x] Typewriter prompt pacing and delayed answer-option reveal.
 - [x] Timer starts only after the prompt/options are visible.
 - [x] Smooth circular countdown with post-zero answer support.
-- [x] Speed-based scoring with minimum score for correct post-zero answers.
+- [x] Speed-based 10-point scoring bands with a 10-point post-zero minimum.
 - [x] Local-first result creation and immediate post-quiz summary.
 - [x] Cached completed state for already-played days.
 - [x] Native text sharing from the summary screen.

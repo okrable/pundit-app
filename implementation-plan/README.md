@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.4.0 Pundit avatar personalisation
+> Last updated: v2.6.0 refined scoring and perfect-score celebration
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -39,6 +39,10 @@ In plain English, this work delivered four connected changes:
    library during onboarding or from Me, and publishes that avatar through
    friends and global leaderboards.
 
+7. **v2.6.0 — refined scoring:** the first countdown second is worth 100
+   points, later correct answers step down in 10-point bands to a post-zero
+   minimum of 10, and an immediate perfect daily result receives fireworks.
+
 ## Product Status Snapshot
 
 ### Delivered
@@ -50,9 +54,9 @@ In plain English, this work delivered four connected changes:
   cards, score recap, and career result restoration.
 - Responsive Years/Team/Apps/Goals player journey with unlimited normalized
   name guesses and illustrated rules.
-- Smooth circular timer with numeric seconds, urgency styling, and post-zero minimum-score behavior.
+- Smooth circular timer with numeric seconds, 10-point score bands, and a 10-point post-zero minimum.
 - Suspense-based answer reveal with locked/correct/incorrect message pairs.
-- Immediate daily summary screen with final score, answer recap, and native text sharing.
+- Immediate daily summary screen with final score, answer recap, native text sharing, and perfect-score fireworks.
 - Cached completed screen for already-played daily state.
 - Guest mode with local-only daily results.
 - Auth0 accounts with blocking username onboarding, username-only Me profile, and settings.

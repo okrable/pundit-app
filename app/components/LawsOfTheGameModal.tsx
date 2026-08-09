@@ -39,7 +39,8 @@ export default function LawsOfTheGameModal({ visible, onClose }: LawsOfTheGameMo
             <View style={styles.rule}>
               <Text style={styles.ruleTitle}>Score Big</Text>
               <Text style={styles.ruleText}>
-                Points drop from 100 as the clock ticks.{"\n"}
+                Score 100 before the first tick, then points drop by 10.{"\n"}
+                Correct answers after zero still score 10.{"\n"}
                 Don't get caught in possession!
               </Text>
             </View>

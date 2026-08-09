@@ -12,6 +12,7 @@ import { Quiz, QuizResultImmediate } from '../types';
 import { theme } from '../theme/theme';
 import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
 import { formatStreakLabel } from '../../shared/streak';
+import PerfectScoreFireworks from './PerfectScoreFireworks';
 
 const logoImage = require('../../assets/logo/dark/pundit-black.png');
 const celebrationImage = require('../../assets/images/Asset 9.png');
@@ -75,6 +76,7 @@ export default function ResultsScreen({
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      {result.score === 500 ? <PerfectScoreFireworks /> : null}
       <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
         <View style={styles.topBar}>
           <Image source={logoImage} style={styles.logo} resizeMode="contain" />
