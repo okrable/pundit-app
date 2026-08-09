@@ -23,6 +23,7 @@ import type { AvatarId } from '../../shared/avatarCatalog';
 import { useAuthStore } from '../state/useAuthStore';
 import { logError, logInfo, logWarn } from './debugLog';
 import { getQuizDate } from '../utils/quizDate';
+import { buildDailyQuizPath } from '../../shared/dailyQuiz';
 
 function resolveApiBaseUrl(): string {
   if (
@@ -260,8 +261,7 @@ export async function fetchApi<T>(
 }
 
 export async function getDailyQuiz(date?: string): Promise<Quiz> {
-  const params = date ? `?date=${date}` : '';
-  return fetchApi<Quiz>(`/getDailyQuiz${params}`, undefined, {
+  return fetchApi<Quiz>(buildDailyQuizPath(date), undefined, {
     timeoutMs: QUIZ_TIMEOUT_MS,
   });
 }

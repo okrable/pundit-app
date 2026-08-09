@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme/theme';
 import { CachedQuizResult } from '../storage/quizStorage';
 import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
-import { formatStreakLabel } from '../../shared/streak';
+import { formatDailyQuizShare } from '../../shared/dailyQuiz';
 
 interface CompletedQuizScreenProps {
   result: CachedQuizResult;
@@ -26,11 +26,14 @@ export default function CompletedQuizScreen({
   const { width } = useWindowDimensions();
   // Convert boolean array directly to emojis
   const emojis = result.answers.map(isCorrect => isCorrect ? '⚽️' : '❌').join('');
-  const correctCount = result.answers.filter(isCorrect => isCorrect).length;
 
   const handleShare = async () => {
     try {
-      const shareText = `Pundit - ${result.date}\n${emojis}\n${result.score} points (${correctCount}/${result.totalQuestions} correct)\n🔥 ${formatStreakLabel(result.streak)}\n\nPlay at: [app link]`;
+      const shareText = formatDailyQuizShare({
+        date: result.date,
+        score: result.score,
+        answers: result.answers,
+      });
 
       await Share.share({
         message: shareText,

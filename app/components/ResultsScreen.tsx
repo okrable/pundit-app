@@ -11,8 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Quiz, QuizResultImmediate } from '../types';
 import { theme } from '../theme/theme';
 import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
-import { formatStreakLabel } from '../../shared/streak';
 import PerfectScoreFireworks from './PerfectScoreFireworks';
+import { formatDailyQuizShare } from '../../shared/dailyQuiz';
+import { PERFECT_DAILY_SCORE } from '../../shared/scoring';
 
 const logoImage = require('../../assets/logo/dark/pundit-black.png');
 const celebrationImage = require('../../assets/images/Asset 9.png');
@@ -50,8 +51,6 @@ export default function ResultsScreen({
     [quiz.questions, result.answers]
   );
 
-  const correctCount = summaryAnswers.filter(answer => answer.isCorrect).length;
-  const answerEmojiRow = summaryAnswers.map(answer => (answer.isCorrect ? '⚽️' : '❌')).join('');
   const syncMessage =
     result.syncState === 'pending'
       ? 'Stats syncing in the background.'
@@ -60,23 +59,18 @@ export default function ResultsScreen({
         : null;
 
   const handleShare = async () => {
-    const streakLine =
-      typeof result.streak === 'number' ? formatStreakLabel(result.streak) : '';
-    const shareText = [
-      `Pundit Daily Quiz - ${result.date}`,
-      `Final score: ${result.score}`,
-      `${correctCount}/${result.totalQuestions} correct ${answerEmojiRow}`,
-      streakLine,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const shareText = formatDailyQuizShare({
+      date: result.date,
+      score: result.score,
+      answers: summaryAnswers.map((answer) => answer.isCorrect),
+    });
 
     await Share.share({ message: shareText });
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      {result.score === 500 ? <PerfectScoreFireworks /> : null}
+      {result.score === PERFECT_DAILY_SCORE ? <PerfectScoreFireworks /> : null}
       <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
         <View style={styles.topBar}>
           <Image source={logoImage} style={styles.logo} resizeMode="contain" />

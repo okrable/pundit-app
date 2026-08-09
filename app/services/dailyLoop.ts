@@ -7,6 +7,8 @@ import { useChallengeStore } from '../state/useChallengeStore';
 import { useCareerGameStore } from '../state/useCareerGameStore';
 import { logError, logInfo, logWarn } from './debugLog';
 import { isIdentityActivationCurrent } from '../../shared/clientIdentityPolicy';
+import { getQuizDate } from '../utils/quizDate';
+import { getTodayQuizResult } from '../storage/quizStorage';
 
 const inflightPrefetches = new Map<string, Promise<void>>();
 const inflightAuthSyncs = new Map<string, Promise<void>>();
@@ -67,7 +69,9 @@ export async function prefetchDailyLoop(options?: string | PrefetchOptions): Pro
       : options ?? { mode: 'public-warm' as PrefetchMode };
   const mode = normalizedOptions.mode ?? 'public-warm';
   const effectiveUserId = normalizedOptions.userId ?? (await resolveEffectiveUserId());
-  const existingPrefetch = inflightPrefetches.get(`${effectiveUserId}:${mode}`);
+  const prefetchDate = getQuizDate();
+  const prefetchKey = `${effectiveUserId}:${mode}:${prefetchDate}`;
+  const existingPrefetch = inflightPrefetches.get(prefetchKey);
   if (existingPrefetch) {
     logWarn('dailyLoop.prefetch.skipped_inflight', { userId: effectiveUserId, mode });
     return existingPrefetch;
@@ -84,12 +88,24 @@ export async function prefetchDailyLoop(options?: string | PrefetchOptions): Pro
   logInfo('dailyLoop.prefetch.start', {
     userId: effectiveUserId,
     mode,
+    targetDate: prefetchDate,
     isAuthenticated,
     hasToken,
     shouldRunProtected,
   });
   const tasks: Promise<unknown>[] = [
-    useQuizStore.getState().fetchQuiz(),
+    useQuizStore.getState().fetchQuiz(prefetchDate),
+    getTodayQuizResult(effectiveUserId).then((cachedResult) => {
+      if (prefetchDate !== getQuizDate()) {
+        logWarn('dailyLoop.prefetch.result_discarded_stale', {
+          userId: effectiveUserId,
+          targetDate: prefetchDate,
+          currentDate: getQuizDate(),
+        });
+        return;
+      }
+      useQuizStore.getState().setCachedResult(cachedResult);
+    }),
     useLeaderboardStore.getState().prefetchDailyLoop(effectiveUserId, shouldRunProtected),
   ];
 
@@ -109,10 +125,10 @@ export async function prefetchDailyLoop(options?: string | PrefetchOptions): Pro
       throw error;
     })
     .finally(() => {
-      inflightPrefetches.delete(`${effectiveUserId}:${mode}`);
+      inflightPrefetches.delete(prefetchKey);
     });
 
-  inflightPrefetches.set(`${effectiveUserId}:${mode}`, prefetch);
+  inflightPrefetches.set(prefetchKey, prefetch);
   return prefetch;
 }
 

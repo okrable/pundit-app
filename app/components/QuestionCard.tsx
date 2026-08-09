@@ -63,7 +63,7 @@ interface QuestionCardProps {
   showResult?: boolean;
   correctOptionIndex?: number;
   isHolding?: boolean;
-  onTypingComplete?: () => void;
+  onOptionsReady?: () => void;
   questionNumber: number;
   totalQuestions: number;
   score: number;
@@ -199,7 +199,7 @@ export default function QuestionCard({
   showResult = false,
   correctOptionIndex,
   isHolding = false,
-  onTypingComplete,
+  onOptionsReady,
   questionNumber,
   totalQuestions,
   score,
@@ -216,7 +216,7 @@ export default function QuestionCard({
   const typingTimer = useRef<NodeJS.Timeout | null>(null);
   const optionReadyTimer = useRef<NodeJS.Timeout | null>(null);
   const isHoldingRef = useRef(false);
-  const onTypingCompleteRef = useRef(onTypingComplete);
+  const onOptionsReadyRef = useRef(onOptionsReady);
   const questionContentOpacity = useSharedValue(1);
   const questionContentScale = useSharedValue(1);
 
@@ -241,8 +241,8 @@ export default function QuestionCard({
   }, [isHolding]);
 
   useEffect(() => {
-    onTypingCompleteRef.current = onTypingComplete;
-  }, [onTypingComplete]);
+    onOptionsReadyRef.current = onOptionsReady;
+  }, [onOptionsReady]);
 
   useEffect(() => {
     setDisplayedText('');
@@ -272,7 +272,7 @@ export default function QuestionCard({
       const optionRevealMs =
         OPTION_STAGGER_DELAY * Math.max(question.options.length - 1, 0) + OPTION_FADE_DURATION;
       optionReadyTimer.current = setTimeout(() => {
-        onTypingCompleteRef.current?.();
+        onOptionsReadyRef.current?.();
       }, optionRevealMs);
     };
 

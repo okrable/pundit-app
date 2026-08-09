@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.6.1 identity-sync resilience and streak-state clarity
+> Last updated: v2.6.2 daily rollover, sharing, and answer safeguards
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -48,20 +48,27 @@ In plain English, this work delivered four connected changes:
    timing diagnostics. The streak flame is orange only after today's quiz has
    extended or confirmed the streak, and greyscale while today's play is pending.
 
+9. **v2.6.2 — daily quiz safeguards:** daily and challenge answer options stay
+   non-interactive until the full option reveal completes. Date-scoped requests,
+   validated caches, and stale-response guards prevent previous-day questions
+   after rollover, while daily results share a numbered public scorecard.
+
 ## Product Status Snapshot
 
 ### Delivered
 
 - Daily 5-question football quiz with local-first play and same-day replay prevention.
 - Refreshed shared gameplay UI for daily quiz and challenge mode.
-- Typewriter question pacing, delayed option reveal, timer start after full reveal, and content-only question transitions.
+- Typewriter question pacing, delayed option reveal, timer and answer activation
+  after full reveal, and content-only question transitions.
 - Games landing page with independent Daily Quiz and player-journey completion
   cards, score recap, and career result restoration.
 - Responsive Years/Team/Apps/Goals player journey with unlimited normalized
   name guesses and illustrated rules.
 - Smooth circular timer with numeric seconds, 10-point score bands, and a 10-point post-zero minimum.
 - Suspense-based answer reveal with locked/correct/incorrect message pairs.
-- Immediate daily summary screen with final score, answer recap, native text sharing, and perfect-score fireworks.
+- Immediate daily summary screen with final score, answer recap, numbered native
+  scorecard sharing, and perfect-score fireworks.
 - Cached completed screen for already-played daily state.
 - Guest mode with local-only daily results.
 - Auth0 accounts with blocking username onboarding, username-only Me profile, and settings.

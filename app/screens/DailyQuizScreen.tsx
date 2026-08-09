@@ -18,6 +18,8 @@ import { calculateQuizPoints } from '../../shared/scoring';
 import { trackAnalyticsEvent } from '../services/analytics';
 import type { GamesStackParamList } from '../navigation/GamesNavigator';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
+import { getQuizDate } from '../utils/quizDate';
+import { isQuizForDate } from '../../shared/dailyQuiz';
 
 const REVEAL_SUSPENSE_DELAY = 1000;
 const RESULT_HOLD_DELAY = 1650;
@@ -37,6 +39,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
   const [startRequested, setStartRequested] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
+  const [answeringEnabled, setAnsweringEnabled] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(TIMER_DURATION);
   const [answerTimings, setAnswerTimings] = useState<Record<string, number>>({});
   const [isQuestionExiting, setIsQuestionExiting] = useState(false);
@@ -83,6 +86,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     setShowingResult(false);
     setScore(0);
     setTimerActive(false);
+    setAnsweringEnabled(false);
     setTimeRemaining(TIMER_DURATION);
     setAnswerTimings({});
     setIsQuestionExiting(false);
@@ -99,7 +103,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
   }, [fetchQuiz, isAuthenticated, setUserId, user]);
 
   useEffect(() => {
-    if (startRequested && quiz) {
+    if (startRequested && isQuizForDate(quiz, getQuizDate())) {
       setQuizStarted(true);
       setStartRequested(false);
     }
@@ -111,7 +115,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     }
 
     resetPlayState();
-    if (quiz) {
+    if (isQuizForDate(quiz, getQuizDate())) {
       setQuizStarted(true);
     } else {
       setStartRequested(true);
@@ -130,6 +134,9 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (quiz) {
       resetPlayState();
+    } else {
+      resetPlayState();
+      setQuizStarted(false);
     }
   }, [quiz?.id]);
 
@@ -221,7 +228,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
   }, []);
 
   const handleSelectOption = (questionId: string, optionIndex: number) => {
-    if (showingResult || answers[questionId] !== undefined) return;
+    if (!answeringEnabled || showingResult || answers[questionId] !== undefined) return;
 
     const currentQuestion = quiz?.questions[currentQuestionIndex];
     if (!currentQuestion) return;
@@ -233,6 +240,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
       );
     }
 
+    setAnsweringEnabled(false);
     setTimerActive(false);
     const capturedTime = timeRemaining;
     const updatedAnswers = { ...answers, [questionId]: optionIndex };
@@ -281,8 +289,10 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
 
             void completeQuiz(formattedAnswers);
           } else {
-            setCurrentQuestionIndex((prev) => prev + 1);
+            setTimerActive(false);
+            setAnsweringEnabled(false);
             setTimeRemaining(TIMER_DURATION);
+            setCurrentQuestionIndex((prev) => prev + 1);
           }
         }, QUESTION_EXIT_DELAY);
       }, RESULT_HOLD_DELAY);
@@ -293,12 +303,15 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     setTimerActive(false);
   };
 
-  const handleTypingComplete = () => {
+  const handleOptionsReady = () => {
+    setAnsweringEnabled(true);
     setTimerActive(true);
   };
 
-  const totalQuestions = quiz?.questions.length ?? 0;
-  const currentQuestion = quiz?.questions[currentQuestionIndex];
+  const currentQuizDate = getQuizDate();
+  const quizIsCurrent = isQuizForDate(quiz, currentQuizDate);
+  const totalQuestions = quizIsCurrent ? quiz?.questions.length ?? 0 : 0;
+  const currentQuestion = quizIsCurrent ? quiz?.questions[currentQuestionIndex] : undefined;
   const currentAnswer =
     currentQuestion && answers[currentQuestion.id] !== undefined
       ? answers[currentQuestion.id]
@@ -313,7 +326,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
 
   const handleStartQuiz = () => {
     resetPlayState();
-    if (quiz) {
+    if (isQuizForDate(quiz, getQuizDate())) {
       setQuizStarted(true);
       return;
     }
@@ -326,7 +339,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     ? quizError
     : submitError
       ? submitError
-      : startRequested && !quiz
+      : startRequested && !quizIsCurrent
         ? 'Today’s questions are warming up.'
         : null;
 
@@ -343,7 +356,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     );
   }
 
-  if (result && quiz) {
+  if (result?.date === currentQuizDate && quizIsCurrent && quiz) {
     return (
       <ResultsScreen
         result={result}
@@ -353,7 +366,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     );
   }
 
-  if (cachedResult) {
+  if (cachedResult?.date === currentQuizDate) {
     return (
       <CompletedQuizScreen
         result={cachedResult}
@@ -366,13 +379,13 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     return (
       <WelcomeScreen
         onStartQuiz={handleStartQuiz}
-        isPreparing={startRequested && !quiz}
+        isPreparing={startRequested && !quizIsCurrent}
         helperText={helperText}
       />
     );
   }
 
-  if (!quiz) {
+  if (!quizIsCurrent) {
     return (
       <WelcomeScreen
         onStartQuiz={handleStartQuiz}
@@ -399,11 +412,12 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
               question={currentQuestion}
               selectedOption={currentAnswer}
               onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
+              disabled={!answeringEnabled}
               isExiting={isQuestionExiting}
               showResult={showingResult}
               correctOptionIndex={currentQuestion.correctOptionIndex}
               isHolding={isHolding}
-              onTypingComplete={handleTypingComplete}
+              onOptionsReady={handleOptionsReady}
               questionNumber={currentQuestionIndex + 1}
               totalQuestions={totalQuestions}
               score={score}

@@ -77,6 +77,13 @@ import {
   isAvatarId,
   resolvePersistedAvatarId,
 } from '../shared/avatarCatalog';
+import {
+  buildDailyQuizPath,
+  formatDailyQuizShare,
+  getDailyQuizCacheControl,
+  getDailyQuizNumber,
+  isQuizForDate,
+} from '../shared/dailyQuiz';
 
 test('validates the complete avatar catalogue', () => {
   assert.equal(AVATAR_DEFINITIONS.length, 58);
@@ -121,6 +128,100 @@ test('scores answers consistently across timer boundaries', () => {
   });
 
   assert.equal(calculateQuizPoints(-1_000), 10);
+});
+
+test('derives stable daily quiz numbers from the launch-date anchor', () => {
+  assert.equal(getDailyQuizNumber('2025-09-27'), null);
+  assert.equal(getDailyQuizNumber('2025-09-28'), 1);
+  assert.equal(getDailyQuizNumber('2026-08-06'), 313);
+  assert.equal(getDailyQuizNumber('2026-08-07'), 314);
+  assert.equal(getDailyQuizNumber('2026-08-08'), 315);
+
+  const leapDayNumber = getDailyQuizNumber('2028-02-29');
+  assert.equal(getDailyQuizNumber('2028-02-28'), (leapDayNumber ?? 0) - 1);
+  assert.equal(getDailyQuizNumber('2028-03-01'), (leapDayNumber ?? 0) + 1);
+  assert.equal(getDailyQuizNumber('2026-02-30'), null);
+  assert.equal(getDailyQuizNumber('not-a-date'), null);
+});
+
+test('formats standard and perfect daily quiz shares consistently', () => {
+  assert.equal(
+    formatDailyQuizShare({
+      date: '2026-08-07',
+      score: 380,
+      answers: [true, true, true, true, false],
+    }),
+    [
+      'Pundit Trivia #314',
+      '⚽️⚽️⚽️⚽️❌',
+      '',
+      '🏆 380/500',
+      '',
+      'Can you beat that?',
+      '👉 https://pundittrivia.com/',
+      '',
+      '#ThinkYouKnowFootball?',
+    ].join('\n')
+  );
+
+  assert.equal(
+    formatDailyQuizShare({
+      date: '2026-08-07',
+      score: 500,
+      answers: [true, true, true, true, true],
+    }),
+    [
+      'Pundit Trivia #314',
+      '⚽️⚽️⚽️⚽️⚽️',
+      '',
+      '🐐 500/500',
+      '',
+      'I know football. Do you?',
+      '👉 https://pundittrivia.com/',
+      '',
+      '#ThinkYouKnowFootball?',
+    ].join('\n')
+  );
+
+  assert.equal(
+    formatDailyQuizShare({
+      date: 'invalid',
+      score: 490,
+      answers: [true, false],
+    }).startsWith('Pundit Trivia\n⚽️❌'),
+    true
+  );
+});
+
+test('keeps daily quiz identity and CDN caching scoped to the requested date', () => {
+  assert.equal(
+    isQuizForDate(
+      { id: 'quiz-2026-08-07', date: '2026-08-07' },
+      '2026-08-07'
+    ),
+    true
+  );
+  assert.equal(
+    isQuizForDate(
+      { id: 'quiz-2026-08-06', date: '2026-08-06' },
+      '2026-08-07'
+    ),
+    false
+  );
+  assert.equal(
+    isQuizForDate(
+      { id: 'quiz-2026-08-06', date: '2026-08-07' },
+      '2026-08-07'
+    ),
+    false
+  );
+  assert.equal(
+    getDailyQuizCacheControl(true),
+    'public, max-age=300, stale-while-revalidate=21600'
+  );
+  assert.equal(getDailyQuizCacheControl(false), 'no-store');
+  assert.equal(buildDailyQuizPath('2026-08-07'), '/getDailyQuiz?date=2026-08-07');
+  assert.equal(buildDailyQuizPath(), '/getDailyQuiz');
 });
 
 test('matches career answers with configured names and conservative spelling tolerance', () => {

@@ -117,6 +117,10 @@ DailyQuizScreen
 
 The immediate summary is shown only after completing a daily quiz in the current session. Returning later uses the completed/cached state.
 
+Both result surfaces use the same daily share formatter. Quiz numbers are
+derived from the London quiz date with 28 September 2025 as number 1; standard
+scores use the trophy challenge copy and 500 uses the goat perfect-score copy.
+
 Challenge results use the same compact logo/card/action rhythm as the daily summary, adapted for waiting and head-to-head complete states.
 
 ## Shared Gameplay Surface
@@ -129,7 +133,7 @@ Current behavior:
 - Question content transitions independently so the top bar does not flicker.
 - Prompt uses the intentional typewriter effect.
 - Answer options fade in one by one after typing completes.
-- Timer starts only once the prompt and options are visible.
+- Timer and answer interaction start only once the prompt and all options are visible.
 - Timer remains at zero and allows an answer; correct post-zero answers receive 10 points.
 - The first countdown second awards 100 points, followed by two-second 10-point bands down to the minimum.
 - Answer tap locks options, shows a short suspense beat, then reveals correctness.
@@ -157,7 +161,9 @@ Login/logout orchestration lives in `app/services/authFlow.ts`:
 
 ### Quiz
 
-`useQuizStore` owns quiz cache, same-day result cache, immediate result, user identity, pending submission, and identity reconciliation.
+`useQuizStore` owns quiz cache, same-day result cache, immediate result, user identity, pending submission, and identity reconciliation. Daily quiz requests
+always include the London quiz date, and cache/network payloads must match that
+date and canonical quiz ID before they can replace active state.
 
 Important behaviors:
 
@@ -196,7 +202,8 @@ acceptances do not wait for cache expiry.
 
 Profile resources use cache schema 4 and leaderboard resources use social
 cache schema 3. Old payloads are removed lazily while quiz and result storage
-remains separate. The daily quiz payload uses cache schema 2 for `careerGame`.
+remains separate. The daily quiz payload uses cache schema 3 and rejects
+cross-date payloads before hydration.
 Username onboarding previews the server-assigned football
 avatar and opens the shared 58-avatar picker. The authenticated Me avatar opens
 the same picker and saves server-confirmed changes into profile and leaderboard

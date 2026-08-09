@@ -2,6 +2,17 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.6.2 - Daily quiz rollover and interaction safeguards
+
+- Prevented daily and challenge answers from being selected before every option
+  is visible and the countdown has started.
+- Reset answer readiness and timer state between questions so an early interaction
+  cannot activate the following question's countdown.
+- Date-scoped daily quiz requests and validated cache entries so a bookmarked or
+  suspended app cannot surface the previous day's questions after rollover.
+- Replaced daily result sharing with numbered Pundit Trivia scorecards, including
+  distinct standard and perfect-score copy with a public play link.
+
 ## v2.6.1 - Identity-sync resilience and streak-state clarity
 
 - Gave identity synchronization a dedicated 15-second timeout while preserving

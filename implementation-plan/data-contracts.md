@@ -54,7 +54,7 @@ Apps, and Goals are displayed; category and rank remain source metadata.
 
 Answer payloads can include timing metadata. The client clamps timer behavior so:
 
-- timer starts after the prompt/options finish revealing;
+- timer and answer interaction start after the prompt/options finish revealing;
 - answers at zero are valid;
 - correct answers score 100 while the countdown is 20, then drop in 10-point bands;
 - correct post-zero answers receive the 10-point minimum;
@@ -66,6 +66,9 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - Guest daily results are cached locally first and can be migrated after login.
 - Same-day cached results prevent replay and drive `CompletedQuizScreen`.
 - Immediate in-memory results drive the current-session daily summary.
+- Immediate and cached daily results share the same presentation-only quiz
+  number and scorecard formatter; the quiz number is not persisted or returned
+  by the API.
 - Authenticated completion stores a user/quiz-scoped pending submission before
   contacting the server. Its optimistic result is replaced by the authoritative
   response or retained for a later retry.

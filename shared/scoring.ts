@@ -1,3 +1,5 @@
+export const PERFECT_DAILY_SCORE = 500;
+
 export function calculateQuizPoints(timeRemainingMs: number | undefined): number {
   if (timeRemainingMs === undefined) return 60;
 

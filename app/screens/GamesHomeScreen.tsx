@@ -25,6 +25,8 @@ import CenteredWebContent, {
 import { theme } from '../theme/theme';
 import { getGamesHubCompletionState } from '../../shared/gamesHub';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
+import { getQuizDate } from '../utils/quizDate';
+import { isQuizForDate } from '../../shared/dailyQuiz';
 
 type Props = NativeStackScreenProps<GamesStackParamList, 'GamesHome'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -151,13 +153,17 @@ export default function GamesHomeScreen({ navigation }: Props) {
       ? screenPadding
       : Math.max(screenPadding, Math.round((appWidth - cardWidth) / 2));
 
-  const quizEmojis = cachedResult?.answers
+  const currentQuizDate = getQuizDate();
+  const currentCachedResult =
+    cachedResult?.date === currentQuizDate ? cachedResult : null;
+  const quizEmojis = currentCachedResult?.answers
     .map((isCorrect) => (isCorrect ? '⚽️' : '❌'))
     .join('');
-  const quizCorrect = cachedResult?.answers.filter(Boolean).length ?? 0;
-  const quizAvailable = Boolean(quiz?.questions.length);
+  const quizCorrect = currentCachedResult?.answers.filter(Boolean).length ?? 0;
+  const quizAvailable =
+    isQuizForDate(quiz, currentQuizDate) && Boolean(quiz?.questions.length);
   const isDailyPayloadLoading = isHubRefreshing || isQuizLoading;
-  const hubState = getGamesHubCompletionState(Boolean(cachedResult), false);
+  const hubState = getGamesHubCompletionState(Boolean(currentCachedResult), false);
 
   const quizActionLabel =
     hubState.quiz === 'completed'
@@ -211,15 +217,15 @@ export default function GamesHomeScreen({ navigation }: Props) {
               }
               actionLabel={quizActionLabel}
               actionTone={quizActionTone}
-              showActionArrow={quizAvailable && !cachedResult}
+              showActionArrow={quizAvailable && !currentCachedResult}
               actionSummary={
-                cachedResult ? (
+                currentCachedResult ? (
                   <View style={styles.quizSummary}>
                     <Text style={styles.quizScore}>
-                      {cachedResult.score} pts
+                      {currentCachedResult.score} pts
                     </Text>
                     <Text style={styles.quizRecap}>
-                      {quizEmojis} · {quizCorrect}/{cachedResult.totalQuestions}
+                      {quizEmojis} · {quizCorrect}/{currentCachedResult.totalQuestions}
                     </Text>
                   </View>
                 ) : quizError ? (

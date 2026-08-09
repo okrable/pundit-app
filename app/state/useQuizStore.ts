@@ -40,6 +40,7 @@ import {
   isQuizSubmissionCurrent,
   isTransientQuizSubmissionFailure,
 } from '../../shared/quizSync';
+import { isQuizForDate } from '../../shared/dailyQuiz';
 
 interface QuizState {
   quiz: Quiz | null;
@@ -85,6 +86,7 @@ function buildUserProfile(): UserProfile | undefined {
 
 let inflightIdentityReconciliation: Promise<void> | null = null;
 let lastIdentityReconciliationKey: string | null = null;
+let latestQuizFetchRequest = 0;
 const SUBMISSION_RETRY_DELAY_MS = 750;
 
 async function holdInterstitial(startedAt: number): Promise<void> {
@@ -129,6 +131,17 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       getTodayQuizResult(userId),
     ]);
 
+    const currentDate = getQuizDate();
+    if (targetDate !== currentDate) {
+      logWarn('quiz.cache.hydrate.discarded_stale', {
+        userId,
+        targetDate,
+        currentDate,
+        responseDate: quizCache?.data.date,
+      });
+      return get().hydrateFromCache(userId, currentDate);
+    }
+
     set({
       userId,
       quiz: quizCache?.data ?? null,
@@ -140,17 +153,90 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       userId,
       targetDate,
       hasQuiz: Boolean(quizCache?.data),
+      responseDate: quizCache?.data.date,
+      source: quizCache?.data ? 'local-cache' : 'none',
       hasCachedResult: Boolean(cachedResult),
     });
   },
 
   fetchQuiz: async (date?: string, options?: { force?: boolean }) => {
     const targetDate = date || getQuizDate();
-    logInfo('quiz.fetch.start', { targetDate, force: Boolean(options?.force) });
+    const requestId = ++latestQuizFetchRequest;
+    const isCurrentRequest = () =>
+      requestId === latestQuizFetchRequest && targetDate === getQuizDate();
+    const discardStaleRequest = (
+      source: 'local-cache' | 'network',
+      responseDate?: string
+    ) => {
+      const currentDate = getQuizDate();
+      logWarn('quiz.fetch.discarded_stale', {
+        targetDate,
+        responseDate,
+        currentDate,
+        requestId,
+        latestRequestId: latestQuizFetchRequest,
+        source,
+      });
+
+      if (requestId === latestQuizFetchRequest && targetDate !== currentDate) {
+        set({
+          quiz: null,
+          quizCache: null,
+          cachedResult: null,
+          result: null,
+          quizError: null,
+          isQuizLoading: true,
+        });
+        void get().fetchQuiz(currentDate);
+      }
+    };
+    const currentState = get();
+    const hasMismatchedQuiz = Boolean(
+      currentState.quiz && !isQuizForDate(currentState.quiz, targetDate)
+    );
+    const hasMismatchedCachedResult = Boolean(
+      currentState.cachedResult && currentState.cachedResult.date !== targetDate
+    );
+    const hasMismatchedResult = Boolean(
+      currentState.result && currentState.result.date !== targetDate
+    );
+
+    logInfo('quiz.fetch.start', {
+      targetDate,
+      force: Boolean(options?.force),
+      requestId,
+      heldQuizDate: currentState.quiz?.date,
+    });
+
+    if (hasMismatchedQuiz || hasMismatchedCachedResult || hasMismatchedResult) {
+      logWarn('quiz.fetch.date_rollover_clear', {
+        targetDate,
+        heldQuizDate: currentState.quiz?.date,
+        heldResultDate: currentState.cachedResult?.date ?? currentState.result?.date,
+      });
+      set({
+        ...(hasMismatchedQuiz ? { quiz: null, quizCache: null } : {}),
+        ...(hasMismatchedCachedResult ? { cachedResult: null } : {}),
+        ...(hasMismatchedResult ? { result: null } : {}),
+        quizError: null,
+        isQuizLoading: true,
+      });
+    }
+
     const cachedQuiz = await getCachedQuizEntry(targetDate);
 
+    if (!isCurrentRequest()) {
+      discardStaleRequest('local-cache', cachedQuiz?.data.date);
+      return null;
+    }
+
     if (cachedQuiz && !options?.force && !isQuizCacheStale(cachedQuiz)) {
-      logInfo('quiz.fetch.cache_hit', { targetDate });
+      logInfo('quiz.fetch.cache_hit', {
+        targetDate,
+        responseDate: cachedQuiz.data.date,
+        requestId,
+        source: 'local-cache',
+      });
       set({
         quiz: cachedQuiz.data,
         quizCache: cachedQuiz,
@@ -170,18 +256,46 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     set({ isQuizLoading: !cachedQuiz?.data, quizError: null });
 
     try {
-      const quiz = await getDailyQuiz(date);
+      const quiz = await getDailyQuiz(targetDate);
+      if (!isQuizForDate(quiz, targetDate)) {
+        logWarn('quiz.fetch.response_date_mismatch', {
+          targetDate,
+          responseDate: quiz.date,
+          responseQuizId: quiz.id,
+          requestId,
+          source: 'network',
+        });
+        throw new Error(`Received quiz ${quiz.id} for ${quiz.date}, expected ${targetDate}`);
+      }
+
       await setCachedQuiz(targetDate, quiz);
       const refreshedCache = await getCachedQuizEntry(targetDate);
+
+      if (!isCurrentRequest()) {
+        discardStaleRequest('network', quiz.date);
+        return null;
+      }
+
       set({
         quiz,
         quizCache: refreshedCache,
         isQuizLoading: false,
         quizError: null,
       });
-      logInfo('quiz.fetch.success', { targetDate, questionCount: quiz.questions.length });
+      logInfo('quiz.fetch.success', {
+        targetDate,
+        responseDate: quiz.date,
+        requestId,
+        source: 'network',
+        questionCount: quiz.questions.length,
+      });
       return quiz;
     } catch (error) {
+      if (!isCurrentRequest()) {
+        discardStaleRequest('network');
+        return null;
+      }
+
       if (error instanceof ApiError && error.statusCode === 404) {
         logWarn('quiz.fetch.missing', { targetDate, message: error.message });
         set({

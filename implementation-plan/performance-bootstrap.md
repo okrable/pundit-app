@@ -46,8 +46,10 @@ version so stale work cannot revive a logged-out or replaced session.
 ### Quiz
 
 - Keyed by quiz date.
-- Warm opens prefer cached quiz data first.
-- Stale data is revalidated in the background.
+- Warm opens prefer cached quiz data only when its date and canonical quiz ID
+  match the current London quiz date.
+- Network requests are explicitly date-scoped; stale cross-date responses are
+  discarded rather than displayed during background revalidation.
 
 ### Same-Day Result
 
@@ -60,8 +62,8 @@ version so stale work cannot revive a logged-out or replaced session.
 
 - Profile stats are cached per authenticated user.
 - Friends and global leaderboards are cached separately.
-- Profile and leaderboard envelopes require social schema version 2; quiz
-  envelopes remain on version 1.
+- Quiz envelopes use schema version 3; profile and leaderboard resources retain
+  their independently versioned schemas.
 - Me and League Tables render cached or placeholder content before background refresh.
 - Protected profile refreshes happen during authenticated session sync or
   explicit pull-to-refresh.

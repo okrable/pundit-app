@@ -36,6 +36,7 @@ export default function ChallengeQuizScreen() {
   const [score, setScore] = useState(0);
   const [isHolding, setIsHolding] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
+  const [answeringEnabled, setAnsweringEnabled] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(TIMER_DURATION);
   const [answerTimings, setAnswerTimings] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -75,6 +76,7 @@ export default function ChallengeQuizScreen() {
       setScore(0);
       setShowingResult(false);
       setTimerActive(false);
+      setAnsweringEnabled(false);
       setTimeRemaining(TIMER_DURATION);
       setAnswerTimings({});
       setIsQuestionExiting(false);
@@ -82,11 +84,18 @@ export default function ChallengeQuizScreen() {
   }, [currentChallenge?.challengeId]);
 
   const handleSelectOption = async (questionId: string, optionIndex: number) => {
-    if (showingResult || answers[questionId] !== undefined || !currentChallenge || !userId) return;
+    if (
+      !answeringEnabled ||
+      showingResult ||
+      answers[questionId] !== undefined ||
+      !currentChallenge ||
+      !userId
+    ) return;
 
     const currentQuestion = currentChallenge.questions[currentQuestionIndex];
     if (!currentQuestion) return;
 
+    setAnsweringEnabled(false);
     setTimerActive(false);
     const capturedTime = timeRemaining;
     const updatedAnswers = { ...answers, [questionId]: optionIndex };
@@ -148,8 +157,10 @@ export default function ChallengeQuizScreen() {
               setSubmitting(false);
             }
           } else {
-            setCurrentQuestionIndex((prev) => prev + 1);
+            setTimerActive(false);
+            setAnsweringEnabled(false);
             setTimeRemaining(TIMER_DURATION);
+            setCurrentQuestionIndex((prev) => prev + 1);
           }
         }, QUESTION_EXIT_DELAY);
       }, RESULT_HOLD_DELAY);
@@ -160,7 +171,8 @@ export default function ChallengeQuizScreen() {
     setTimerActive(false);
   };
 
-  const handleTypingComplete = () => {
+  const handleOptionsReady = () => {
+    setAnsweringEnabled(true);
     setTimerActive(true);
   };
 
@@ -228,11 +240,12 @@ export default function ChallengeQuizScreen() {
               question={currentQuestion}
               selectedOption={currentAnswer}
               onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
+              disabled={!answeringEnabled}
               isExiting={isQuestionExiting}
               showResult={showingResult}
               correctOptionIndex={currentQuestion.correctOptionIndex}
               isHolding={isHolding}
-              onTypingComplete={handleTypingComplete}
+              onOptionsReady={handleOptionsReady}
               questionNumber={currentQuestionIndex + 1}
               totalQuestions={totalQuestions}
               score={score}

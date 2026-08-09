@@ -7,6 +7,7 @@ import {
   buildDailyQuizResponse,
   DailyQuizQuestionRow,
 } from './lib/dailyQuizResponse';
+import { getDailyQuizCacheControl } from '../../shared/dailyQuiz';
 
 interface QuizQuestion extends DailyQuizQuestionRow {
   date: string | null;
@@ -76,7 +77,7 @@ export const handler: Handler = async (event) => {
       statusCode: 200,
       headers: {
         ...headers,
-        'Cache-Control': 'public, max-age=300, stale-while-revalidate=21600',
+        'Cache-Control': getDailyQuizCacheControl(Boolean(date)),
       },
       body: JSON.stringify(formattedQuiz),
     };
