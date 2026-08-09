@@ -2,6 +2,11 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.6.3 - Quiz-number reference date
+
+- Simplified daily share numbering to a single editable reference date and set
+  1 July 2026 as Pundit Trivia number 1.
+
 ## v2.6.2 - Daily quiz rollover and interaction safeguards
 
 - Prevented daily and challenge answers from being selected before every option

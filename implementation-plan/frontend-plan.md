@@ -118,7 +118,7 @@ DailyQuizScreen
 The immediate summary is shown only after completing a daily quiz in the current session. Returning later uses the completed/cached state.
 
 Both result surfaces use the same daily share formatter. Quiz numbers are
-derived from the London quiz date with 28 September 2025 as number 1; standard
+derived from the London quiz date with 1 July 2026 as number 1; standard
 scores use the trophy challenge copy and 500 uses the goat perfect-score copy.
 
 Challenge results use the same compact logo/card/action rhythm as the daily summary, adapted for waiting and head-to-head complete states.

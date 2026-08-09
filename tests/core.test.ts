@@ -131,11 +131,11 @@ test('scores answers consistently across timer boundaries', () => {
 });
 
 test('derives stable daily quiz numbers from the launch-date anchor', () => {
-  assert.equal(getDailyQuizNumber('2025-09-27'), null);
-  assert.equal(getDailyQuizNumber('2025-09-28'), 1);
-  assert.equal(getDailyQuizNumber('2026-08-06'), 313);
-  assert.equal(getDailyQuizNumber('2026-08-07'), 314);
-  assert.equal(getDailyQuizNumber('2026-08-08'), 315);
+  assert.equal(getDailyQuizNumber('2026-06-30'), null);
+  assert.equal(getDailyQuizNumber('2026-07-01'), 1);
+  assert.equal(getDailyQuizNumber('2026-08-06'), 37);
+  assert.equal(getDailyQuizNumber('2026-08-07'), 38);
+  assert.equal(getDailyQuizNumber('2026-08-08'), 39);
 
   const leapDayNumber = getDailyQuizNumber('2028-02-29');
   assert.equal(getDailyQuizNumber('2028-02-28'), (leapDayNumber ?? 0) - 1);
@@ -152,7 +152,7 @@ test('formats standard and perfect daily quiz shares consistently', () => {
       answers: [true, true, true, true, false],
     }),
     [
-      'Pundit Trivia #314',
+      'Pundit Trivia #38',
       '⚽️⚽️⚽️⚽️❌',
       '',
       '🏆 380/500',
@@ -171,7 +171,7 @@ test('formats standard and perfect daily quiz shares consistently', () => {
       answers: [true, true, true, true, true],
     }),
     [
-      'Pundit Trivia #314',
+      'Pundit Trivia #38',
       '⚽️⚽️⚽️⚽️⚽️',
       '',
       '🐐 500/500',

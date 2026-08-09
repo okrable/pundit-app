@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.6.2 daily rollover, sharing, and answer safeguards
+> Last updated: v2.6.3 quiz-number reference date
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -52,6 +52,9 @@ In plain English, this work delivered four connected changes:
    non-interactive until the full option reveal completes. Date-scoped requests,
    validated caches, and stale-response guards prevent previous-day questions
    after rollover, while daily results share a numbered public scorecard.
+
+10. **v2.6.3 — quiz-number reference:** daily share numbering now uses one
+    editable reference date, with 1 July 2026 defined as Pundit Trivia number 1.
 
 ## Product Status Snapshot
 

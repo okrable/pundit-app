@@ -1,7 +1,7 @@
 import { PERFECT_DAILY_SCORE } from './scoring';
 
-export const DAILY_QUIZ_NUMBER_ONE_DATE = '2025-09-28';
-const QUIZ_NUMBER_ONE_UTC = Date.UTC(2025, 8, 28);
+export const DAILY_QUIZ_NUMBER_ONE_DATE = '2026-07-01';
+const QUIZ_NUMBER_ONE_UTC = Date.parse(`${DAILY_QUIZ_NUMBER_ONE_DATE}T00:00:00.000Z`);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const DATED_DAILY_QUIZ_CACHE_CONTROL =
