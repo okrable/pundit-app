@@ -147,11 +147,13 @@ export default function MeScreen() {
           },
           currentQuizDate
         );
-  const hasActiveStreak =
-    streakStatus.state === 'active_today' || streakStatus.state === 'at_risk';
-  const streakAccessibilityLabel = hasActiveStreak
-    ? `${streakStatus.current} ${streakStatus.current === 1 ? 'day' : 'days'} streak, active`
-    : 'No active streak';
+  const streakHighlighted = streakStatus.state === 'active_today';
+  const streakAccessibilityLabel =
+    streakStatus.state === 'active_today'
+      ? `${streakStatus.current} ${streakStatus.current === 1 ? 'day' : 'days'} streak, extended today.`
+      : streakStatus.state === 'at_risk'
+        ? `${streakStatus.current} ${streakStatus.current === 1 ? 'day' : 'days'} streak, play today to continue.`
+        : 'No active streak.';
 
   if (authLoadingIntent !== null) {
     return <AuthSyncScreen />;
@@ -275,7 +277,7 @@ export default function MeScreen() {
             accessibilityLabel={streakAccessibilityLabel}
           >
             <StreakIcon
-              active={hasActiveStreak}
+              highlighted={streakHighlighted}
               size={isCompactWidth ? 26 : 32}
             />
             <Text

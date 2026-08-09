@@ -39,6 +39,7 @@ function resolveApiBaseUrl(): string {
 const API_BASE_URL = resolveApiBaseUrl();
 const inflightRequests = new Map<string, Promise<unknown>>();
 const API_TIMEOUT_MS = 8000;
+const IDENTITY_SYNC_TIMEOUT_MS = 15000;
 const QUIZ_TIMEOUT_MS = 15000;
 const SUBMIT_QUIZ_TIMEOUT_MS = 20000;
 const LEADERBOARD_TIMEOUT_MS = 15000;
@@ -121,12 +122,14 @@ async function executeFetch<T>(
 
   clearTimeout(timeout);
   const serverTiming = response.headers.get('server-timing') || undefined;
+  const requestId = response.headers.get('x-request-id') || undefined;
   logInfo('api.request.response', {
     endpoint,
     method,
     status: response.status,
     durationMs: Date.now() - startedAt,
     attempt,
+    requestId,
     serverTiming,
   });
 
@@ -453,10 +456,16 @@ export async function syncIdentity(
   userId: string,
   intent: 'signup' | 'login' | 'restore'
 ): Promise<SyncIdentityResponse> {
-  return fetchApi<SyncIdentityResponse>('/syncIdentity', {
-    method: 'POST',
-    body: JSON.stringify({ userId, intent }),
-  });
+  return fetchApi<SyncIdentityResponse>(
+    '/syncIdentity',
+    {
+      method: 'POST',
+      body: JSON.stringify({ userId, intent }),
+    },
+    {
+      timeoutMs: IDENTITY_SYNC_TIMEOUT_MS,
+    }
+  );
 }
 
 // Friends API functions

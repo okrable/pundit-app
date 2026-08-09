@@ -2,7 +2,7 @@ import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 
 interface StreakIconProps {
-  active: boolean;
+  highlighted: boolean;
   size?: number;
 }
 
@@ -22,10 +22,10 @@ const INACTIVE_COLORS = {
 } as const;
 
 export default function StreakIcon({
-  active,
+  highlighted,
   size = 32,
 }: StreakIconProps) {
-  const colors = active ? ACTIVE_COLORS : INACTIVE_COLORS;
+  const colors = highlighted ? ACTIVE_COLORS : INACTIVE_COLORS;
 
   return (
     <Svg width={size} height={size} viewBox="0 0 32 32">

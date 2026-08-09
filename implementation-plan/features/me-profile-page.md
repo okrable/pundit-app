@@ -1,7 +1,7 @@
 # Feature: Me Profile Page
 
 > Status: Implemented
-> Last updated: v2.4.0 avatar personalisation
+> Last updated: v2.6.1 streak-state clarity
 
 ## Delivered
 
@@ -16,8 +16,9 @@
   the 58-avatar symbol-and-letter picker; Save remains disabled until the
   selection differs and applies only after server confirmation.
 - The inline streak indicator uses the two-tone Microsoft Fluent Emoji flame:
-  its original orange colours for active and at-risk streaks, and the identical
-  silhouette in greys when no streak is active.
+  its original orange colours only when today's quiz has extended or confirmed
+  the streak. An intact streak awaiting today's play keeps its count but uses
+  the identical greyscale silhouette, as do inactive and not-started states.
 - Required username selection is an app-level gate before the Me screen or
   other authenticated navigation can render.
 - Username onboarding previews the server-assigned random football symbol and

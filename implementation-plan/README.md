@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.6.0 refined scoring and perfect-score celebration
+> Last updated: v2.6.1 identity-sync resilience and streak-state clarity
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -42,6 +42,11 @@ In plain English, this work delivered four connected changes:
 7. **v2.6.0 — refined scoring:** the first countdown second is worth 100
    points, later correct answers step down in 10-point bands to a post-zero
    minimum of 10, and an immediate perfect daily result receives fireworks.
+
+8. **v2.6.1 — identity and streak clarity:** identity synchronization has a
+   dedicated 15-second client timeout plus server-side auth, database, and total
+   timing diagnostics. The streak flame is orange only after today's quiz has
+   extended or confirmed the streak, and greyscale while today's play is pending.
 
 ## Product Status Snapshot
 

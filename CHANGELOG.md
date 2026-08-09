@@ -2,6 +2,15 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.6.1 - Identity-sync resilience and streak-state clarity
+
+- Gave identity synchronization a dedicated 15-second timeout while preserving
+  manual retry and the existing timeout for ordinary API calls.
+- Added request IDs plus Auth0, database, and total timing diagnostics to
+  identity-sync response headers and server logs.
+- Reserved the orange streak flame for streaks extended today, with intact
+  streaks awaiting today's quiz shown in greyscale with state-aware accessibility copy.
+
 ## v2.6.0 - Refined quiz scoring and perfect-score celebration
 
 - Limited 100 points to the first countdown second, then added finer 10-point
