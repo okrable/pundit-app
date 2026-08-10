@@ -1,4 +1,8 @@
 import type { CareerGame } from '../../../app/types';
+import {
+  getCareerSourceRows,
+  getQuestionSource,
+} from './questionSource';
 
 const CAREER_GAME_ID_PATTERN = /^career-(\d{4}-\d{2}-\d{2})$/;
 
@@ -12,8 +16,34 @@ export function getCurrentCareerGameDate(
 
 export async function getCareerGameForDate(
   date: string,
-  _language = 'uk'
-): Promise<CareerGame> {
+  language = 'uk'
+): Promise<CareerGame | undefined> {
+  if (getQuestionSource(date, language) === 'bigquery') {
+    const source = await getCareerSourceRows(date, language);
+    if (!source) {
+      return undefined;
+    }
+
+    const canonicalName = source.question.player_name!.trim();
+    const surname = canonicalName.split(/\s+/).at(-1);
+    return {
+      id: `career-${date}`,
+      date,
+      prompt: source.question.question!.trim(),
+      canonicalName,
+      acceptedAliases: [],
+      acceptedSurnames: surname ? [surname] : [],
+      career: source.career.map((row) => ({
+        years: row.years!.trim(),
+        team: row.team!.trim(),
+        appearances: Number(row.appearances),
+        goals: Number(row.goals),
+        category: row.category!.trim(),
+        rank: Number(row.rank),
+      })),
+    };
+  }
+
   return {
     id: `career-${date}`,
     date,

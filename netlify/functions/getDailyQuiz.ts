@@ -1,5 +1,4 @@
 import { Handler } from '@netlify/functions';
-import { query } from './lib/db';
 import { getQuizDate } from './lib/quizDate';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 import { getCareerGameForDate } from './lib/careerGame';
@@ -8,13 +7,10 @@ import {
   DailyQuizQuestionRow,
 } from './lib/dailyQuizResponse';
 import { getDailyQuizCacheControl } from '../../shared/dailyQuiz';
-
-interface QuizQuestion extends DailyQuizQuestionRow {
-  date: string | null;
-  language: string | null;
-  rank: number | null;
-  player_id: string | null;
-}
+import {
+  getDailyQuestionRows,
+  QuestionSourceError,
+} from './lib/questionSource';
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -45,12 +41,9 @@ export const handler: Handler = async (event) => {
     const targetDate = date || getQuizDate();
     console.log('Quiz query params', { targetDate, language });
 
-    const questions = await query<QuizQuestion>(
-      `SELECT * FROM pu_player_ques
-       WHERE date = $1 AND language = $2
-       ORDER BY rank ASC
-       LIMIT 5`,
-      [targetDate, language]
+    const questions: DailyQuizQuestionRow[] = await getDailyQuestionRows(
+      targetDate,
+      language
     );
     console.log('Quiz rows', questions.length);
 
@@ -65,7 +58,16 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const careerGame = await getCareerGameForDate(targetDate, language);
+    let careerGame;
+    try {
+      careerGame = await getCareerGameForDate(targetDate, language);
+    } catch (error) {
+      console.warn('Career game source unavailable', {
+        targetDate,
+        language,
+        errorCode: error instanceof QuestionSourceError ? error.code : 'READ_FAILED',
+      });
+    }
     const formattedQuiz = buildDailyQuizResponse(
       targetDate,
       questions,
@@ -85,7 +87,7 @@ export const handler: Handler = async (event) => {
     logRequestError({ endpoint: 'getDailyQuiz', requestId }, Date.now() - requestStartedAt, error);
     console.error('Error fetching quiz:', error);
     return {
-      statusCode: 500,
+      statusCode: error instanceof QuestionSourceError ? 503 : 500,
       headers,
       body: JSON.stringify({
         error: 'Internal server error',

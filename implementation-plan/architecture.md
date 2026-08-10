@@ -4,7 +4,9 @@
 
 - Client: Expo SDK 55 / React Native 0.83 app with TypeScript.
 - API: Netlify Functions under `netlify/functions/*`.
-- Data: CockroachDB/PostgreSQL via `pg`.
+- Content data: BigQuery for UK questions/careers from the configured cutover
+  date; CockroachDB `pu_player_ques` before cutover and for other languages.
+- Transactional data: CockroachDB/PostgreSQL via `pg`.
 - Auth: Auth0 through Expo AuthSession.
 - State: Zustand stores backed by AsyncStorage/SecureStore caches.
 
@@ -13,6 +15,8 @@
 ### Daily Quiz
 
 - Fetches the current 5-question quiz by timezone-aware quiz date.
+- Resolves every delivery and answer-key read through one deterministic
+  date/language source adapter so daily and challenge play cannot mix sources.
 - Plays locally with typewriter prompt pacing, delayed option reveal, timer-after-reveal behavior, and immediate answer reveal.
 - Creates an immediate local summary after the fifth answer.
 - Authenticated results submit to the server; guest results stay local until login migration/adoption.
@@ -26,8 +30,8 @@
   client/server normalization.
 - Persists completion through separate local keys and `career_game_results`;
   it never changes quiz or profile aggregates.
-- Uses a date-scoped Anthony Gordon fixture until the upstream datasource is
-  available.
+- Uses the BigQuery rank-6 question and `player_stats` career after cutover,
+  while the date-scoped Anthony Gordon fixture remains only for legacy dates.
 
 ### Challenge Mode
 
@@ -78,6 +82,9 @@
 - Quiz completion ordering: local result, pending submission, and optimistic
   streak are published and persisted before the protected submission starts;
   authoritative success reconciles them before leaderboard refresh.
+- BigQuery cutover is server-only and deterministic. Once a UK quiz date is on
+  BigQuery, source errors use existing caches or return a temporary error; they
+  never silently fall back to a different Cockroach question set.
 
 ## Known Architectural Gaps
 

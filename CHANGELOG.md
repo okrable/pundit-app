@@ -2,6 +2,16 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.7.0 - BigQuery daily content source
+
+- Added a server-only, date-gated BigQuery source for UK daily questions,
+  challenge answer keys, and rank-6 player-journey career data while keeping
+  CockroachDB authoritative for users, results, challenges, and social state.
+- Kept pre-cutover and non-UK quizzes on the existing Cockroach source, with no
+  automatic same-day fallback after BigQuery cutover.
+- Added strict six-rank content validation, structured source diagnostics, and
+  a read-only date-range audit command for release checks.
+
 ## v2.6.3 - Quiz-number reference date
 
 - Simplified daily share numbering to a single editable reference date and set

@@ -9,6 +9,7 @@ import {
   getCompatibilityPlayerName,
   resolveChallengeIdentity,
 } from './lib/challengeIdentity';
+import { getAnswerKeyRows, QuestionSourceError } from './lib/questionSource';
 
 interface SubmitChallengeRequest {
   challengeId: string;
@@ -38,15 +39,6 @@ interface DbChallenge {
   status: string;
   expires_at: string;
   winner_id: string | null;
-}
-
-interface CorrectAnswerRow {
-  question_id: string;
-  player_name: string;
-  player_0: string;
-  player_1: string;
-  player_2: string;
-  player_3: string;
 }
 
 type ChallengeResult = 'win' | 'loss' | 'draw';
@@ -143,13 +135,52 @@ export const handler: Handler = async (event) => {
       return rateLimitError;
     }
 
-    // Fetch correct answers from database
+    const sourceChallenges = await query<DbChallenge>(
+      `SELECT * FROM challenges WHERE id = $1`,
+      [challengeId]
+    );
+    if (sourceChallenges.length === 0) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Challenge not found' }),
+      };
+    }
+    const sourceChallenge = sourceChallenges[0];
+    if (
+      sourceChallenge.creator_id !== userId &&
+      sourceChallenge.opponent_id !== userId
+    ) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'You are not part of this challenge' }),
+      };
+    }
+    if (
+      sourceChallenge.status === 'revoked' ||
+      sourceChallenge.status === 'expired' ||
+      (new Date(sourceChallenge.expires_at) < new Date() &&
+        sourceChallenge.status !== 'completed')
+    ) {
+      const unavailableStatus =
+        new Date(sourceChallenge.expires_at) < new Date() &&
+        sourceChallenge.status !== 'completed'
+          ? 'expired'
+          : sourceChallenge.status;
+      return {
+        statusCode: 410,
+        headers,
+        body: JSON.stringify({ error: `Challenge is ${unavailableStatus}` }),
+      };
+    }
+
+    // Resolve answer keys from the same date-based source that served the challenge.
     const questionIds = answers.map((a) => a.questionId);
-    const correctAnswers = await query<CorrectAnswerRow>(
-      `SELECT question_id, player_name, player_0, player_1, player_2, player_3
-       FROM public.pu_player_ques
-       WHERE question_id = ANY($1)`,
-      [questionIds]
+    const correctAnswers = await getAnswerKeyRows(
+      sourceChallenge.quiz_date,
+      'uk',
+      questionIds
     );
     const correctAnswersById = new Map(correctAnswers.map((row) => [row.question_id, row]));
 
@@ -446,7 +477,7 @@ export const handler: Handler = async (event) => {
     logRequestError({ endpoint: 'submitChallengeAnswers', requestId }, Date.now() - requestStartedAt, error);
     console.error('Error submitting challenge answers:', error);
     return {
-      statusCode: 500,
+      statusCode: error instanceof QuestionSourceError ? 503 : 500,
       headers,
       body: JSON.stringify({
         error: 'Internal server error',

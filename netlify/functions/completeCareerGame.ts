@@ -8,6 +8,7 @@ import {
 } from './lib/careerGame';
 import { getQuizDate } from './lib/quizDate';
 import { matchesCareerAnswer } from '../../shared/careerAnswer';
+import { QuestionSourceError } from './lib/questionSource';
 
 interface CompleteCareerGameRequest {
   userId: string;
@@ -73,7 +74,7 @@ export const handler: Handler = async (event) => {
     }
 
     const game = await getCareerGameForDate(gameDate);
-    if (game.id !== gameId || !matchesCareerAnswer(submittedAnswer, game)) {
+    if (!game || game.id !== gameId || !matchesCareerAnswer(submittedAnswer, game)) {
       return {
         statusCode: 422,
         headers,
@@ -111,7 +112,7 @@ export const handler: Handler = async (event) => {
   } catch (error) {
     console.error('Error completing career game:', error);
     return {
-      statusCode: 500,
+      statusCode: error instanceof QuestionSourceError ? 503 : 500,
       headers,
       body: JSON.stringify({
         error: 'Internal server error',

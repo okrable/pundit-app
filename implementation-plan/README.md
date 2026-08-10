@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.6.3 quiz-number reference date
+> Last updated: v2.7.0 BigQuery daily content source
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -55,6 +55,10 @@ In plain English, this work delivered four connected changes:
 
 10. **v2.6.3 — quiz-number reference:** daily share numbering now uses one
     editable reference date, with 1 July 2026 defined as Pundit Trivia number 1.
+
+11. **v2.7.0 — BigQuery content source:** one server adapter now selects UK
+    BigQuery questions/careers from a fixed cutover date while CockroachDB
+    continues to own transactional gameplay and all legacy question dates.
 
 ## Product Status Snapshot
 

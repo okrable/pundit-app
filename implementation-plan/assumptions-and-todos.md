@@ -2,7 +2,9 @@
 
 ## Confirmed Assumptions
 
-- Daily quiz data is sourced from CockroachDB table `pu_player_ques`.
+- UK daily quiz and career data is sourced from BigQuery from the configured
+  cutover date; legacy and non-UK quiz data remains in `pu_player_ques`.
+- Approved BigQuery rows are immutable once their quiz date is live.
 - Quiz-day logic must stay aligned between backend `QUIZ_TIMEZONE` and frontend `EXPO_PUBLIC_QUIZ_TIMEZONE`.
 - Protected endpoints require Auth0 bearer-token ownership checks.
 - Guest play remains supported, but guest daily results are local-only until login migration/adoption.

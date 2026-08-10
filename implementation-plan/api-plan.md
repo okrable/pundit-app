@@ -21,6 +21,9 @@ All APIs are Netlify Functions under `/.netlify/functions/`.
 ## Daily Quiz APIs
 
 - `GET /getDailyQuiz` returns the daily quiz payload by date/language.
+- UK dates at or after `BIGQUERY_CUTOVER_DATE` read ranks 1–5 and optional
+  rank-6 career content from BigQuery; earlier/non-UK dates read CockroachDB.
+- Daily/challenge submissions resolve answer keys through the same source rule.
 - `GET /getTodayResult` checks whether an authenticated user has a persisted same-day result.
 - `POST /submitQuiz` accepts authenticated quiz answers and timing metadata.
 - `POST /migrateGuestResult` adopts a local guest result for an authenticated user when allowed.

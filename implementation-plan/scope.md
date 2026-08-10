@@ -26,7 +26,8 @@
 
 ## Current Constraints
 
-- Daily quiz source is `pu_player_ques`.
+- UK daily content uses BigQuery from the configured cutover date; earlier and
+  non-UK content uses CockroachDB `pu_player_ques`.
 - Database access is server-only through Netlify Functions.
 - Guest users do not get full profile/social persistence until login.
 - One active created challenge per user at a time.

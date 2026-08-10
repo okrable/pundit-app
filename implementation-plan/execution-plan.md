@@ -13,6 +13,9 @@
 - [x] Games hub with independent Daily Quiz and player-journey results.
 - [x] Temporary date-scoped Anthony Gordon career fixture behind a replaceable
   daily source adapter.
+- [x] Date-gated BigQuery UK questions, challenge answer keys, and rank-6
+  player-career content behind the shared server source adapter.
+- [x] Read-only BigQuery date-range audit for release validation.
 - [x] One-question-at-a-time gameplay.
 - [x] Typewriter prompt pacing and delayed answer-option reveal.
 - [x] Timer starts only after the prompt/options are visible.

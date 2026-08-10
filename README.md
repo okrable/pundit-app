@@ -1,10 +1,13 @@
-# Pundit Trivia v2.6.3
+# Pundit Trivia v2.7.0
 
-Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScript, Netlify Functions, and CockroachDB.
+Pundit Trivia is a daily football quiz app built with Expo React Native,
+TypeScript, Netlify Functions, BigQuery, and CockroachDB.
 
 ## Current Product
 
 - Daily 5-question football quiz with typewriter prompt pacing.
+- Date-gated UK question and player-career content from BigQuery, with
+  CockroachDB retained for pre-cutover questions and transactional app state.
 - Shared refreshed gameplay UI for daily quiz and challenge mode.
 - Reanimated question transitions, option reveal, circular timer, and answer reveal states.
 - Swipeable Games gallery with the playable Daily Quiz and provisional
@@ -40,7 +43,7 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 
 ## Versioning
 
-- Current app/docs version: `2.6.3`.
+- Current app/docs version: `2.7.0`.
 - `package.json`, `package-lock.json`, `app.json`, `app/constants/version.ts`,
   and native iOS/Android marketing versions must stay aligned.
 - Settings displays the app version from `APP_VERSION`.
@@ -56,6 +59,7 @@ Pundit Trivia is a daily football quiz app built with Expo React Native, TypeScr
 - Expo AuthSession with Auth0
 - React Native Reanimated
 - Netlify Functions
+- Google BigQuery via the server-only Node client
 - CockroachDB/PostgreSQL via `pg`
 
 ## Getting Started
@@ -89,6 +93,18 @@ Important variables:
 - `EXPO_PUBLIC_API_BASE_URL`
 - `QUIZ_TIMEZONE`
 - `EXPO_PUBLIC_QUIZ_TIMEZONE`
+- `BIGQUERY_PROJECT_ID`
+- `BIGQUERY_DATASET`
+- `BIGQUERY_LOCATION` when the dataset is not in the default location
+- `BIGQUERY_CUTOVER_DATE` (unset keeps Cockroach question reads enabled)
+- `BIGQUERY_SERVICE_ACCOUNT_JSON` in deployed Functions, or
+  `GOOGLE_APPLICATION_CREDENTIALS` for local development
+
+Audit an approved BigQuery range without changing either database:
+
+```bash
+npm run audit:bigquery-questions -- --from YYYY-MM-DD --to YYYY-MM-DD
+```
 
 ## Development
 

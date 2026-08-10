@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { Query } from '@google-cloud/bigquery';
 import { calculateQuizPoints } from '../shared/scoring';
 import { validateSubmittedAnswers } from '../shared/submissionValidation';
 import { chooseReconciliationSource } from '../shared/reconciliation';
@@ -61,6 +62,17 @@ import {
   getCurrentCareerGameDate,
 } from '../netlify/functions/lib/careerGame';
 import { buildDailyQuizResponse } from '../netlify/functions/lib/dailyQuizResponse';
+import {
+  getAnswerKeyRows,
+  getCareerSourceRows,
+  getDailyQuestionRows,
+  getQuestionSource,
+  QuestionSourceClients,
+  QuestionSourceError,
+  SourceQuestionRow,
+  validateCareerRows,
+  validateQuestionRows,
+} from '../netlify/functions/lib/questionSource';
 import {
   authorizeUser,
   classifyAuth0VerificationFailure,
@@ -243,6 +255,7 @@ test('matches career answers with configured names and conservative spelling tol
 
 test('returns the temporary Anthony Gordon career fixture in display order', async () => {
   const game = await getCareerGameForDate('2026-07-27', 'uk');
+  assert.ok(game);
 
   assert.equal(game.id, 'career-2026-07-27');
   assert.equal(game.date, '2026-07-27');
@@ -294,6 +307,7 @@ test('accepts career completion only for the current daily game', () => {
 
 test('adds the career game without changing daily quiz root fields', async () => {
   const careerGame = await getCareerGameForDate('2026-07-27', 'uk');
+  assert.ok(careerGame);
   const response = buildDailyQuizResponse(
     '2026-07-27',
     [
@@ -326,6 +340,223 @@ test('adds the career game without changing daily quiz root fields', async () =>
     },
   ]);
   assert.equal(response.careerGame, careerGame);
+});
+
+test('selects BigQuery only for UK dates at or after cutover', () => {
+  assert.equal(getQuestionSource('2026-08-09', 'uk', '2026-08-10'), 'cockroach');
+  assert.equal(getQuestionSource('2026-08-10', 'uk', '2026-08-10'), 'bigquery');
+  assert.equal(getQuestionSource('2026-08-11', 'UK', '2026-08-10'), 'bigquery');
+  assert.equal(getQuestionSource('2026-08-11', 'dn', '2026-08-10'), 'cockroach');
+  assert.equal(getQuestionSource('2026-08-11', 'uk', ''), 'cockroach');
+  assert.throws(
+    () => getQuestionSource('2026-08-11', 'uk', '10-08-2026'),
+    (error: unknown) =>
+      error instanceof QuestionSourceError &&
+      error.code === 'INVALID_CUTOVER_DATE'
+  );
+});
+
+function buildSourceQuestion(rank: number): SourceQuestionRow {
+  return {
+    question_id: `question-${rank}`,
+    question: `Question ${rank}`,
+    player_id: `player-${rank}`,
+    player_name: `Correct ${rank}`,
+    player_0: `Wrong A ${rank}`,
+    player_1: `Correct ${rank}`,
+    player_2: `Wrong B ${rank}`,
+    player_3: `Wrong C ${rank}`,
+    rank,
+    correct_answer_position: 1,
+  };
+}
+
+test('validates complete ordered BigQuery question bundles', () => {
+  const rows = [5, 2, 1, 4, 3].map(buildSourceQuestion);
+  const validated = validateQuestionRows(
+    rows,
+    [1, 2, 3, 4, 5],
+    'bigquery',
+    true
+  );
+  assert.deepEqual(validated.map((row) => row.rank), [1, 2, 3, 4, 5]);
+
+  assert.throws(
+    () => validateQuestionRows(rows.slice(0, 4), [1, 2, 3, 4, 5], 'bigquery', true),
+    (error: unknown) =>
+      error instanceof QuestionSourceError &&
+      error.code === 'INCOMPLETE_QUESTION_SET'
+  );
+
+  const mismatched = { ...buildSourceQuestion(1), correct_answer_position: 0 };
+  assert.throws(
+    () => validateQuestionRows([mismatched], [1], 'bigquery', true),
+    (error: unknown) =>
+      error instanceof QuestionSourceError &&
+      error.code === 'CORRECT_POSITION_MISMATCH'
+  );
+});
+
+test('reads and maps BigQuery bundles with a mocked server client', async () => {
+  const originalCutover = process.env.BIGQUERY_CUTOVER_DATE;
+  process.env.BIGQUERY_CUTOVER_DATE = '2026-08-10';
+  const bundle = [6, 2, 1, 5, 3, 4].map(buildSourceQuestion);
+  const careerRows = [
+    {
+      years: '2020–2022',
+      team: 'Club',
+      appearances: 10,
+      goals: 2,
+      category: 'Domestic',
+      rank: 1,
+    },
+    {
+      years: '2022–',
+      team: 'Country',
+      appearances: 5,
+      goals: 1,
+      category: 'International',
+      rank: 1,
+    },
+  ];
+  const queries: string[] = [];
+  const clients: QuestionSourceClients = {
+    async bigQuery<T>(options: Query) {
+      const sql = String(options.query);
+      queries.push(sql);
+      if (sql.includes('.questions')) {
+        const params = Array.isArray(options.params) ? undefined : options.params;
+        assert.equal(
+          (params?.date as { value?: string } | undefined)?.value,
+          '2026-08-10'
+        );
+      }
+      return (sql.includes('player_stats') ? careerRows : bundle) as T[];
+    },
+    async cockroach<T>() {
+      throw new Error('Cockroach should not be called after cutover');
+    },
+  };
+
+  try {
+    const daily = await getDailyQuestionRows('2026-08-10', 'uk', clients);
+    assert.deepEqual(daily.map((row) => row.rank), [1, 2, 3, 4, 5]);
+
+    const answerKeys = await getAnswerKeyRows(
+      '2026-08-10',
+      'uk',
+      daily.map((row) => row.question_id),
+      clients
+    );
+    assert.deepEqual(answerKeys.map((row) => row.rank), [1, 2, 3, 4, 5]);
+
+    const career = await getCareerSourceRows('2026-08-10', 'uk', clients);
+    assert.equal(career?.question.rank, 6);
+    assert.deepEqual(career?.career, careerRows);
+    assert.equal(queries.filter((sql) => sql.includes('.questions')).length, 3);
+    assert.equal(queries.filter((sql) => sql.includes('player_stats')).length, 1);
+  } finally {
+    if (originalCutover === undefined) {
+      delete process.env.BIGQUERY_CUTOVER_DATE;
+    } else {
+      process.env.BIGQUERY_CUTOVER_DATE = originalCutover;
+    }
+  }
+});
+
+test('uses a mocked Cockroach client before cutover without calling BigQuery', async () => {
+  const originalCutover = process.env.BIGQUERY_CUTOVER_DATE;
+  process.env.BIGQUERY_CUTOVER_DATE = '2026-08-11';
+  const rows = [1, 2, 3, 4, 5].map(buildSourceQuestion);
+  let cockroachCalls = 0;
+  const clients: QuestionSourceClients = {
+    async bigQuery<T>() {
+      throw new Error('BigQuery should not be called before cutover');
+    },
+    async cockroach<T>() {
+      cockroachCalls += 1;
+      return rows as T[];
+    },
+  };
+
+  try {
+    const daily = await getDailyQuestionRows('2026-08-10', 'uk', clients);
+    assert.equal(cockroachCalls, 1);
+    assert.deepEqual(daily, rows);
+  } finally {
+    if (originalCutover === undefined) {
+      delete process.env.BIGQUERY_CUTOVER_DATE;
+    } else {
+      process.env.BIGQUERY_CUTOVER_DATE = originalCutover;
+    }
+  }
+});
+
+test('categorizes mocked BigQuery read failures as retryable source errors', async () => {
+  const originalCutover = process.env.BIGQUERY_CUTOVER_DATE;
+  process.env.BIGQUERY_CUTOVER_DATE = '2026-08-10';
+  const clients: QuestionSourceClients = {
+    async bigQuery<T>() {
+      throw new Error('temporary upstream failure');
+    },
+    async cockroach<T>() {
+      throw new Error('Cockroach should not be called after cutover');
+    },
+  };
+
+  try {
+    await assert.rejects(
+      getDailyQuestionRows('2026-08-10', 'uk', clients),
+      (error: unknown) =>
+        error instanceof QuestionSourceError &&
+        error.source === 'bigquery' &&
+        error.code === 'READ_FAILED'
+    );
+  } finally {
+    if (originalCutover === undefined) {
+      delete process.env.BIGQUERY_CUTOVER_DATE;
+    } else {
+      process.env.BIGQUERY_CUTOVER_DATE = originalCutover;
+    }
+  }
+});
+
+test('validates ordered career rows and rejects duplicate category ranks', () => {
+  const career = [
+    {
+      years: '2020–2022',
+      team: 'Club',
+      appearances: 10,
+      goals: 2,
+      category: 'Domestic',
+      rank: 1,
+    },
+    {
+      years: '2022–',
+      team: 'Country',
+      appearances: 5,
+      goals: 1,
+      category: 'International',
+      rank: 1,
+    },
+  ];
+  assert.equal(validateCareerRows(career).length, 2);
+  assert.throws(
+    () => validateCareerRows([career[0], { ...career[0], team: 'Other Club' }]),
+    (error: unknown) =>
+      error instanceof QuestionSourceError &&
+      error.code === 'INVALID_CAREER_ROWS'
+  );
+});
+
+test('omits an unavailable career game without changing the daily quiz', () => {
+  const response = buildDailyQuizResponse(
+    '2026-08-10',
+    [buildSourceQuestion(1)],
+    undefined
+  );
+  assert.equal(response.questions.length, 1);
+  assert.equal(response.careerGame, undefined);
 });
 
 test('keeps daily quiz and career completion states independent', () => {
