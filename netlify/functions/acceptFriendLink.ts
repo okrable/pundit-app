@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { queryWithClient, withTransaction } from './lib/db';
 import { enforceRateLimit } from './lib/rateLimit';
 import { requireCompletedIdentity } from './lib/identity';
@@ -29,7 +29,7 @@ type AcceptResult =
       };
     };
 
-export const handler: Handler = async (event) => {
+const handler: LambdaHandler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -282,3 +282,5 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
+export default withLambda(handler);

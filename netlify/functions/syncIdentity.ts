@@ -1,4 +1,4 @@
-import type { Handler } from '@netlify/functions';
+import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { authorizeUser } from './lib/auth';
 import {
   syncIdentityRecord,
@@ -47,7 +47,7 @@ function logIdentityTimings(
   console.info('[api.identity.sync.timing]', payload);
 }
 
-export const handler: Handler = async (event) => {
+const handler: LambdaHandler = async (event) => {
   const requestStartedAt = Date.now();
   const requestId = createRequestId();
   const timings: PhaseTiming[] = [];
@@ -186,3 +186,5 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
+export default withLambda(handler);

@@ -1,11 +1,11 @@
-import { Handler } from '@netlify/functions';
+import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 
 // Web URL handler for friend invite links
 // URL format: /f/{CODE}
 // This returns an HTML page that attempts to open the app via deep link,
 // with a fallback UI if the app isn't installed.
 
-export const handler: Handler = async (event) => {
+const handler: LambdaHandler = async (event) => {
   const htmlHeaders: Record<string, string> = {
     'Content-Type': 'text/html',
     'Cache-Control': 'no-cache',
@@ -251,3 +251,5 @@ function generateErrorPage(message: string): string {
 </body>
 </html>`;
 }
+
+export default withLambda(handler);

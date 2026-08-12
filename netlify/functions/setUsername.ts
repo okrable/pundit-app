@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { queryWithClient, withTransaction } from './lib/db';
 import { authorizeUser } from './lib/auth';
 import { enforceRateLimit } from './lib/rateLimit';
@@ -89,7 +89,7 @@ async function assignUsername(userId: string, normalized: string, avatarId?: Ava
   throw new Error('Username assignment did not complete');
 }
 
-export const handler: Handler = async (event) => {
+const handler: LambdaHandler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -267,3 +267,5 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
+export default withLambda(handler);

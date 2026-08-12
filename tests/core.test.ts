@@ -62,6 +62,7 @@ import {
   getCurrentCareerGameDate,
 } from '../netlify/functions/lib/careerGame';
 import { buildDailyQuizResponse } from '../netlify/functions/lib/dailyQuizResponse';
+import getDailyQuizFunction from '../netlify/functions/getDailyQuiz';
 import {
   getAnswerKeyRows,
   getCareerSourceRows,
@@ -234,6 +235,19 @@ test('keeps daily quiz identity and CDN caching scoped to the requested date', (
   assert.equal(getDailyQuizCacheControl(false), 'no-store');
   assert.equal(buildDailyQuizPath('2026-08-07'), '/getDailyQuiz?date=2026-08-07');
   assert.equal(buildDailyQuizPath(), '/getDailyQuiz');
+});
+
+test('serves Lambda-shaped endpoints through the modern Netlify wrapper', async () => {
+  const response = await getDailyQuizFunction(
+    new Request('https://preview.example/.netlify/functions/getDailyQuiz', {
+      method: 'OPTIONS',
+    }),
+    {} as never
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('access-control-allow-methods'), 'GET, OPTIONS');
+  assert.equal(await response.text(), '');
 });
 
 test('matches career answers with configured names and conservative spelling tolerance', () => {

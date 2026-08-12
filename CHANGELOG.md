@@ -11,6 +11,9 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
   automatic same-day fallback after BigQuery cutover.
 - Added strict six-rank content validation, structured source diagnostics, and
   a read-only date-range audit command for release checks.
+- Moved legacy Lambda-shaped endpoints onto Netlify's modern Functions runtime
+  through the official compatibility adapter, removing the 4 KB environment
+  limit without changing public endpoint contracts.
 
 ## v2.6.3 - Quiz-number reference date
 

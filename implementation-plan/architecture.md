@@ -3,7 +3,8 @@
 ## Runtime Topology
 
 - Client: Expo SDK 55 / React Native 0.83 app with TypeScript.
-- API: Netlify Functions under `netlify/functions/*`.
+- API: modern Netlify Functions under `netlify/functions/*`; existing
+  Lambda-shaped handlers use the official compatibility adapter.
 - Content data: BigQuery for UK questions/careers from the configured cutover
   date; CockroachDB `pu_player_ques` before cutover and for other languages.
 - Transactional data: CockroachDB/PostgreSQL via `pg`.

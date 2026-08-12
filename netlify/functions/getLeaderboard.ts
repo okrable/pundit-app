@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
 import {
   getGlobalLeaderboardRows,
@@ -6,7 +6,7 @@ import {
   parseLeaderboardPeriod,
 } from './lib/leaderboards';
 
-export const handler: Handler = async (event) => {
+const handler: LambdaHandler = async (event) => {
   const startedAt = Date.now();
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -75,3 +75,5 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
+export default withLambda(handler);

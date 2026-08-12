@@ -273,7 +273,10 @@ pundit-app/
 
 ## API Surface
 
-Netlify Functions live under `/.netlify/functions/`.
+Netlify Functions live under `/.netlify/functions/`. Lambda-shaped handlers
+run on Netlify's modern Functions runtime through `@netlify/aws-lambda-compat`,
+which preserves the existing API contract without the legacy 4 KB combined
+environment-variable limit.
 
 Core groups:
 
