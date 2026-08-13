@@ -2,7 +2,9 @@
 
 ## Confirmed Assumptions
 
-- Daily quiz data is sourced from CockroachDB table `pu_player_ques`.
+- UK daily quiz and career data is sourced from BigQuery from the configured
+  cutover date; legacy and non-UK quiz data remains in `pu_player_ques`.
+- Approved BigQuery rows are immutable once their quiz date is live.
 - Quiz-day logic must stay aligned between backend `QUIZ_TIMEZONE` and frontend `EXPO_PUBLIC_QUIZ_TIMEZONE`.
 - Protected endpoints require Auth0 bearer-token ownership checks.
 - Guest play remains supported, but guest daily results are local-only until login migration/adoption.
@@ -15,6 +17,8 @@
 - `main` is the only permanent and production-significant branch; all other branches receive identical preview behavior.
 - Web and iOS changes are validated from the same source commit.
 - Preview builds use designated test accounts against the configured production CockroachDB/Auth0 services.
+- Challenge remains retired across new and installed clients; its implementation
+  and historical data are preserved without active mutations.
 
 ## Active TODOs
 
@@ -36,13 +40,12 @@
 
 ### Low Priority
 
-- [ ] Add pull-to-refresh parity to remaining challenge views where useful.
 - [x] Add anonymous aggregate analytics for key funnel events.
 - [ ] Add production release tags so changelog milestones can be dated authoritatively.
 
 ## Known Limitations
 
-1. Quiz and challenge submissions retry, but the app is not a fully offline product.
+1. Daily quiz and Journey submissions retry, but the app is not a fully offline product.
 2. Error boundary coverage exists at the app root; finer per-screen recovery can still be added later if needed.
 3. Rate-limit rows require routine expiry cleanup as traffic grows.
 4. Release history before v1.1.0 is milestone-based rather than tag/date-based.

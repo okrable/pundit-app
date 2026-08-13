@@ -3,8 +3,11 @@
 ## Runtime Topology
 
 - Client: Expo SDK 55 / React Native 0.83 app with TypeScript.
-- API: Netlify Functions under `netlify/functions/*`.
-- Data: CockroachDB/PostgreSQL via `pg`.
+- API: modern Netlify Functions under `netlify/functions/*`; existing
+  Lambda-shaped handlers use the official compatibility adapter.
+- Content data: BigQuery for UK questions/careers from the configured cutover
+  date; CockroachDB `pu_player_ques` before cutover and for other languages.
+- Transactional data: CockroachDB/PostgreSQL via `pg`.
 - Auth: Auth0 through Expo AuthSession.
 - State: Zustand stores backed by AsyncStorage/SecureStore caches.
 
@@ -13,6 +16,8 @@
 ### Daily Quiz
 
 - Fetches the current 5-question quiz by timezone-aware quiz date.
+- Resolves every delivery and answer-key read through one deterministic
+  date/language source adapter.
 - Plays locally with typewriter prompt pacing, delayed option reveal, timer-after-reveal behavior, and immediate answer reveal.
 - Creates an immediate local summary after the fifth answer.
 - Authenticated results submit to the server; guest results stay local until login migration/adoption.
@@ -20,23 +25,25 @@
 
 ### Daily Career Game
 
-- Ships beside the quiz in the combined daily payload through a replaceable
-  career source adapter.
+- Whose Journey ships beside the quiz in the combined daily payload and is
+  playable from the Games gallery whenever `careerGame` is present.
 - Matches full names, configured aliases, and surnames through shared
   client/server normalization.
 - Persists completion through separate local keys and `career_game_results`;
   it never changes quiz or profile aggregates.
-- Uses a date-scoped Anthony Gordon fixture until the upstream datasource is
-  available.
+- Uses the BigQuery rank-6 question and `player_stats` career after cutover,
+  while the date-scoped Anthony Gordon fixture remains only for legacy dates.
+- Displays Domestic rows by rank, followed directly by International rows by
+  rank, and restores only the current London date's completion.
 
-### Challenge Mode
+### Retired Challenge Mode
 
-- Async 1v1 challenge lifecycle: create, join, play, submit, reveal, revoke, and history.
-- Uses the shared refreshed `QuestionCard` gameplay surface.
-- Persists challenge W/L/D stats for authenticated users.
-- Resolves signed-in participants from verified bearer-token identities and
-  returns current canonical usernames; legacy guest history remains explicitly
-  labelled.
+- The Challenge tab/drawer entry opens a static Coming Soon screen.
+- Old challenge links are cleared locally and redirected there without auth,
+  previews, or mutations. Friend-invite links are unchanged.
+- All six challenge Functions fail closed with HTTP `410` before auth, BigQuery,
+  or CockroachDB work. Dormant screens, state modules, Functions, tables, and
+  historical rows are retained for a future redesign.
 
 ### Profile and Social
 
@@ -78,10 +85,13 @@
 - Quiz completion ordering: local result, pending submission, and optimistic
   streak are published and persisted before the protected submission starts;
   authoritative success reconciles them before leaderboard refresh.
+- BigQuery cutover is server-only and deterministic. Once a UK quiz date is on
+  BigQuery, source errors use existing caches or return a temporary error; they
+  never silently fall back to a different Cockroach question set.
 
 ## Known Architectural Gaps
 
-1. Broader offline behavior is incomplete beyond persisted quiz/challenge submission retry.
+1. Broader offline behavior is incomplete beyond persisted daily and Journey submission retry.
 2. Structured logs exist, but operational alerting and error-budget reporting are not configured.
 3. Authenticated API, cache, and cross-platform UI integration coverage remains limited.
 4. Error-boundary coverage exists at the app root; finer per-screen recovery can still be added later if needed.

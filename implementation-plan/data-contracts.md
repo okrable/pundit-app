@@ -6,7 +6,7 @@ Canonical TypeScript interfaces live in `app/types/index.ts`.
 
 - Daily quiz: `Quiz`, `Question`, `AnswerWithTiming`, `QuizResultImmediate`, `QuizResult`.
 - Profile/social: `UserProfile`, `UserStats`, `LeaderboardEntry`, friends types.
-- Challenge: active challenge, challenge history, challenge submit/result types.
+- Retired Challenge: compatibility types remain for dormant code and older clients.
 
 ## Daily Quiz Payload
 
@@ -45,10 +45,11 @@ Canonical TypeScript interfaces live in `app/types/index.ts`.
 
 `correctOptionIndex` is intentionally present before submit so the app can reveal answers and build local results immediately.
 
-`careerGame` is optional so a missing career datasource never blocks the
-five-question quiz. The installed fallback is date-scoped and uses the supplied
-Anthony Gordon record until the upstream adapter replaces it. Only Years, Team,
-Apps, and Goals are displayed; category and rank remain source metadata.
+`careerGame` is optional so missing career data never blocks a valid
+five-question quiz. From BigQuery cutover, ranks 1–5 supply the quiz and rank 6
+supplies the career prompt/player; `player_stats` supplies the timeline. Legacy
+dates retain the date-scoped Anthony Gordon fixture. Only Years, Team, Apps,
+and Goals are displayed; category and rank remain source metadata.
 
 ## Answer Timing
 
@@ -87,6 +88,8 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
   contribute to quiz scores, streaks, profile aggregates, or leaderboards.
 - Daily leaderboards rank a single `quiz_date` by score, then earliest submission time, then user id.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
+- Challenge tables and user aggregate columns are retained without mutation
+  while all challenge endpoints are retired with HTTP `410`.
 - `users.username` is the canonical public identity for persisted social data.
 - `users.avatar_id` is the canonical static avatar identity. New and legacy
   accounts receive a football-symbol default before players may choose any

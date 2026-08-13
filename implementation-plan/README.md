@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.6.3 quiz-number reference date
+> Last updated: v2.8.0 Whose Journey launch and Challenge retirement
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -56,12 +56,20 @@ In plain English, this work delivered four connected changes:
 10. **v2.6.3 — quiz-number reference:** daily share numbering now uses one
     editable reference date, with 1 July 2026 defined as Pundit Trivia number 1.
 
+11. **v2.7.0 — BigQuery content source:** one server adapter now selects UK
+    BigQuery questions/careers from a fixed cutover date while CockroachDB
+    continues to own transactional gameplay and all legacy question dates.
+
+12. **v2.8.0 — focused Games refresh:** rank-6 Whose Journey is live, Challenge
+    is replaced by a Coming Soon entry and fail-closed APIs, and Me no longer
+    displays its Stats section.
+
 ## Product Status Snapshot
 
 ### Delivered
 
 - Daily 5-question football quiz with local-first play and same-day replay prevention.
-- Refreshed shared gameplay UI for daily quiz and challenge mode.
+- Refreshed daily quiz gameplay UI.
 - Typewriter question pacing, delayed option reveal, timer and answer activation
   after full reveal, and content-only question transitions.
 - Games landing page with independent Daily Quiz and player-journey completion
@@ -82,13 +90,14 @@ In plain English, this work delivered four connected changes:
 - Server-resolved username identities across friends, persisted leaderboards, and challenges.
 - Centralized auth flow with post-login quiz reconciliation and first data prefetch behind `AuthSyncScreen`.
 - Guest-to-auth daily result migration/adoption where applicable.
-- Daily global leaderboard, friends leaderboard, friend links, and async challenge mode.
+- Daily global leaderboard, friends leaderboard, and friend links. Challenge
+  implementation and history are preserved but retired from active use.
 - Branded bootstrap, stale-first cache hydration, and debug-log export.
 - Mobile-first web shell aligned with the native bottom-tab layout.
 - Date-aware daily leaderboard caches with forced refresh after authenticated submissions.
 - Friends-leaderboard refresh after friendship mutations and League Tables focus.
 - Pull-request CI, uniform Netlify previews, and same-commit web/iOS validation gates.
-- Persistent retry for daily and challenge submissions.
+- Persistent retry for daily and Journey submissions.
 - Immediate local quiz completion and projected post-play streak before server
   reconciliation.
 - Shared database-backed rate limiting on sensitive endpoints.

@@ -84,8 +84,8 @@ version so stale work cannot revive a logged-out or replaced session.
   later authenticated warm path.
 - Submission logs include client duration and the existing `Server-Timing`
   response header for backend phase attribution.
-- Challenge answers are persisted before submission and retry on authenticated warm paths.
-- Challenge submission is idempotent: replaying a completed request returns the stored result instead of incrementing stats again.
+- Legacy pending challenge submissions are discarded during cache hydration;
+  retired challenge endpoints are never retried from warm paths.
 
 ## UX Rules
 

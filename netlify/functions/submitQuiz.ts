@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { query, queryWithClient, withTransaction } from './lib/db';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 import { calculateQuizPoints } from '../../shared/scoring';
@@ -6,6 +6,7 @@ import { validateSubmittedAnswers } from '../../shared/submissionValidation';
 import { enforceRateLimit } from './lib/rateLimit';
 import { requireCompletedIdentity } from './lib/identity';
 import { recomputeUserStreak } from './lib/streaks';
+import { getAnswerKeyRows, QuestionSourceError } from './lib/questionSource';
 
 interface SubmitQuizRequest {
   quizId: string;
@@ -20,15 +21,6 @@ interface SubmitQuizRequest {
     email?: string;
     avatarUrl?: string;
   };
-}
-
-interface CorrectAnswerRow {
-  question_id: string;
-  player_name: string;
-  player_0: string;
-  player_1: string;
-  player_2: string;
-  player_3: string;
 }
 
 interface InsertedResultRow {
@@ -59,7 +51,7 @@ function cloneHeaders(baseHeaders: Record<string, string>, extra?: Record<string
   };
 }
 
-export const handler: Handler = async (event) => {
+const handler: LambdaHandler = async (event) => {
   const baseHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -134,13 +126,17 @@ export const handler: Handler = async (event) => {
     }
     mark('rate_limit');
 
+    const quizDateMatch = /^quiz-(\d{4}-\d{2}-\d{2})$/.exec(quizId);
+    if (!quizDateMatch) {
+      return {
+        statusCode: 400,
+        headers: baseHeaders,
+        body: JSON.stringify({ error: 'Invalid quizId' }),
+      };
+    }
+    const quizDate = quizDateMatch[1];
     const questionIds = answers.map((a) => a.questionId);
-    const correctAnswers = await query<CorrectAnswerRow>(
-      `SELECT question_id, player_name, player_0, player_1, player_2, player_3
-       FROM public.pu_player_ques
-       WHERE question_id = ANY($1)`,
-      [questionIds]
-    );
+    const correctAnswers = await getAnswerKeyRows(quizDate, 'uk', questionIds);
     const correctAnswersById = new Map(correctAnswers.map((row) => [row.question_id, row]));
     mark('answer_key_fetch');
 
@@ -190,8 +186,6 @@ export const handler: Handler = async (event) => {
       answersCorrect.push(isCorrect);
     }
     mark('score');
-
-    const quizDate = quizId.replace('quiz-', '');
 
     if (userId.startsWith('guest_')) {
       const responseBody = {
@@ -336,7 +330,7 @@ export const handler: Handler = async (event) => {
     logRequestError({ endpoint: 'submitQuiz', requestId }, Date.now() - requestStartedAt, error);
     console.error('Error submitting quiz:', error);
     return {
-      statusCode: 500,
+      statusCode: error instanceof QuestionSourceError ? 503 : 500,
       headers: baseHeaders,
       body: JSON.stringify({
         error: 'Internal server error',
@@ -345,3 +339,5 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
+export default withLambda(handler);

@@ -13,20 +13,26 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import type { GamesStackParamList } from '../navigation/GamesNavigator';
 import { useQuizStore } from '../state/useQuizStore';
+import { useCareerGameStore } from '../state/useCareerGameStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
 import { getTodayQuizResult } from '../storage/quizStorage';
 import ComingSoonModal from '../components/ComingSoonModal';
 import GameGalleryTile from '../components/GameGalleryTile';
+import JourneyGraphic from '../components/JourneyGraphic';
 import CenteredWebContent, {
   useMobileLayoutMetrics,
   webContentWidth,
 } from '../components/ResponsiveLayout';
 import { theme } from '../theme/theme';
-import { getGamesHubCompletionState } from '../../shared/gamesHub';
+import {
+  getCareerTileState,
+  getGamesHubCompletionState,
+} from '../../shared/gamesHub';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 import { getQuizDate } from '../utils/quizDate';
 import { isQuizForDate } from '../../shared/dailyQuiz';
+import { getCareerResultForDate } from '../../shared/careerGame';
 
 type Props = NativeStackScreenProps<GamesStackParamList, 'GamesHome'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -97,6 +103,11 @@ export default function GamesHomeScreen({ navigation }: Props) {
     setUserId,
     setCachedResult,
   } = useQuizStore();
+  const {
+    result: careerResult,
+    setUserId: setCareerUserId,
+    hydrateFromCache: hydrateCareerFromCache,
+  } = useCareerGameStore();
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -108,8 +119,10 @@ export default function GamesHomeScreen({ navigation }: Props) {
             return;
           }
           setUserId(userId);
+          setCareerUserId(userId);
           const [quizResult] = await Promise.all([
             getTodayQuizResult(userId),
+            hydrateCareerFromCache(userId),
             fetchQuiz(),
           ]);
           if (active) {
@@ -129,6 +142,8 @@ export default function GamesHomeScreen({ navigation }: Props) {
     }, [
       fetchQuiz,
       isAuthenticated,
+      hydrateCareerFromCache,
+      setCareerUserId,
       setCachedResult,
       setUserId,
       user,
@@ -163,7 +178,21 @@ export default function GamesHomeScreen({ navigation }: Props) {
   const quizAvailable =
     isQuizForDate(quiz, currentQuizDate) && Boolean(quiz?.questions.length);
   const isDailyPayloadLoading = isHubRefreshing || isQuizLoading;
-  const hubState = getGamesHubCompletionState(Boolean(currentCachedResult), false);
+  const currentCareerResult = getCareerResultForDate(
+    careerResult,
+    currentQuizDate
+  );
+  const careerAvailable =
+    isQuizForDate(quiz, currentQuizDate) && Boolean(quiz?.careerGame);
+  const hubState = getGamesHubCompletionState(
+    Boolean(currentCachedResult),
+    Boolean(currentCareerResult)
+  );
+  const careerTileState = getCareerTileState({
+    hasGame: careerAvailable,
+    hasResult: hubState.career === 'completed',
+    isLoading: isDailyPayloadLoading,
+  });
 
   const quizActionLabel =
     hubState.quiz === 'completed'
@@ -182,6 +211,22 @@ export default function GamesHomeScreen({ navigation }: Props) {
   const quizDisabled =
     hubState.quiz !== 'completed' &&
     (!quizAvailable || isDailyPayloadLoading);
+  const careerActionLabel =
+    careerTileState === 'completed'
+      ? 'Player found'
+      : careerTileState === 'available'
+        ? 'Play'
+        : careerTileState === 'loading'
+          ? 'Warming up'
+          : 'Unavailable';
+  const careerActionTone =
+    careerTileState === 'available' || careerTileState === 'completed'
+      ? 'primary'
+      : careerTileState === 'unavailable'
+        ? 'unavailable'
+        : 'muted';
+  const careerDisabled =
+    careerTileState === 'loading' || careerTileState === 'unavailable';
 
   return (
     <SafeAreaView style={styles.container} edges={safeAreaEdges}>
@@ -255,11 +300,25 @@ export default function GamesHomeScreen({ navigation }: Props) {
             <GameGalleryTile
               title="Whose journey is this?"
               description="Trace the clubs. Guess the player."
-              badgeLabel="COMING SOON"
-              badgeTone="muted"
+              artwork={<JourneyGraphic width={86} />}
+              actionLabel={careerActionLabel}
+              actionTone={careerActionTone}
+              actionSummary={
+                currentCareerResult ? (
+                  <Text style={styles.careerResultName} numberOfLines={1}>
+                    {currentCareerResult.canonicalName}
+                  </Text>
+                ) : undefined
+              }
+              showActionArrow={careerTileState === 'available'}
               width={cardWidth}
-              accessibilityHint="Shows a coming soon message"
-              onPress={() => setComingSoonTitle('Whose journey is this?')}
+              disabled={careerDisabled}
+              accessibilityHint={
+                careerTileState === 'completed'
+                  ? 'Opens today’s completed player journey'
+                  : 'Starts today’s player journey game'
+              }
+              onPress={() => navigation.navigate('CareerGame')}
             />
           </GameRow>
 
@@ -353,5 +412,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.incorrect,
+  },
+  careerResultName: {
+    maxWidth: 150,
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBold,
+    color: theme.colors.white,
+    textAlign: 'right',
   },
 });

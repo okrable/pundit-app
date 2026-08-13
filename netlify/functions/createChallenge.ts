@@ -1,10 +1,13 @@
-import { Handler } from '@netlify/functions';
+import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { query } from './lib/db';
 import { getQuizDate } from './lib/quizDate';
 import { createRequestId, logRequestEnd, logRequestError, logRequestStart } from './lib/observability';
 import { getSiteUrl } from './lib/siteUrl';
 import { enforceRateLimit } from './lib/rateLimit';
 import { requireCompletedIdentity } from './lib/identity';
+import { getDailyQuestionRows, QuestionSourceError } from './lib/questionSource';
+import { formatDailyQuizQuestions } from './lib/dailyQuizResponse';
+import { getChallengeUnavailableResponse } from './lib/challengeAvailability';
 
 interface CreateChallengeRequest {
   userId: string;
@@ -24,12 +27,15 @@ function generateChallengeCode(): string {
   return code;
 }
 
-export const handler: Handler = async (event) => {
+const handler: LambdaHandler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
+
+  const unavailable = getChallengeUnavailableResponse(headers);
+  if (unavailable) return unavailable;
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
@@ -106,22 +112,7 @@ export const handler: Handler = async (event) => {
 
     // Get today's quiz in configured quiz timezone
     const today = getQuizDate();
-    const questions = await query<{
-      question_id: string;
-      question: string;
-      player_name: string;
-      player_0: string;
-      player_1: string;
-      player_2: string;
-      player_3: string;
-    }>(
-      `SELECT question_id, question, player_name, player_0, player_1, player_2, player_3
-       FROM pu_player_ques
-       WHERE date = $1 AND language = 'uk'
-       ORDER BY rank ASC
-       LIMIT 5`,
-      [today]
-    );
+    const questions = await getDailyQuestionRows(today, 'uk');
 
     if (questions.length === 0) {
       return {
@@ -174,16 +165,7 @@ export const handler: Handler = async (event) => {
     const challengeId = result[0].id;
 
     // Format questions for response
-    const formattedQuestions = questions.map((q) => {
-      const options = [q.player_0, q.player_1, q.player_2, q.player_3].filter(Boolean);
-      const correctIndex = options.findIndex((opt) => opt === q.player_name);
-      return {
-        id: q.question_id,
-        prompt: q.question,
-        options,
-        correctOptionIndex: correctIndex >= 0 ? correctIndex : 0,
-      };
-    });
+    const formattedQuestions = formatDailyQuizQuestions(questions);
 
     logRequestEnd({ endpoint: 'createChallenge', requestId, userId }, Date.now() - requestStartedAt, 201);
     return {
@@ -205,7 +187,7 @@ export const handler: Handler = async (event) => {
     logRequestError({ endpoint: 'createChallenge', requestId }, Date.now() - requestStartedAt, error);
     console.error('Error creating challenge:', error);
     return {
-      statusCode: 500,
+      statusCode: error instanceof QuestionSourceError ? 503 : 500,
       headers,
       body: JSON.stringify({
         error: 'Internal server error',
@@ -214,3 +196,5 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
+export default withLambda(handler);

@@ -13,8 +13,8 @@
 - Post-login reconciliation prevents stale guest in-progress quiz UI from flashing.
 - Authenticated persistence paths use the shared verified identity guard instead
   of creating partial user rows independently.
-- Quiz and challenge submissions have persisted retry paths, and challenge
-  completion replay is idempotent.
+- Quiz and Journey submissions have persisted retry paths. Legacy pending
+  challenge submissions are cleared because Challenge is retired.
 
 ## Current Caveats
 

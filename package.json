@@ -1,6 +1,6 @@
 {
   "name": "pundit-temp",
-  "version": "2.6.3",
+  "version": "2.8.0",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -19,6 +19,7 @@
     "seed:demo-leaderboard": "node scripts/seed-demo-leaderboard.js",
     "inspect:leaderboard-performance": "node scripts/inspect-leaderboard-performance.js",
     "audit:profile-avatars": "node scripts/audit-profile-avatars.js",
+    "audit:bigquery-questions": "node scripts/audit-bigquery-questions.js",
     "repair:total-correct": "node scripts/repair-total-correct.js",
     "eas:login": "npx eas-cli@latest login",
     "build:ios:simulator": "npx eas-cli@latest build --platform ios --profile ios-simulator",
@@ -31,6 +32,8 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
+    "@google-cloud/bigquery": "^8.3.1",
+    "@netlify/aws-lambda-compat": "^1.0.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "7.18.14",
     "@react-navigation/drawer": "^7.13.5",

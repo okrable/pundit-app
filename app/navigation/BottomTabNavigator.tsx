@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GamesNavigator from './GamesNavigator';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import MeScreen from '../screens/MeScreen';
-import ChallengeScreen from '../screens/ChallengeScreen';
+import ChallengeComingSoonScreen from '../screens/ChallengeComingSoonScreen';
 import { theme } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
@@ -56,7 +56,7 @@ export default function BottomTabNavigator() {
       />
       <Tab.Screen
         name="Challenge"
-        component={ChallengeScreen}
+        component={ChallengeComingSoonScreen}
         options={{
           title: 'Challenge',
           tabBarIcon: ({ color, size }) => (

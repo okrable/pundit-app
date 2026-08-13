@@ -80,7 +80,10 @@ updated client is released, its letter-avatar count should also be zero.
 | `api_rate_limits` | Shared fixed-window API throttling across serverless instances |
 | `analytics_events` | Anonymous aggregate product funnel events |
 
-The `pu_player_ques` table is the existing daily quiz source table and is not managed by these migrations.
+The `pu_player_ques` table is the legacy/pre-cutover daily quiz source and is
+not managed by these migrations. UK dates at or after the configured BigQuery
+cutover read content directly from BigQuery; CockroachDB remains authoritative
+for results, challenges, users, and other transactional state.
 
 ## Current App Semantics
 

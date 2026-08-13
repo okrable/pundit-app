@@ -3,7 +3,7 @@ import { createNativeBottomTabNavigator } from '@react-navigation/bottom-tabs/un
 import GamesNavigator from './GamesNavigator';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import MeScreen from '../screens/MeScreen';
-import ChallengeScreen from '../screens/ChallengeScreen';
+import ChallengeComingSoonScreen from '../screens/ChallengeComingSoonScreen';
 import { theme } from '../theme/theme';
 import type { MainSectionParamList } from './MainNavigator';
 import { MainTabSafeAreaProvider } from './MainTabSafeArea';
@@ -42,7 +42,7 @@ export default function IOSNativeTabNavigator() {
         />
         <Tab.Screen
           name="Challenge"
-          component={ChallengeScreen}
+          component={ChallengeComingSoonScreen}
           options={{
             title: 'Challenge',
             tabBarIcon: ({ focused }) => ({

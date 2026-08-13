@@ -1,11 +1,11 @@
-import { Handler } from '@netlify/functions';
+import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { isAvatarId } from '../../shared/avatarCatalog';
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
 
-export const handler: Handler = async (event) => {
+const handler: LambdaHandler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -166,3 +166,5 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
+export default withLambda(handler);

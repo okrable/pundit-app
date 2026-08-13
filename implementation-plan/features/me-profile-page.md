@@ -1,13 +1,14 @@
 # Feature: Me Profile Page
 
 > Status: Implemented
-> Last updated: v2.6.1 streak-state clarity
+> Last updated: v2.8.0 Stats-section retirement
 
 ## Delivered
 
 - Me tab supports authenticated and guest states.
 - Authenticated users see a compact username header with an inline football
-  streak indicator, a Best Score and challenge W-L-D row, and account actions.
+  streak indicator and account actions. The former Best Score and challenge
+  W-L-D Stats section is no longer displayed.
 - Guest users see conversion prompts and limited settings actions.
 - Settings modal is accessible from the Me header.
 - Authenticated profiles display the canonical username without editable

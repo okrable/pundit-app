@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { query } from './lib/db';
 import { enforceRateLimit } from './lib/rateLimit';
 import { requireCompletedIdentity } from './lib/identity';
@@ -6,6 +6,9 @@ import {
   getCompatibilityPlayerName,
   resolveChallengeIdentity,
 } from './lib/challengeIdentity';
+import { getDailyQuestionRows, QuestionSourceError } from './lib/questionSource';
+import { formatDailyQuizQuestions } from './lib/dailyQuizResponse';
+import { getChallengeUnavailableResponse } from './lib/challengeAvailability';
 
 interface JoinChallengeRequest {
   code: string;
@@ -30,12 +33,15 @@ interface DbChallenge {
   expires_at: string;
 }
 
-export const handler: Handler = async (event) => {
+const handler: LambdaHandler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
+
+  const unavailable = getChallengeUnavailableResponse(headers);
+  if (unavailable) return unavailable;
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
@@ -85,6 +91,53 @@ export const handler: Handler = async (event) => {
       return rateLimitError;
     }
 
+    const challengeCode = code.toUpperCase();
+    const availableChallenges = await query<DbChallenge>(
+      `SELECT * FROM challenges WHERE code = $1`,
+      [challengeCode]
+    );
+    if (availableChallenges.length === 0) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Challenge not found' }),
+      };
+    }
+
+    const availableChallenge = availableChallenges[0];
+    if (availableChallenge.creator_id === userId) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Cannot join your own challenge' }),
+      };
+    }
+    if (availableChallenge.opponent_id !== null) {
+      return {
+        statusCode: 409,
+        headers,
+        body: JSON.stringify({ error: 'Challenge already has an opponent' }),
+      };
+    }
+    if (new Date(availableChallenge.expires_at) < new Date()) {
+      return {
+        statusCode: 410,
+        headers,
+        body: JSON.stringify({ error: 'Challenge has expired' }),
+      };
+    }
+    if (!['pending', 'active'].includes(availableChallenge.status)) {
+      return {
+        statusCode: 410,
+        headers,
+        body: JSON.stringify({ error: `Challenge is ${availableChallenge.status}` }),
+      };
+    }
+
+    // Read the immutable daily bundle before claiming the opponent slot. A source
+    // outage therefore leaves the challenge safely retryable.
+    const questions = await getDailyQuestionRows(availableChallenge.quiz_date, 'uk');
+
     // Atomic update: only succeeds if challenge exists, has no opponent, is joinable, not expired, and user isn't creator
     // This prevents race conditions when multiple users try to join simultaneously
     const updateResult = await query<DbChallenge>(
@@ -96,7 +149,7 @@ export const handler: Handler = async (event) => {
        AND expires_at > NOW()
        AND creator_id != $1
        RETURNING *`,
-      [userId, identity.identity.username, identity.identity.username, code.toUpperCase()]
+      [userId, identity.identity.username, identity.identity.username, challengeCode]
     );
 
     let challenge: DbChallenge;
@@ -105,7 +158,7 @@ export const handler: Handler = async (event) => {
       // Update failed - determine specific error by checking the challenge
       const challenges = await query<DbChallenge>(
         `SELECT * FROM challenges WHERE code = $1`,
-        [code.toUpperCase()]
+        [challengeCode]
       );
 
       if (challenges.length === 0) {
@@ -161,35 +214,8 @@ export const handler: Handler = async (event) => {
     // Success - we atomically claimed the opponent spot
     challenge = updateResult[0];
 
-    // Fetch quiz questions
-    const questions = await query<{
-      question_id: string;
-      question: string;
-      player_name: string;
-      player_0: string;
-      player_1: string;
-      player_2: string;
-      player_3: string;
-    }>(
-      `SELECT question_id, question, player_name, player_0, player_1, player_2, player_3
-       FROM pu_player_ques
-       WHERE date = $1 AND language = 'uk'
-       ORDER BY rank ASC
-       LIMIT 5`,
-      [challenge.quiz_date]
-    );
-
     // Format questions for response
-    const formattedQuestions = questions.map((q) => {
-      const options = [q.player_0, q.player_1, q.player_2, q.player_3].filter(Boolean);
-      const correctIndex = options.findIndex((opt) => opt === q.player_name);
-      return {
-        id: q.question_id,
-        prompt: q.question,
-        options,
-        correctOptionIndex: correctIndex >= 0 ? correctIndex : 0,
-      };
-    });
+    const formattedQuestions = formatDailyQuizQuestions(questions);
 
     const creatorUsers = await query<{ username: string | null }>(
       `SELECT username
@@ -224,7 +250,7 @@ export const handler: Handler = async (event) => {
   } catch (error) {
     console.error('Error joining challenge:', error);
     return {
-      statusCode: 500,
+      statusCode: error instanceof QuestionSourceError ? 503 : 500,
       headers,
       body: JSON.stringify({
         error: 'Internal server error',
@@ -233,3 +259,5 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
+export default withLambda(handler);

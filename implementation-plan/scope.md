@@ -4,7 +4,7 @@
 
 - One daily 5-question football quiz.
 - Bottom navigation: Games, Challenge, League Tables, Me.
-- Refreshed shared quiz gameplay for daily and challenge modes.
+- Refreshed daily quiz gameplay.
 - Games hub with independent Daily Quiz and daily player-journey completion.
 - Daily career card with unlimited name guesses and separate guest/authenticated
   result persistence.
@@ -16,20 +16,21 @@
 - Guest-to-auth result migration/adoption after login.
 - Global leaderboard plus a mutual friends leaderboard backed by one ordered
   relationship row and reusable seven-day invite links.
-- Async 1v1 challenge mode with create/join/play/reveal/history and
-  server-resolved participant usernames.
+- A Challenge navigation entry that presents a dedicated Coming Soon screen;
+  old links route there without authentication or API calls.
 - Stale-first cache hydration and background refresh.
 - Debug-log export from Settings.
 - Uniform pull-request web previews and same-commit iOS validation.
-- Persistent retry for authenticated quiz and challenge submissions.
+- Persistent retry for authenticated quiz and Journey submissions.
 - Anonymous aggregate product analytics.
 
 ## Current Constraints
 
-- Daily quiz source is `pu_player_ques`.
+- UK daily content uses BigQuery from the configured cutover date; earlier and
+  non-UK content uses CockroachDB `pu_player_ques`.
 - Database access is server-only through Netlify Functions.
 - Guest users do not get full profile/social persistence until login.
-- One active created challenge per user at a time.
+- Challenge code, tables, and historical rows remain preserved but inactive.
 - Authenticated protected endpoints require token ownership checks.
 - Persisted social actions/rankings require a completed username identity.
 - Preview and production runtimes currently share configured Auth0/CockroachDB

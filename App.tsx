@@ -4,8 +4,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MainNavigator from './app/navigation/MainNavigator';
-import ChallengeQuizScreen from './app/screens/ChallengeQuizScreen';
-import ChallengeResultsScreen from './app/screens/ChallengeResultsScreen';
 import useFonts from './app/hooks/useFonts';
 import useAuthInit from './app/hooks/useAuthInit';
 import useDeepLinkHandler from './app/hooks/useDeepLinkHandler';
@@ -79,9 +77,9 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, AppError
 // Separate component to use hooks that need navigation context
 function AppContent() {
   const sharedLink = useDeepLinkHandler({
-    onChallengeJoined: React.useCallback(() => {
+    onChallengeUnavailable: React.useCallback(() => {
       if (navigationRef.isReady()) {
-        navigationRef.navigate('ChallengeQuiz');
+        navigationRef.navigate('Main', { screen: 'Challenge' });
       }
     }, []),
   });
@@ -132,28 +130,9 @@ function AppContent() {
         component={MainNavigator}
         options={{ headerShown: false }}
       />
-      <Stack.Screen
-        name="ChallengeQuiz"
-        component={ChallengeQuizScreen}
-        options={{
-          title: 'Challenge',
-          headerBackTitle: 'Back',
-          gestureEnabled: false,
-        }}
-      />
-      <Stack.Screen
-        name="ChallengeResults"
-        component={ChallengeResultsScreen}
-        options={{
-          title: 'Results',
-          headerBackVisible: false,
-          gestureEnabled: false,
-        }}
-      />
       </Stack.Navigator>
       <SharedLinkAcceptanceModal
         visible={sharedLink.visible}
-        action={sharedLink.pendingAction}
         phase={sharedLink.phase}
         preview={sharedLink.preview}
         message={sharedLink.message}

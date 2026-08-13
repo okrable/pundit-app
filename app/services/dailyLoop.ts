@@ -3,8 +3,8 @@ import { useAuthStore } from '../state/useAuthStore';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { useProfileStore } from '../state/useProfileStore';
 import { useQuizStore } from '../state/useQuizStore';
-import { useChallengeStore } from '../state/useChallengeStore';
 import { useCareerGameStore } from '../state/useCareerGameStore';
+import { clearPendingChallengeSubmission } from '../storage/pendingChallengeSubmission';
 import { logError, logInfo, logWarn } from './debugLog';
 import { isIdentityActivationCurrent } from '../../shared/clientIdentityPolicy';
 import { getQuizDate } from '../utils/quizDate';
@@ -57,6 +57,9 @@ export async function hydrateDailyLoopFromCache(userId: string): Promise<void> {
     }),
     useCareerGameStore.getState().hydrateFromCache(userId).then(() => {
       logInfo('dailyLoop.cache.hydrate.career.success', { userId });
+    }),
+    clearPendingChallengeSubmission().then(() => {
+      logInfo('dailyLoop.cache.challenge_pending_cleared');
     }),
   ]);
   logInfo('dailyLoop.cache.hydrate.success', { userId });
@@ -111,7 +114,6 @@ export async function prefetchDailyLoop(options?: string | PrefetchOptions): Pro
 
   if (shouldRunProtected) {
     tasks.push(useQuizStore.getState().retryPendingSubmission());
-    tasks.push(useChallengeStore.getState().retryPendingSubmission(effectiveUserId));
     tasks.push(useCareerGameStore.getState().retryPendingSubmission(effectiveUserId));
     tasks.push(useProfileStore.getState().revalidate(effectiveUserId));
   }

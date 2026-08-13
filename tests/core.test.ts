@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { Query } from '@google-cloud/bigquery';
 import { calculateQuizPoints } from '../shared/scoring';
 import { validateSubmittedAnswers } from '../shared/submissionValidation';
 import { chooseReconciliationSource } from '../shared/reconciliation';
@@ -61,11 +62,36 @@ import {
   getCurrentCareerGameDate,
 } from '../netlify/functions/lib/careerGame';
 import { buildDailyQuizResponse } from '../netlify/functions/lib/dailyQuizResponse';
+import getDailyQuizFunction from '../netlify/functions/getDailyQuiz';
+import {
+  getAnswerKeyRows,
+  getCareerSourceRows,
+  getDailyQuestionRows,
+  getQuestionSource,
+  QuestionSourceClients,
+  QuestionSourceError,
+  SourceQuestionRow,
+  validateCareerRows,
+  validateQuestionRows,
+} from '../netlify/functions/lib/questionSource';
 import {
   authorizeUser,
   classifyAuth0VerificationFailure,
 } from '../netlify/functions/lib/auth';
-import { getGamesHubCompletionState } from '../shared/gamesHub';
+import {
+  getCareerTileState,
+  getGamesHubCompletionState,
+} from '../shared/gamesHub';
+import {
+  getCareerResultForDate,
+  orderCareerRows,
+} from '../shared/careerGame';
+import createChallengeFunction from '../netlify/functions/createChallenge';
+import getChallengeFunction from '../netlify/functions/getChallenge';
+import joinChallengeFunction from '../netlify/functions/joinChallenge';
+import submitChallengeAnswersFunction from '../netlify/functions/submitChallengeAnswers';
+import revokeChallengeFunction from '../netlify/functions/revokeChallenge';
+import getUserChallengesFunction from '../netlify/functions/getUserChallenges';
 import {
   getNativeTabsFallbackReason,
   selectMainNavigator,
@@ -224,6 +250,19 @@ test('keeps daily quiz identity and CDN caching scoped to the requested date', (
   assert.equal(buildDailyQuizPath(), '/getDailyQuiz');
 });
 
+test('serves Lambda-shaped endpoints through the modern Netlify wrapper', async () => {
+  const response = await getDailyQuizFunction(
+    new Request('https://preview.example/.netlify/functions/getDailyQuiz', {
+      method: 'OPTIONS',
+    }),
+    {} as never
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('access-control-allow-methods'), 'GET, OPTIONS');
+  assert.equal(await response.text(), '');
+});
+
 test('matches career answers with configured names and conservative spelling tolerance', () => {
   const answerKey = {
     canonicalName: 'Anthony Gordon',
@@ -243,6 +282,7 @@ test('matches career answers with configured names and conservative spelling tol
 
 test('returns the temporary Anthony Gordon career fixture in display order', async () => {
   const game = await getCareerGameForDate('2026-07-27', 'uk');
+  assert.ok(game);
 
   assert.equal(game.id, 'career-2026-07-27');
   assert.equal(game.date, '2026-07-27');
@@ -294,6 +334,7 @@ test('accepts career completion only for the current daily game', () => {
 
 test('adds the career game without changing daily quiz root fields', async () => {
   const careerGame = await getCareerGameForDate('2026-07-27', 'uk');
+  assert.ok(careerGame);
   const response = buildDailyQuizResponse(
     '2026-07-27',
     [
@@ -328,6 +369,223 @@ test('adds the career game without changing daily quiz root fields', async () =>
   assert.equal(response.careerGame, careerGame);
 });
 
+test('selects BigQuery only for UK dates at or after cutover', () => {
+  assert.equal(getQuestionSource('2026-08-09', 'uk', '2026-08-10'), 'cockroach');
+  assert.equal(getQuestionSource('2026-08-10', 'uk', '2026-08-10'), 'bigquery');
+  assert.equal(getQuestionSource('2026-08-11', 'UK', '2026-08-10'), 'bigquery');
+  assert.equal(getQuestionSource('2026-08-11', 'dn', '2026-08-10'), 'cockroach');
+  assert.equal(getQuestionSource('2026-08-11', 'uk', ''), 'cockroach');
+  assert.throws(
+    () => getQuestionSource('2026-08-11', 'uk', '10-08-2026'),
+    (error: unknown) =>
+      error instanceof QuestionSourceError &&
+      error.code === 'INVALID_CUTOVER_DATE'
+  );
+});
+
+function buildSourceQuestion(rank: number): SourceQuestionRow {
+  return {
+    question_id: `question-${rank}`,
+    question: `Question ${rank}`,
+    player_id: `player-${rank}`,
+    player_name: `Correct ${rank}`,
+    player_0: `Wrong A ${rank}`,
+    player_1: `Correct ${rank}`,
+    player_2: `Wrong B ${rank}`,
+    player_3: `Wrong C ${rank}`,
+    rank,
+    correct_answer_position: 1,
+  };
+}
+
+test('validates complete ordered BigQuery question bundles', () => {
+  const rows = [5, 2, 1, 4, 3].map(buildSourceQuestion);
+  const validated = validateQuestionRows(
+    rows,
+    [1, 2, 3, 4, 5],
+    'bigquery',
+    true
+  );
+  assert.deepEqual(validated.map((row) => row.rank), [1, 2, 3, 4, 5]);
+
+  assert.throws(
+    () => validateQuestionRows(rows.slice(0, 4), [1, 2, 3, 4, 5], 'bigquery', true),
+    (error: unknown) =>
+      error instanceof QuestionSourceError &&
+      error.code === 'INCOMPLETE_QUESTION_SET'
+  );
+
+  const mismatched = { ...buildSourceQuestion(1), correct_answer_position: 0 };
+  assert.throws(
+    () => validateQuestionRows([mismatched], [1], 'bigquery', true),
+    (error: unknown) =>
+      error instanceof QuestionSourceError &&
+      error.code === 'CORRECT_POSITION_MISMATCH'
+  );
+});
+
+test('reads and maps BigQuery bundles with a mocked server client', async () => {
+  const originalCutover = process.env.BIGQUERY_CUTOVER_DATE;
+  process.env.BIGQUERY_CUTOVER_DATE = '2026-08-10';
+  const bundle = [6, 2, 1, 5, 3, 4].map(buildSourceQuestion);
+  const careerRows = [
+    {
+      years: '2020–2022',
+      team: 'Club',
+      appearances: 10,
+      goals: 2,
+      category: 'Domestic',
+      rank: 1,
+    },
+    {
+      years: '2022–',
+      team: 'Country',
+      appearances: 5,
+      goals: 1,
+      category: 'International',
+      rank: 1,
+    },
+  ];
+  const queries: string[] = [];
+  const clients: QuestionSourceClients = {
+    async bigQuery<T>(options: Query) {
+      const sql = String(options.query);
+      queries.push(sql);
+      if (sql.includes('.questions')) {
+        const params = Array.isArray(options.params) ? undefined : options.params;
+        assert.equal(
+          (params?.date as { value?: string } | undefined)?.value,
+          '2026-08-10'
+        );
+      }
+      return (sql.includes('player_stats') ? careerRows : bundle) as T[];
+    },
+    async cockroach<T>() {
+      throw new Error('Cockroach should not be called after cutover');
+    },
+  };
+
+  try {
+    const daily = await getDailyQuestionRows('2026-08-10', 'uk', clients);
+    assert.deepEqual(daily.map((row) => row.rank), [1, 2, 3, 4, 5]);
+
+    const answerKeys = await getAnswerKeyRows(
+      '2026-08-10',
+      'uk',
+      daily.map((row) => row.question_id),
+      clients
+    );
+    assert.deepEqual(answerKeys.map((row) => row.rank), [1, 2, 3, 4, 5]);
+
+    const career = await getCareerSourceRows('2026-08-10', 'uk', clients);
+    assert.equal(career?.question.rank, 6);
+    assert.deepEqual(career?.career, careerRows);
+    assert.equal(queries.filter((sql) => sql.includes('.questions')).length, 3);
+    assert.equal(queries.filter((sql) => sql.includes('player_stats')).length, 1);
+  } finally {
+    if (originalCutover === undefined) {
+      delete process.env.BIGQUERY_CUTOVER_DATE;
+    } else {
+      process.env.BIGQUERY_CUTOVER_DATE = originalCutover;
+    }
+  }
+});
+
+test('uses a mocked Cockroach client before cutover without calling BigQuery', async () => {
+  const originalCutover = process.env.BIGQUERY_CUTOVER_DATE;
+  process.env.BIGQUERY_CUTOVER_DATE = '2026-08-11';
+  const rows = [1, 2, 3, 4, 5].map(buildSourceQuestion);
+  let cockroachCalls = 0;
+  const clients: QuestionSourceClients = {
+    async bigQuery<T>() {
+      throw new Error('BigQuery should not be called before cutover');
+    },
+    async cockroach<T>() {
+      cockroachCalls += 1;
+      return rows as T[];
+    },
+  };
+
+  try {
+    const daily = await getDailyQuestionRows('2026-08-10', 'uk', clients);
+    assert.equal(cockroachCalls, 1);
+    assert.deepEqual(daily, rows);
+  } finally {
+    if (originalCutover === undefined) {
+      delete process.env.BIGQUERY_CUTOVER_DATE;
+    } else {
+      process.env.BIGQUERY_CUTOVER_DATE = originalCutover;
+    }
+  }
+});
+
+test('categorizes mocked BigQuery read failures as retryable source errors', async () => {
+  const originalCutover = process.env.BIGQUERY_CUTOVER_DATE;
+  process.env.BIGQUERY_CUTOVER_DATE = '2026-08-10';
+  const clients: QuestionSourceClients = {
+    async bigQuery<T>() {
+      throw new Error('temporary upstream failure');
+    },
+    async cockroach<T>() {
+      throw new Error('Cockroach should not be called after cutover');
+    },
+  };
+
+  try {
+    await assert.rejects(
+      getDailyQuestionRows('2026-08-10', 'uk', clients),
+      (error: unknown) =>
+        error instanceof QuestionSourceError &&
+        error.source === 'bigquery' &&
+        error.code === 'READ_FAILED'
+    );
+  } finally {
+    if (originalCutover === undefined) {
+      delete process.env.BIGQUERY_CUTOVER_DATE;
+    } else {
+      process.env.BIGQUERY_CUTOVER_DATE = originalCutover;
+    }
+  }
+});
+
+test('validates ordered career rows and rejects duplicate category ranks', () => {
+  const career = [
+    {
+      years: '2020–2022',
+      team: 'Club',
+      appearances: 10,
+      goals: 2,
+      category: 'Domestic',
+      rank: 1,
+    },
+    {
+      years: '2022–',
+      team: 'Country',
+      appearances: 5,
+      goals: 1,
+      category: 'International',
+      rank: 1,
+    },
+  ];
+  assert.equal(validateCareerRows(career).length, 2);
+  assert.throws(
+    () => validateCareerRows([career[0], { ...career[0], team: 'Other Club' }]),
+    (error: unknown) =>
+      error instanceof QuestionSourceError &&
+      error.code === 'INVALID_CAREER_ROWS'
+  );
+});
+
+test('omits an unavailable career game without changing the daily quiz', () => {
+  const response = buildDailyQuizResponse(
+    '2026-08-10',
+    [buildSourceQuestion(1)],
+    undefined
+  );
+  assert.equal(response.questions.length, 1);
+  assert.equal(response.careerGame, undefined);
+});
+
 test('keeps daily quiz and career completion states independent', () => {
   assert.deepEqual(getGamesHubCompletionState(false, false), {
     quiz: 'available',
@@ -345,6 +603,90 @@ test('keeps daily quiz and career completion states independent', () => {
     quiz: 'completed',
     career: 'completed',
   });
+});
+
+test('derives every Journey tile state without revealing stale results', () => {
+  assert.equal(
+    getCareerTileState({ hasGame: false, hasResult: false, isLoading: true }),
+    'loading'
+  );
+  assert.equal(
+    getCareerTileState({ hasGame: false, hasResult: false, isLoading: false }),
+    'unavailable'
+  );
+  assert.equal(
+    getCareerTileState({ hasGame: true, hasResult: false, isLoading: false }),
+    'available'
+  );
+  assert.equal(
+    getCareerTileState({ hasGame: true, hasResult: true, isLoading: false }),
+    'completed'
+  );
+
+  const result = { date: '2026-08-13', canonicalName: 'Player One' };
+  assert.equal(getCareerResultForDate(result, '2026-08-13'), result);
+  assert.equal(getCareerResultForDate(result, '2026-08-14'), null);
+});
+
+test('orders Journey careers by category and then rank', () => {
+  const rows = [
+    { team: 'International 2', category: 'International', rank: 2 },
+    { team: 'Domestic 2', category: 'Domestic', rank: 2 },
+    { team: 'International 1', category: 'International', rank: 1 },
+    { team: 'Domestic 1', category: 'Domestic', rank: 1 },
+  ];
+
+  assert.deepEqual(
+    orderCareerRows(rows).map(({ team }) => team),
+    ['Domestic 1', 'Domestic 2', 'International 1', 'International 2']
+  );
+  assert.deepEqual(rows.map(({ team }) => team), [
+    'International 2',
+    'Domestic 2',
+    'International 1',
+    'Domestic 1',
+  ]);
+});
+
+test('retires every challenge Function before request validation or protected work', async () => {
+  const originalEnabled = process.env.CHALLENGES_ENABLED;
+  delete process.env.CHALLENGES_ENABLED;
+
+  const endpoints = [
+    { name: 'createChallenge', fn: createChallengeFunction, method: 'POST' },
+    { name: 'getChallenge', fn: getChallengeFunction, method: 'GET' },
+    { name: 'joinChallenge', fn: joinChallengeFunction, method: 'POST' },
+    {
+      name: 'submitChallengeAnswers',
+      fn: submitChallengeAnswersFunction,
+      method: 'POST',
+    },
+    { name: 'revokeChallenge', fn: revokeChallengeFunction, method: 'POST' },
+    { name: 'getUserChallenges', fn: getUserChallengesFunction, method: 'GET' },
+  ] as const;
+
+  try {
+    for (const endpoint of endpoints) {
+      const response = await endpoint.fn(
+        new Request(
+          `https://preview.example/.netlify/functions/${endpoint.name}`,
+          { method: endpoint.method }
+        ),
+        {} as never
+      );
+      assert.equal(response.status, 410, endpoint.name);
+      assert.deepEqual(await response.json(), {
+        code: 'CHALLENGE_UNAVAILABLE',
+        message: 'Challenge mode is currently unavailable.',
+      });
+    }
+  } finally {
+    if (originalEnabled === undefined) {
+      delete process.env.CHALLENGES_ENABLED;
+    } else {
+      process.env.CHALLENGES_ENABLED = originalEnabled;
+    }
+  }
 });
 
 test('distinguishes rejected Auth0 tokens from temporary verification failures', () => {
@@ -510,6 +852,10 @@ test('resolves challenge and friend codes from text and URLs', () => {
   assert.equal(resolveSharedCode('ABCD2345').kind, 'friendInvite');
   assert.equal(
     getSharedCodeActionFromUrl('https://pundittrivia.com/c/ABC234')?.kind,
+    'challenge'
+  );
+  assert.equal(
+    getSharedCodeActionFromUrl('pundit-app://challenge/ABC234')?.kind,
     'challenge'
   );
   assert.equal(

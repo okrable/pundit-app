@@ -11,7 +11,7 @@ app/
 ├── constants/        # App constants such as version
 ├── hooks/            # Bootstrap/auth/font hooks
 ├── navigation/       # Web drawer, native iOS tabs, and Android bottom tabs
-├── screens/          # Daily, Challenge, Leaderboard, Me screens
+├── screens/          # Daily, Journey, retired Challenge, Leaderboard, Me screens
 ├── services/         # API, auth flow, Auth0 config, daily prefetch
 ├── state/            # Zustand stores
 ├── storage/          # AsyncStorage/SecureStore helpers
@@ -52,8 +52,8 @@ Authentication content is capped at 560px, gameplay/results and profile
 compositions at 760px, lists at 960px, and gallery/header framing at 1200px.
 The Games tiles themselves grow to 760px.
 
-Challenge creation and code entry form two columns on desktop. Leaderboards
-remain a centred 960px list, while Me and the daily game surfaces retain a
+The Challenge entry uses one centred Coming Soon card on desktop and mobile.
+Leaderboards remain a centred 960px list, while Me and the daily game surfaces retain a
 comfortable 760px reading width. Mobile browsers remain single-column.
 
 The native runtime uses Expo SDK 55, React Native 0.83, Reanimated 4.2.1,
@@ -87,8 +87,7 @@ identifiers, callback schemes, and app resources.
 
 The native tab controller owns the bottom inset. Screens inside the main tab
 subtree omit their own bottom safe-area edge only while native tabs are active;
-Android, web, Expo Go, and standalone challenge/result routes retain their
-existing safe-area handling.
+Android, web, and Expo Go retain their existing safe-area handling.
 
 The web navigation drawer keeps dedicated authentication actions anchored in
 its footer. Guests see separate Create Account and Log In actions so new
@@ -98,11 +97,11 @@ Auth0 flow and expose pending and retryable error states.
 
 ## Games Hub
 
-The Games tab opens an internal stack with the Daily Quiz as the current
-playable mode. The player journey remains implemented for future reuse but its
-gallery entry is a Coming Soon concept until live player data is connected. Its
-tile retains the headline “Whose journey is this?” and supporting copy “Trace
-the clubs. Guess the player.” without artwork or gameplay navigation.
+The Games tab opens an internal stack with Daily Quiz and Whose Journey as
+playable modes. Journey is available whenever today's payload contains
+`careerGame`; it shows Play, Player found, Warming up, or Unavailable and reveals
+the player name on its tile only after completion. Games focus refreshes the
+quiz and hydrates the date-scoped Journey result for the current identity.
 
 ## Daily Quiz Flow
 
@@ -121,11 +120,10 @@ Both result surfaces use the same daily share formatter. Quiz numbers are
 derived from the London quiz date with 1 July 2026 as number 1; standard
 scores use the trophy challenge copy and 500 uses the goat perfect-score copy.
 
-Challenge results use the same compact logo/card/action rhythm as the daily summary, adapted for waiting and head-to-head complete states.
-
 ## Shared Gameplay Surface
 
-`QuestionCard` is shared by daily quiz and challenge mode.
+`QuestionCard` owns daily quiz gameplay. Dormant challenge screens retain the
+same component for possible future redesign work but are unreachable.
 
 Current behavior:
 
@@ -140,7 +138,6 @@ Current behavior:
 - Locked/correct/incorrect message copy is selected as linked pairs by index.
 - Correct answer reveal uses repeated pulse; wrong answers do not shake.
 - Between questions, the question content zoom-fades out, pauses, then the next question begins.
-- Challenge mode keeps the same full-window card proportions as daily quiz, with only a small neutral challenge context pill above the shared card.
 
 ## State Management
 
@@ -185,11 +182,9 @@ play and a completed tile opens its cached recap. It uses Uni Sans, its football
 treatment, and original tagline with its green action treatment integrated into
 the card rather than rendered as a nested button.
 
-The provisional player journey, Starting XI, and The Link Up tiles open one
-shared Coming Soon message. The journey tile intentionally has no artwork;
-Starting XI and The Link Up retain their code-native icons. Rules and career
-components remain available to the game surfaces but are not entry points from
-the gallery.
+Whose Journey uses its Journey artwork and opens gameplay when available;
+completion reopens the solved card. Starting XI and The Link Up retain their
+code-native icons and shared Coming Soon message.
 
 ### Profile and Leaderboards
 

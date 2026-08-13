@@ -21,6 +21,9 @@ All APIs are Netlify Functions under `/.netlify/functions/`.
 ## Daily Quiz APIs
 
 - `GET /getDailyQuiz` returns the daily quiz payload by date/language.
+- UK dates at or after `BIGQUERY_CUTOVER_DATE` read ranks 1–5 and optional
+  rank-6 career content from BigQuery; earlier/non-UK dates read CockroachDB.
+- Daily submissions resolve answer keys through the same source rule.
 - `GET /getTodayResult` checks whether an authenticated user has a persisted same-day result.
 - `POST /submitQuiz` accepts authenticated quiz answers and timing metadata.
 - `POST /migrateGuestResult` adopts a local guest result for an authenticated user when allowed.
@@ -58,9 +61,11 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `POST /submitChallengeAnswers`
 - `POST /revokeChallenge`
 - `GET /getUserChallenges`
-- Create/join ignore client-supplied names and resolve the player from the verified bearer token.
-- Create, join, submit, revoke, and history require a completed username identity.
-- Active, join, history, lookup, and result payloads return current usernames. Legacy guest rows return a legacy-activity label instead of an invented username.
+
+Challenge is retired. With `CHALLENGES_ENABLED` absent or not explicitly
+`true`, every endpoint returns HTTP `410` with code `CHALLENGE_UNAVAILABLE`
+before method validation, authentication, BigQuery, or CockroachDB work. The
+Functions and historical data remain preserved for a future redesign.
 
 ## Friends APIs
 
@@ -80,5 +85,5 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 
 - Core endpoints emit structured lifecycle logs with request IDs, endpoint names, status, user context where available, and duration.
 - Client-side debug logs capture API failures, auth transitions, bootstrap, daily-loop prefetch, and reconciliation behavior.
-- Sensitive submit, challenge, username, and invitation endpoints use shared database-backed fixed-window rate limits.
+- Sensitive submit, username, and invitation endpoints use shared database-backed fixed-window rate limits. Retired challenge endpoints return before rate-limit work.
 - `POST /trackEvent` accepts an allowlisted anonymous event name plus actor type, platform, app version, and app environment; it never accepts user identifiers or free-form metadata.

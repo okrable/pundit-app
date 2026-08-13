@@ -22,6 +22,7 @@ import { getUserId } from '../storage/userStorage';
 import JourneyGraphic from '../components/JourneyGraphic';
 import CenteredWebContent, { webContentWidth } from '../components/ResponsiveLayout';
 import { matchesCareerAnswer } from '../../shared/careerAnswer';
+import { orderCareerRows } from '../../shared/careerGame';
 import { theme } from '../theme/theme';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 
@@ -55,10 +56,7 @@ export default function CareerGameScreen({ navigation }: Props) {
 
   const game = quiz?.careerGame;
   const rows = useMemo(
-    () =>
-      game?.career
-        .slice()
-        .sort((left, right) => (left.rank ?? 0) - (right.rank ?? 0)) ?? [],
+    () => orderCareerRows(game?.career ?? []),
     [game]
   );
 
