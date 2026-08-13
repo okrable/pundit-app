@@ -10,6 +10,7 @@ import {
   resolveChallengeIdentity,
 } from './lib/challengeIdentity';
 import { getAnswerKeyRows, QuestionSourceError } from './lib/questionSource';
+import { getChallengeUnavailableResponse } from './lib/challengeAvailability';
 
 interface SubmitChallengeRequest {
   challengeId: string;
@@ -89,6 +90,9 @@ const handler: LambdaHandler = async (event) => {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
+
+  const unavailable = getChallengeUnavailableResponse(headers);
+  if (unavailable) return unavailable;
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };

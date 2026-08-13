@@ -6,7 +6,7 @@ Canonical TypeScript interfaces live in `app/types/index.ts`.
 
 - Daily quiz: `Quiz`, `Question`, `AnswerWithTiming`, `QuizResultImmediate`, `QuizResult`.
 - Profile/social: `UserProfile`, `UserStats`, `LeaderboardEntry`, friends types.
-- Challenge: active challenge, challenge history, challenge submit/result types.
+- Retired Challenge: compatibility types remain for dormant code and older clients.
 
 ## Daily Quiz Payload
 
@@ -88,6 +88,8 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
   contribute to quiz scores, streaks, profile aggregates, or leaderboards.
 - Daily leaderboards rank a single `quiz_date` by score, then earliest submission time, then user id.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
+- Challenge tables and user aggregate columns are retained without mutation
+  while all challenge endpoints are retired with HTTP `410`.
 - `users.username` is the canonical public identity for persisted social data.
 - `users.avatar_id` is the canonical static avatar identity. New and legacy
   accounts receive a football-symbol default before players may choose any

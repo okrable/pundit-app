@@ -7,6 +7,7 @@ import { enforceRateLimit } from './lib/rateLimit';
 import { requireCompletedIdentity } from './lib/identity';
 import { getDailyQuestionRows, QuestionSourceError } from './lib/questionSource';
 import { formatDailyQuizQuestions } from './lib/dailyQuizResponse';
+import { getChallengeUnavailableResponse } from './lib/challengeAvailability';
 
 interface CreateChallengeRequest {
   userId: string;
@@ -32,6 +33,9 @@ const handler: LambdaHandler = async (event) => {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
+
+  const unavailable = getChallengeUnavailableResponse(headers);
+  if (unavailable) return unavailable;
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };

@@ -130,10 +130,6 @@ export default function MeScreen() {
     }
   };
 
-  const formatChallengeRecord = (wins: number, losses: number, draws: number): string => {
-    return `${wins}-${losses}-${draws}`;
-  };
-
   const localStats = stats ?? EMPTY_STATS;
   const currentAvatarId = user?.avatarId ?? localStats.avatarId;
   const currentQuizDate = getQuizDate();
@@ -172,7 +168,7 @@ export default function MeScreen() {
         <View style={[styles.loggedOutContent, centeredProfileStyle]}>
           <Text style={styles.promoTitle}>Join our growing community!</Text>
           <Text style={styles.promoSubtitle}>
-            View your stats, streak, leaderboards and more
+            Track your streak, join leaderboards and more
           </Text>
 
           {isAuth0Available && (
@@ -288,30 +284,6 @@ export default function MeScreen() {
             >
               {streakStatus.current}
             </Text>
-          </View>
-        </View>
-
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>STATS</Text>
-
-          <View style={styles.statsCard}>
-            <View style={styles.statCell}>
-              <Ionicons name="star" size={20} color={theme.colors.accent} />
-              <Text style={styles.statValue}>{localStats.bestScore}</Text>
-              <Text style={styles.statLabel}>Best Score</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statCell}>
-              <Ionicons name="trophy" size={20} color={theme.colors.primary} />
-              <Text style={styles.statValue}>
-                {formatChallengeRecord(
-                  localStats.challengeWins,
-                  localStats.challengeLosses,
-                  localStats.challengeDraws
-                )}
-              </Text>
-              <Text style={styles.statLabel}>W-L-D</Text>
-            </View>
           </View>
         </View>
 
@@ -451,44 +423,5 @@ const styles = StyleSheet.create({
   streakValueCompact: {
     minWidth: 16,
     fontSize: 22,
-  },
-  statsSection: {
-    marginBottom: theme.spacing.xl,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.mediumGray,
-    marginBottom: theme.spacing.md,
-    letterSpacing: 1,
-  },
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    paddingVertical: theme.spacing.md,
-  },
-  statCell: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 76,
-    gap: theme.spacing.xs,
-  },
-  statDivider: {
-    width: 1,
-    alignSelf: 'stretch',
-    backgroundColor: theme.colors.lightGray,
-    marginVertical: theme.spacing.xs,
-  },
-  statValue: {
-    fontSize: 20,
-    fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.textDark,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontFamily: theme.fonts.gothamBook,
-    color: theme.colors.mediumGray,
   },
 });

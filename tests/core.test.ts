@@ -78,7 +78,20 @@ import {
   authorizeUser,
   classifyAuth0VerificationFailure,
 } from '../netlify/functions/lib/auth';
-import { getGamesHubCompletionState } from '../shared/gamesHub';
+import {
+  getCareerTileState,
+  getGamesHubCompletionState,
+} from '../shared/gamesHub';
+import {
+  getCareerResultForDate,
+  orderCareerRows,
+} from '../shared/careerGame';
+import createChallengeFunction from '../netlify/functions/createChallenge';
+import getChallengeFunction from '../netlify/functions/getChallenge';
+import joinChallengeFunction from '../netlify/functions/joinChallenge';
+import submitChallengeAnswersFunction from '../netlify/functions/submitChallengeAnswers';
+import revokeChallengeFunction from '../netlify/functions/revokeChallenge';
+import getUserChallengesFunction from '../netlify/functions/getUserChallenges';
 import {
   getNativeTabsFallbackReason,
   selectMainNavigator,
@@ -592,6 +605,90 @@ test('keeps daily quiz and career completion states independent', () => {
   });
 });
 
+test('derives every Journey tile state without revealing stale results', () => {
+  assert.equal(
+    getCareerTileState({ hasGame: false, hasResult: false, isLoading: true }),
+    'loading'
+  );
+  assert.equal(
+    getCareerTileState({ hasGame: false, hasResult: false, isLoading: false }),
+    'unavailable'
+  );
+  assert.equal(
+    getCareerTileState({ hasGame: true, hasResult: false, isLoading: false }),
+    'available'
+  );
+  assert.equal(
+    getCareerTileState({ hasGame: true, hasResult: true, isLoading: false }),
+    'completed'
+  );
+
+  const result = { date: '2026-08-13', canonicalName: 'Player One' };
+  assert.equal(getCareerResultForDate(result, '2026-08-13'), result);
+  assert.equal(getCareerResultForDate(result, '2026-08-14'), null);
+});
+
+test('orders Journey careers by category and then rank', () => {
+  const rows = [
+    { team: 'International 2', category: 'International', rank: 2 },
+    { team: 'Domestic 2', category: 'Domestic', rank: 2 },
+    { team: 'International 1', category: 'International', rank: 1 },
+    { team: 'Domestic 1', category: 'Domestic', rank: 1 },
+  ];
+
+  assert.deepEqual(
+    orderCareerRows(rows).map(({ team }) => team),
+    ['Domestic 1', 'Domestic 2', 'International 1', 'International 2']
+  );
+  assert.deepEqual(rows.map(({ team }) => team), [
+    'International 2',
+    'Domestic 2',
+    'International 1',
+    'Domestic 1',
+  ]);
+});
+
+test('retires every challenge Function before request validation or protected work', async () => {
+  const originalEnabled = process.env.CHALLENGES_ENABLED;
+  delete process.env.CHALLENGES_ENABLED;
+
+  const endpoints = [
+    { name: 'createChallenge', fn: createChallengeFunction, method: 'POST' },
+    { name: 'getChallenge', fn: getChallengeFunction, method: 'GET' },
+    { name: 'joinChallenge', fn: joinChallengeFunction, method: 'POST' },
+    {
+      name: 'submitChallengeAnswers',
+      fn: submitChallengeAnswersFunction,
+      method: 'POST',
+    },
+    { name: 'revokeChallenge', fn: revokeChallengeFunction, method: 'POST' },
+    { name: 'getUserChallenges', fn: getUserChallengesFunction, method: 'GET' },
+  ] as const;
+
+  try {
+    for (const endpoint of endpoints) {
+      const response = await endpoint.fn(
+        new Request(
+          `https://preview.example/.netlify/functions/${endpoint.name}`,
+          { method: endpoint.method }
+        ),
+        {} as never
+      );
+      assert.equal(response.status, 410, endpoint.name);
+      assert.deepEqual(await response.json(), {
+        code: 'CHALLENGE_UNAVAILABLE',
+        message: 'Challenge mode is currently unavailable.',
+      });
+    }
+  } finally {
+    if (originalEnabled === undefined) {
+      delete process.env.CHALLENGES_ENABLED;
+    } else {
+      process.env.CHALLENGES_ENABLED = originalEnabled;
+    }
+  }
+});
+
 test('distinguishes rejected Auth0 tokens from temporary verification failures', () => {
   assert.equal(classifyAuth0VerificationFailure(401), 'invalid');
   assert.equal(classifyAuth0VerificationFailure(429), 'unavailable');
@@ -755,6 +852,10 @@ test('resolves challenge and friend codes from text and URLs', () => {
   assert.equal(resolveSharedCode('ABCD2345').kind, 'friendInvite');
   assert.equal(
     getSharedCodeActionFromUrl('https://pundittrivia.com/c/ABC234')?.kind,
+    'challenge'
+  );
+  assert.equal(
+    getSharedCodeActionFromUrl('pundit-app://challenge/ABC234')?.kind,
     'challenge'
   );
   assert.equal(

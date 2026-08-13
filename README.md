@@ -1,4 +1,4 @@
-# Pundit Trivia v2.7.0
+# Pundit Trivia v2.8.0
 
 Pundit Trivia is a daily football quiz app built with Expo React Native,
 TypeScript, Netlify Functions, BigQuery, and CockroachDB.
@@ -8,10 +8,10 @@ TypeScript, Netlify Functions, BigQuery, and CockroachDB.
 - Daily 5-question football quiz with typewriter prompt pacing.
 - Date-gated UK question and player-career content from BigQuery, with
   CockroachDB retained for pre-cutover questions and transactional app state.
-- Shared refreshed gameplay UI for daily quiz and challenge mode.
+- Shared refreshed gameplay foundations retained for future game modes.
 - Reanimated question transitions, option reveal, circular timer, and answer reveal states.
-- Swipeable Games gallery with the playable Daily Quiz and provisional
-  player-journey, Starting XI, and Link Up concepts marked as coming soon.
+- Swipeable Games gallery with playable Daily Quiz and Whose Journey tiles;
+  Starting XI and Link Up remain Coming Soon concepts.
 - Daily player journey with an illustrated career table, unlimited name guesses,
   spelling normalization, and separate guest/authenticated completion storage.
 - Timer and answer interaction start only after the question and all options are visible.
@@ -20,7 +20,7 @@ TypeScript, Netlify Functions, BigQuery, and CockroachDB.
   scorecard sharing, and fireworks for a perfect 500.
 - Cached completed screen for already-played daily quizzes.
 - Guest play by default, with local-only guest daily results.
-- Auth0 sign-in for profile stats, leaderboards, friends, and challenge mode.
+- Auth0 sign-in for persisted results, leaderboards, friends, and profiles.
 - Guest-to-auth daily result reconciliation after login.
 - Centralized auth flow with login, quiz reconciliation, and first data prefetch behind a loading interstitial.
 - Blocking, resumable username onboarding before authenticated players enter the app.
@@ -30,8 +30,9 @@ TypeScript, Netlify Functions, BigQuery, and CockroachDB.
 - Results-backed current streak status with an orange flame after today's play
   and a greyscale flame while an intact streak is awaiting today's quiz.
 - Canonical server-side username identities, with legacy display-name fields retained temporarily for installed-client compatibility.
-- Daily global leaderboard, mutual friendships with reusable seven-day invite links, and async challenge mode.
-- Server-resolved challenge usernames and username-only persisted leaderboard ranking eligibility.
+- Daily global leaderboard and mutual friendships with reusable seven-day invite links.
+- Challenge is retired behind a Coming Soon screen; its code and historical
+  CockroachDB data remain intact for a future redesign.
 - Date-validated cache hydration for quiz and result warm loads, with stale-first
   profile and leaderboard hydration.
 - Forced friends-leaderboard refresh when League Tables gains focus or a friendship changes.
@@ -43,7 +44,7 @@ TypeScript, Netlify Functions, BigQuery, and CockroachDB.
 
 ## Versioning
 
-- Current app/docs version: `2.7.0`.
+- Current app/docs version: `2.8.0`.
 - `package.json`, `package-lock.json`, `app.json`, `app/constants/version.ts`,
   and native iOS/Android marketing versions must stay aligned.
 - Settings displays the app version from `APP_VERSION`.
@@ -285,7 +286,9 @@ Core groups:
 - Identity/profile: `syncIdentity`, `getUserStats`, `updateProfile`, `checkUsername`, `setUsername`
 - Leaderboards: `getLeaderboard`, `getFriendsLeaderboard`
 - Friends: `createFriendLink`, `acceptFriendLink`, `getFriends`, `removeFriend`
-- Challenges: `createChallenge`, `getChallenge`, `joinChallenge`, `submitChallengeAnswers`, `revokeChallenge`, `getUserChallenges`
+- Retired Challenges: `createChallenge`, `getChallenge`, `joinChallenge`,
+  `submitChallengeAnswers`, `revokeChallenge`, `getUserChallenges` all return
+  HTTP `410` with `CHALLENGE_UNAVAILABLE` before auth or database work.
 - Operations: `trackEvent`
 
 Protected endpoints validate Auth0 bearer tokens server-side and enforce `token.sub === userId`.

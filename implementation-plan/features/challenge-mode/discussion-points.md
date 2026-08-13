@@ -1,8 +1,10 @@
 # Challenge Mode Discussion Points
 
-Current challenge mode is shipped. Future discussion should focus on hardening and product depth rather than initial implementation.
+Challenge mode was retired in v2.8.0 because the current experience was not
+compelling enough. Future discussion should start from a new product concept,
+while the old implementation and historical data remain preserved as reference.
 
-## Delivered UX Hardening
+## Preserved Historical Work
 
 - Shared friend and challenge links now open a review flow instead of mutating
   immediately, persist across sign-in, and expose explicit processing and
@@ -10,18 +12,15 @@ Current challenge mode is shipped. Future discussion should focus on hardening a
 - Challenge acceptance claims the opponent slot only when the recipient taps
   **Accept & Play**.
 
-## Open Topics
+## Future Redesign Topics
 
 - Deeper link attribution and server-side funnel reporting.
 - App Store Universal Links for the public friend and challenge URLs. This is
   deferred until the final Apple Team ID, bundle identifier, Associated
   Domains entitlement, provisioning, and production association file can be
   configured and tested together.
-- Challenge expiry/revoke messaging.
-- Alert thresholds and anomaly detection on top of the existing
-  database-backed challenge rate limits.
-- Better operational reporting for created, joined, completed, expired, and
-  revoked challenges.
-- Historical challenge summaries and richer profile integration.
+- Define a challenge loop that is appealing before reopening any API.
+- Decide whether historical rows should contribute to a future experience.
+- Define new notification, expiry, scoring, and profile contracts deliberately.
 
 For current behavior, use `implementation-plan/features/challenge-mode/README.md`.

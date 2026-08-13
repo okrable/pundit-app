@@ -3,18 +3,13 @@ import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import { useAuthStore } from '../state/useAuthStore';
 import { acceptFriendLink, getFriendInvite } from '../services/api';
-import { challengeApi } from '../services/challengeApi';
-import { useChallengeStore } from '../state/useChallengeStore';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import {
   getSharedCodeActionFromUrl,
   SharedCodeAction,
 } from '../services/sharedCode';
 import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
-import type {
-  FriendInvitePreviewResponse,
-  GetChallengeResponse,
-} from '../types';
+import type { FriendInvitePreviewResponse } from '../types';
 import {
   clearPendingSharedAction,
   getPendingSharedAction,
@@ -22,9 +17,10 @@ import {
 } from '../storage/pendingSharedAction';
 import { logError, logInfo } from '../services/debugLog';
 
-export type SharedLinkPreview =
-  | { kind: 'friendInvite'; data: FriendInvitePreviewResponse }
-  | { kind: 'challenge'; data: GetChallengeResponse };
+export type SharedLinkPreview = {
+  kind: 'friendInvite';
+  data: FriendInvitePreviewResponse;
+};
 
 export type SharedLinkPhase =
   | 'idle'
@@ -37,16 +33,7 @@ export type SharedLinkPhase =
   | 'error';
 
 interface DeepLinkHandlerOptions {
-  onChallengeJoined?: () => void;
-}
-
-function getChallengeUnavailableMessage(preview: GetChallengeResponse, userId: string): string {
-  if (preview.creator.userId === userId) return 'You cannot join your own challenge.';
-  if (preview.status === 'expired') return 'This challenge has expired.';
-  if (preview.status === 'revoked') return 'This challenge was cancelled.';
-  if (preview.status === 'completed') return 'This challenge has already finished.';
-  if (preview.opponent) return 'Another player has already accepted this challenge.';
-  return 'This challenge is no longer available.';
+  onChallengeUnavailable?: () => void;
 }
 
 function getFriendUnavailableMessage(preview: FriendInvitePreviewResponse): string {
@@ -65,7 +52,7 @@ function getFriendUnavailableMessage(preview: FriendInvitePreviewResponse): stri
 }
 
 export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {}) {
-  const { onChallengeJoined } = options;
+  const { onChallengeUnavailable } = options;
   const { user, isAuthenticated, isInitialized, identityStatus } = useAuthStore();
   const [pendingAction, setPendingActionState] = useState<SharedCodeAction | null>(null);
   const [phase, setPhase] = useState<SharedLinkPhase>('idle');
@@ -87,6 +74,18 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
 
   const openAction = useCallback(async (action: SharedCodeAction) => {
     if (action.kind === 'invalid') return;
+    if (action.kind === 'challenge') {
+      actionKeyRef.current = null;
+      setPendingActionState(null);
+      setPreview(null);
+      setMessage(null);
+      setPhase('idle');
+      setSuspendedForSignIn(false);
+      await clearPendingSharedAction();
+      logInfo('shared_link.challenge_retired');
+      onChallengeUnavailable?.();
+      return;
+    }
     const key = `${action.kind}:${action.code}`;
     if (actionKeyRef.current === key && pendingAction) return;
     actionKeyRef.current = key;
@@ -97,7 +96,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
     setPhase('loading');
     await setPendingSharedAction(action);
     logInfo('shared_link.received', { kind: action.kind });
-  }, [pendingAction]);
+  }, [onChallengeUnavailable, pendingAction]);
 
   const handleUrl = useCallback((url: string) => {
     const action = getSharedCodeActionFromUrl(url);
@@ -129,33 +128,27 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
   }, [handleUrl]);
 
   const loadPreview = useCallback(async () => {
-    if (!pendingAction || !user?.sub || isProcessingRef.current) return;
+    if (
+      !pendingAction ||
+      pendingAction.kind !== 'friendInvite' ||
+      !user?.sub ||
+      isProcessingRef.current
+    ) return;
     isProcessingRef.current = true;
     setPhase('loading');
     setMessage(null);
     try {
-      if (pendingAction.kind === 'friendInvite') {
-        const data = await getFriendInvite(pendingAction.code, user.sub);
-        setPreview({ kind: 'friendInvite', data });
-        if (data.state === 'already_friends') {
-          setMessage(`You and ${data.inviter?.username || 'this player'} are already friends.`);
-          setPhase('success');
-          await clearPendingSharedAction();
-        } else if (data.canAccept) {
-          setPhase('ready');
-        } else {
-          setMessage(getFriendUnavailableMessage(data));
-          setPhase('unavailable');
-        }
+      const data = await getFriendInvite(pendingAction.code, user.sub);
+      setPreview({ kind: 'friendInvite', data });
+      if (data.state === 'already_friends') {
+        setMessage(`You and ${data.inviter?.username || 'this player'} are already friends.`);
+        setPhase('success');
+        await clearPendingSharedAction();
+      } else if (data.canAccept) {
+        setPhase('ready');
       } else {
-        const data = await challengeApi.getChallenge(pendingAction.code);
-        setPreview({ kind: 'challenge', data });
-        if (data.canJoin && data.creator.userId !== user.sub) {
-          setPhase('ready');
-        } else {
-          setMessage(getChallengeUnavailableMessage(data, user.sub));
-          setPhase('unavailable');
-        }
+        setMessage(getFriendUnavailableMessage(data));
+        setPhase('unavailable');
       }
       logInfo('shared_link.previewed', { kind: pendingAction.kind });
     } catch (error) {
@@ -187,26 +180,25 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
   ]);
 
   const accept = useCallback(async () => {
-    if (!pendingAction || !user?.sub || isProcessingRef.current) return;
+    if (
+      !pendingAction ||
+      pendingAction.kind !== 'friendInvite' ||
+      !user?.sub ||
+      isProcessingRef.current
+    ) return;
     isProcessingRef.current = true;
     setPhase('accepting');
     setMessage(null);
     try {
-      if (pendingAction.kind === 'friendInvite') {
-        const response = await acceptFriendLink(pendingAction.code, user.sub);
-        await useLeaderboardStore.getState().invalidateFriends(user.sub);
-        setMessage(
-          response.alreadyFriends
-            ? `You and ${response.friendUsername || 'this player'} are already friends.`
-            : `You and ${response.friendUsername || 'this player'} are now friends.`
-        );
-        setPhase('success');
-        await clearPendingSharedAction();
-      } else {
-        await useChallengeStore.getState().joinChallenge(pendingAction.code, user.sub);
-        await clearAction();
-        onChallengeJoined?.();
-      }
+      const response = await acceptFriendLink(pendingAction.code, user.sub);
+      await useLeaderboardStore.getState().invalidateFriends(user.sub);
+      setMessage(
+        response.alreadyFriends
+          ? `You and ${response.friendUsername || 'this player'} are already friends.`
+          : `You and ${response.friendUsername || 'this player'} are now friends.`
+      );
+      setPhase('success');
+      await clearPendingSharedAction();
       logInfo('shared_link.accepted', { kind: pendingAction.kind });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to accept this invitation.');
@@ -215,7 +207,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
     } finally {
       isProcessingRef.current = false;
     }
-  }, [clearAction, onChallengeJoined, pendingAction, user?.sub]);
+  }, [pendingAction, user?.sub]);
 
   const retry = useCallback(() => {
     setPreview(null);

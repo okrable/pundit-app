@@ -16,12 +16,10 @@ import type {
   SharedLinkPhase,
   SharedLinkPreview,
 } from '../hooks/useDeepLinkHandler';
-import type { SharedCodeAction } from '../services/sharedCode';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
 
 interface Props {
   visible: boolean;
-  action: SharedCodeAction | null;
   phase: SharedLinkPhase;
   preview: SharedLinkPreview | null;
   message: string | null;
@@ -34,7 +32,6 @@ interface Props {
 
 export default function SharedLinkAcceptanceModal({
   visible,
-  action,
   phase,
   preview,
   message,
@@ -45,14 +42,12 @@ export default function SharedLinkAcceptanceModal({
   onViewFriends,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const isFriend = action?.kind === 'friendInvite';
   const friendPreview = preview?.kind === 'friendInvite' ? preview.data : null;
-  const challengePreview = preview?.kind === 'challenge' ? preview.data : null;
-  const player = friendPreview?.inviter || challengePreview?.creator || null;
+  const player = friendPreview?.inviter || null;
   const playerName = player
-    ? formatPublicPlayerName(player.username, 'legacyLabel' in player ? player.legacyLabel : null, 'Player')
+    ? formatPublicPlayerName(player.username, null, 'Player')
     : 'Player';
-  const expiry = friendPreview?.expiresAt || challengePreview?.expiresAt;
+  const expiry = friendPreview?.expiresAt;
   const expiryLabel = expiry
     ? new Date(expiry).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
     : null;
@@ -80,18 +75,16 @@ export default function SharedLinkAcceptanceModal({
           </TouchableOpacity>
 
           <Ionicons
-            name={isFriend ? 'person-add' : 'flash'}
+            name="person-add"
             size={42}
-            color={isFriend ? theme.colors.primary : theme.colors.accent}
+            color={theme.colors.primary}
           />
-          <Text style={styles.title}>
-            {isFriend ? 'Friend invitation' : 'Challenge invitation'}
-          </Text>
+          <Text style={styles.title}>Friend invitation</Text>
 
           {phase === 'sign_in_required' ? (
             <>
               <Text style={styles.body}>
-                Sign in to review and accept this {isFriend ? 'friend invitation' : 'challenge'}.
+                Sign in to review and accept this friend invitation.
               </Text>
               <TouchableOpacity style={styles.primaryButton} onPress={onSignIn}>
                 <Text style={styles.primaryButtonText}>Sign In to Continue</Text>
@@ -118,9 +111,7 @@ export default function SharedLinkAcceptanceModal({
               )}
               <Text style={styles.playerName}>{playerName}</Text>
               <Text style={styles.body}>
-                {isFriend
-                  ? 'Add this player to your friends leaderboard?'
-                  : 'Accept this challenge and start today’s quiz now?'}
+                Add this player to your friends leaderboard?
               </Text>
               {expiryLabel && <Text style={styles.expiry}>Available until {expiryLabel}</Text>}
               <TouchableOpacity
@@ -133,11 +124,9 @@ export default function SharedLinkAcceptanceModal({
                   <ActivityIndicator size="small" color={theme.colors.white} />
                 ) : (
                   <Text style={styles.primaryButtonText}>
-                    {isFriend
-                      ? friendPreview?.state === 'already_friends'
-                        ? 'View Friendship'
-                        : `Add ${playerName}`
-                      : 'Accept & Play'}
+                    {friendPreview?.state === 'already_friends'
+                      ? 'View Friendship'
+                      : `Add ${playerName}`}
                   </Text>
                 )}
               </TouchableOpacity>

@@ -2,6 +2,20 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.8.0 - Whose Journey launch and Challenge retirement
+
+- Launched the daily rank-6 Whose Journey game from the Games gallery with
+  date-scoped completion restoration and explicit loading/unavailable states.
+- Kept Journey independent from quiz scoring and ordered career rows as
+  Domestic by rank followed directly by International by rank.
+- Replaced every Challenge navigation entry and old challenge deep link with a
+  dedicated Coming Soon screen while preserving the dormant implementation and
+  historical CockroachDB data.
+- Retired all six challenge Functions behind a shared fail-closed HTTP 410
+  response before authentication or database work.
+- Removed the Stats section from Me while retaining compatible profile response
+  fields for older clients.
+
 ## v2.7.0 - BigQuery daily content source
 
 - Added a server-only, date-gated BigQuery source for UK daily questions,

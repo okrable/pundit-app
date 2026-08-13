@@ -5,6 +5,7 @@ import {
   getCompatibilityPlayerName,
   resolveChallengeIdentity,
 } from './lib/challengeIdentity';
+import { getChallengeUnavailableResponse } from './lib/challengeAvailability';
 
 interface DbChallenge {
   id: string;
@@ -39,6 +40,9 @@ const handler: LambdaHandler = async (event) => {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
   };
+
+  const unavailable = getChallengeUnavailableResponse(headers);
+  if (unavailable) return unavailable;
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };

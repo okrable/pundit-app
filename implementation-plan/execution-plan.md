@@ -15,6 +15,8 @@
   daily source adapter.
 - [x] Date-gated BigQuery UK questions, challenge answer keys, and rank-6
   player-career content behind the shared server source adapter.
+- [x] Launched the rank-6 Whose Journey game with date-scoped completion and
+  category-then-rank career ordering.
 - [x] Read-only BigQuery date-range audit for release validation.
 - [x] One-question-at-a-time gameplay.
 - [x] Typewriter prompt pacing and delayed answer-option reveal.
@@ -53,6 +55,9 @@
 - [x] Challenge history and W/L/D stat updates.
 - [x] Shared refreshed quiz UI in challenge play.
 - [x] Canonical username leaderboard eligibility and server-resolved challenge identities.
+- [x] Retired Challenge from reachable navigation and disabled every challenge
+  Function while preserving implementation and historical data.
+- [x] Removed the Me Stats section while retaining compatible API fields.
 
 ### Operations and UX Polish
 

@@ -1,6 +1,7 @@
 import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { query } from './lib/db';
 import { requireCompletedIdentity } from './lib/identity';
+import { getChallengeUnavailableResponse } from './lib/challengeAvailability';
 
 interface RevokeChallengeRequest {
   challengeId: string;
@@ -20,6 +21,9 @@ const handler: LambdaHandler = async (event) => {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
+
+  const unavailable = getChallengeUnavailableResponse(headers);
+  if (unavailable) return unavailable;
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
