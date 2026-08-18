@@ -73,6 +73,10 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - Authenticated completion stores a user/quiz-scoped pending submission before
   contacting the server. Its optimistic result is replaced by the authoritative
   response or retained for a later retry.
+- Daily results may include a deterministic local achievement event and a
+  canonical `achievementSnapshot`. Quiz submission, guest migration, and avatar
+  update accept the same optional `achievementSync` envelope, so achievement
+  reconciliation adds no calculation-only API request.
 
 ## Database-Facing Model
 
@@ -101,6 +105,9 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - New client contracts use `PublicPlayer { userId, username, avatarId?, avatarUrl? }`.
 - Auth storage persists `username`, `usernameRequired`, `onboardingStatus`, and `avatarId`;
   missing legacy metadata is resynchronized before navigation.
+- `user_achievements`, `user_achievement_progress`, and
+  `achievement_sync_receipts` durably reconcile post-v2.9 local achievement
+  events. `getUserStats` returns the authenticated snapshot for cross-device refresh.
 
 ## Streak Status
 

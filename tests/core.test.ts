@@ -110,6 +110,121 @@ import {
   getDailyQuizNumber,
   isQuizForDate,
 } from '../shared/dailyQuiz';
+import {
+  ACHIEVEMENTS,
+  applyAchievementEvent,
+  createEmptyAchievementSnapshot,
+  type AchievementSnapshot,
+  type DailyQuizAchievementEvent,
+} from '../shared/achievements';
+
+function dailyAchievementEvent(
+  date: string,
+  overrides: Partial<DailyQuizAchievementEvent> = {}
+): DailyQuizAchievementEvent {
+  return {
+    id: `daily:quiz-${date}`,
+    kind: 'daily-quiz',
+    occurredAt: `${date}T12:00:00.000Z`,
+    quizDate: date,
+    quizId: `quiz-${date}`,
+    score: 300,
+    answersCorrect: [true, false, true, false, true],
+    correctAtZero: false,
+    allowCumulative: true,
+    ...overrides,
+  };
+}
+
+test('defines the complete achievement catalogue', () => {
+  assert.equal(ACHIEVEMENTS.length, 8);
+  assert.equal(new Set(ACHIEVEMENTS.map(({ id }) => id)).size, 8);
+  assert.deepEqual(
+    ACHIEVEMENTS.filter(({ secret }) => secret).map(({ id }) => id),
+    ['stoppage-time', 'comeback-king', 'fashion-show']
+  );
+});
+
+test('evaluates single-play daily achievements from local result facts', () => {
+  const perfect = applyAchievementEvent(
+    createEmptyAchievementSnapshot(),
+    dailyAchievementEvent('2026-08-18', {
+      score: 500,
+      answersCorrect: [true, true, true, true, true],
+      correctAtZero: true,
+    })
+  );
+  assert.deepEqual(perfect.newlyUnlocked, [
+    'debut',
+    'sharpshooter',
+    'top-bins',
+    'stoppage-time',
+  ]);
+
+  const comeback = applyAchievementEvent(
+    createEmptyAchievementSnapshot(),
+    dailyAchievementEvent('2026-08-18', {
+      answersCorrect: [false, false, true, true, true],
+    })
+  );
+  assert.equal(Boolean(comeback.snapshot.unlocked['comeback-king']), true);
+});
+
+test('advances authenticated achievement streak and veteran progress from release activity', () => {
+  let snapshot: AchievementSnapshot = createEmptyAchievementSnapshot();
+  for (let day = 1; day <= 30; day += 1) {
+    const date = `2026-09-${String(day).padStart(2, '0')}`;
+    snapshot = applyAchievementEvent(snapshot, dailyAchievementEvent(date)).snapshot;
+  }
+  assert.equal(snapshot.progress.dailyCompletions, 30);
+  assert.equal(snapshot.progress.dailyStreak, 30);
+  assert.equal(Boolean(snapshot.unlocked.dedication), true);
+  assert.equal(Boolean(snapshot.unlocked.veteran), true);
+
+  const reset = applyAchievementEvent(
+    snapshot,
+    dailyAchievementEvent('2026-10-02')
+  ).snapshot;
+  assert.equal(reset.progress.dailyStreak, 1);
+});
+
+test('keeps cumulative milestones unavailable to guest achievement events', () => {
+  let snapshot = createEmptyAchievementSnapshot();
+  for (let day = 1; day <= 30; day += 1) {
+    snapshot = applyAchievementEvent(
+      snapshot,
+      dailyAchievementEvent(`2026-09-${String(day).padStart(2, '0')}`, {
+        allowCumulative: false,
+      })
+    ).snapshot;
+  }
+  assert.equal(snapshot.unlocked.dedication, undefined);
+  assert.equal(snapshot.unlocked.veteran, undefined);
+});
+
+test('unlocks Fashion Show after three same-day avatar changes and resets the daily count', () => {
+  let snapshot = createEmptyAchievementSnapshot();
+  for (let index = 1; index <= 3; index += 1) {
+    snapshot = applyAchievementEvent(snapshot, {
+      id: `avatar-${index}`,
+      kind: 'avatar-change',
+      occurredAt: `2026-08-18T1${index}:00:00.000Z`,
+      quizDate: '2026-08-18',
+      allowCumulative: true,
+    }).snapshot;
+  }
+  assert.equal(Boolean(snapshot.unlocked['fashion-show']), true);
+  assert.equal(snapshot.progress.avatarChangesToday, 3);
+
+  snapshot = applyAchievementEvent(snapshot, {
+    id: 'avatar-next-day',
+    kind: 'avatar-change',
+    occurredAt: '2026-08-19T10:00:00.000Z',
+    quizDate: '2026-08-19',
+    allowCumulative: true,
+  }).snapshot;
+  assert.equal(snapshot.progress.avatarChangesToday, 1);
+});
 
 test('validates the complete avatar catalogue', () => {
   assert.equal(AVATAR_DEFINITIONS.length, 58);

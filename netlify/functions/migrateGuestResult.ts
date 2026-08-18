@@ -4,6 +4,14 @@ import { getQuizDate } from './lib/quizDate';
 import type { PoolClient } from 'pg';
 import { requireCompletedIdentity } from './lib/identity';
 import { recomputeUserStreak } from './lib/streaks';
+import type {
+  AchievementSyncEnvelope,
+  DailyQuizAchievementEvent,
+} from '../../shared/achievements';
+import {
+  applyServerAchievementEvent,
+  getServerAchievementSnapshotForUser,
+} from './lib/achievements';
 
 interface MigrateGuestResultRequest {
   userId: string; // Auth0 user ID
@@ -16,6 +24,8 @@ interface MigrateGuestResultRequest {
     email?: string;
     avatarUrl?: string;
   };
+  achievementEvent?: DailyQuizAchievementEvent;
+  achievementSync?: AchievementSyncEnvelope;
 }
 
 interface ResultStatsRow {
@@ -94,7 +104,15 @@ const handler: LambdaHandler = async (event) => {
 
   try {
     const body: MigrateGuestResultRequest = JSON.parse(event.body || '{}');
-    const { userId, quizId, score, totalQuestions, answers } = body;
+    const {
+      userId,
+      quizId,
+      score,
+      totalQuestions,
+      answers,
+      achievementEvent: proposedEvent,
+      achievementSync,
+    } = body;
 
     // Validate request
     if (!userId || !quizId || score === undefined || !answers || answers.length === 0) {
@@ -133,9 +151,36 @@ const handler: LambdaHandler = async (event) => {
       );
 
       const stats = await recomputeUserQuizStats(client, userId);
+      const canonicalAchievementEvent: DailyQuizAchievementEvent = {
+        id: `daily:${quizId}`,
+        kind: 'daily-quiz',
+        occurredAt: new Date().toISOString(),
+        quizDate,
+        quizId,
+        score,
+        answersCorrect: answers,
+        correctAtZero:
+          proposedEvent?.quizId === quizId &&
+          proposedEvent?.quizDate === quizDate &&
+          proposedEvent.correctAtZero === true,
+        allowCumulative: true,
+      };
+      const achievements = inserted.length > 0
+        ? await applyServerAchievementEvent(
+            client,
+            userId,
+            canonicalAchievementEvent,
+            achievementSync
+          )
+        : {
+            snapshot: await getServerAchievementSnapshotForUser(client, userId),
+            newlyUnlocked: [],
+            rejectedProposedIds: [],
+          };
       return {
         migrated: inserted.length > 0,
         ...stats,
+        achievements,
       };
     });
 
@@ -147,6 +192,9 @@ const handler: LambdaHandler = async (event) => {
         message: migration.migrated ? undefined : 'Result already exists for this quiz',
         streak: migration.streak,
         bestScore: migration.bestScore,
+        achievementSnapshot: migration.achievements.snapshot,
+        newlyUnlockedAchievements: migration.achievements.newlyUnlocked,
+        rejectedAchievementIds: migration.achievements.rejectedProposedIds,
       }),
     };
   } catch (error) {

@@ -4,7 +4,7 @@ import { getQuizDate } from '../utils/quizDate';
 
 const PROFILE_CACHE_STALE_MS = 5 * 60 * 1000;
 const PROFILE_CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
-const PROFILE_CACHE_SCHEMA_VERSION = 4;
+const PROFILE_CACHE_SCHEMA_VERSION = 5;
 
 function getProfileCacheKey(userId: string): string {
   return `profile_${userId}`;

@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.8.0 Whose Journey launch and Challenge retirement
+> Last updated: v2.9.0 local-first achievements
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -64,6 +64,11 @@ In plain English, this work delivered four connected changes:
     is replaced by a Coming Soon entry and fail-closed APIs, and Me no longer
     displays its Stats section.
 
+13. **v2.9.0 — local-first achievements:** shared client/server rules evaluate
+    eight achievements from existing quiz and profile state. Local unlocks are
+    optimistic and retry-safe, authenticated state reconciles through existing
+    requests, and Me presents the durable collection without achievement-only APIs.
+
 ## Product Status Snapshot
 
 ### Delivered
@@ -100,6 +105,8 @@ In plain English, this work delivered four connected changes:
 - Persistent retry for daily and Journey submissions.
 - Immediate local quiz completion and projected post-play streak before server
   reconciliation.
+- Local-first achievement evaluation, result-safe stacked celebrations, and
+  authenticated cross-device achievement persistence.
 - Shared database-backed rate limiting on sensitive endpoints.
 - Anonymous aggregate product funnel events.
 - Selective version-2 social cache invalidation that preserves gameplay state.

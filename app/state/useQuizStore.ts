@@ -41,6 +41,8 @@ import {
   isTransientQuizSubmissionFailure,
 } from '../../shared/quizSync';
 import { isQuizForDate } from '../../shared/dailyQuiz';
+import type { DailyQuizAchievementEvent } from '../../shared/achievements';
+import { useAchievementStore } from './useAchievementStore';
 
 interface QuizState {
   quiz: Quiz | null;
@@ -398,14 +400,38 @@ export const useQuizStore = create<QuizState>((set, get) => ({
           return;
         }
 
+        const guestAchievementEvent = guestResult.achievementEvent;
+        const guestAchievementSync = guestAchievementEvent
+          ? {
+              ...useAchievementStore.getState().buildSyncEnvelope(
+                guestAchievementEvent.id,
+                guestResult.newlyUnlockedAchievements ?? []
+              ),
+              acknowledgedIds: guestResult.newlyUnlockedAchievements ?? [],
+            }
+          : undefined;
         const migrationResult = await migrateGuestResult(
           userId,
           guestResult.quizId,
           guestResult.score,
           guestResult.totalQuestions,
           guestResult.answers,
-          userProfile ?? buildUserProfile()
+          userProfile ?? buildUserProfile(),
+          guestAchievementEvent,
+          guestAchievementSync
         );
+
+        if (migrationResult.achievementSnapshot) {
+          await useAchievementStore.getState().reconcileServer(
+            userId,
+            migrationResult.achievementSnapshot,
+            {
+              acceptedEventId: guestAchievementEvent?.id,
+              newlyUnlocked: migrationResult.newlyUnlockedAchievements,
+              rejectedIds: migrationResult.rejectedAchievementIds,
+            }
+          );
+        }
 
         if (!migrationResult.migrated) {
           const existingResult = await getTodayResult(userId);
@@ -517,6 +543,22 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       : currentStats
         ? projectStreakAfterPlay(currentStats.streakStatus)
         : 1;
+    const achievementEvent: DailyQuizAchievementEvent = {
+      id: `daily:${quiz.id}`,
+      kind: 'daily-quiz',
+      occurredAt: new Date().toISOString(),
+      quizDate: quiz.date,
+      quizId: quiz.id,
+      score,
+      answersCorrect: detailedAnswers.map((answer) => answer.isCorrect),
+      correctAtZero: detailedAnswers.some(
+        (answer, index) => answer.isCorrect && answers[index]?.timeRemainingMs === 0
+      ),
+      allowCumulative: !userId.startsWith('guest_'),
+    };
+    const locallyUnlocked = await useAchievementStore
+      .getState()
+      .applyLocalEvent(userId, achievementEvent);
     const localResult: QuizResultImmediate = {
       date: quiz.date,
       quizId: quiz.id,
@@ -528,10 +570,15 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       statsPending: !userId.startsWith('guest_'),
       syncState: userId.startsWith('guest_') ? 'synced' : 'pending',
       isOptimistic: true,
+      achievementEvent,
+      newlyUnlockedAchievements: locallyUnlocked,
     };
 
     const isGuest = userId.startsWith('guest_');
     const userProfile = buildUserProfile();
+    const achievementSync = useAchievementStore
+      .getState()
+      .buildSyncEnvelope(achievementEvent.id, locallyUnlocked);
     const persistPendingSubmission = isGuest
       ? Promise.resolve()
       : setPendingQuizSubmission({
@@ -540,6 +587,8 @@ export const useQuizStore = create<QuizState>((set, get) => ({
           answers,
           userProfile,
           localResult,
+          achievementEvent,
+          achievementSync,
           queuedAt: new Date().toISOString(),
         });
 
@@ -555,6 +604,8 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         answers: localResult.answers.map((answer) => answer.isCorrect),
         syncState: localResult.syncState,
         isOptimistic: localResult.isOptimistic,
+        achievementEvent,
+        newlyUnlockedAchievements: locallyUnlocked,
         cachedAt: new Date().toISOString(),
         userId,
       },
@@ -652,9 +703,23 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       }
 
       try {
-        const serverResult = await submitQuiz(submittedQuizId, userId, answers, profile);
+        const achievementEvent = submissionLocalResult?.achievementEvent;
+        const achievementSync = achievementEvent
+          ? useAchievementStore.getState().buildSyncEnvelope(
+              achievementEvent.id,
+              submissionLocalResult?.newlyUnlockedAchievements ?? []
+            )
+          : undefined;
+        const serverResult = await submitQuiz(
+          submittedQuizId,
+          userId,
+          answers,
+          profile,
+          achievementSync
+        );
         const mergedResult: QuizResultImmediate = {
           ...serverResult,
+          achievementEvent,
           syncState: 'synced',
           statsPending: false,
           isOptimistic: false,
@@ -662,6 +727,18 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
         await saveDailyQuizResult(mergedResult, userId, mergedResult.syncState);
         await clearPendingQuizSubmission({ userId, quizId: submittedQuizId });
+        if (serverResult.achievementSnapshot) {
+          await useAchievementStore.getState().reconcileServer(
+            userId,
+            serverResult.achievementSnapshot,
+            {
+              acceptedEventId: achievementEvent?.id,
+              newlyUnlocked: serverResult.newlyUnlockedAchievements,
+              rejectedIds: serverResult.rejectedAchievementIds,
+              deferReveal: true,
+            }
+          );
+        }
 
         if (
           isQuizSubmissionCurrent(

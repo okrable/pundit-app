@@ -1,5 +1,11 @@
 import type { StreakStatus } from '../../shared/streak';
 import type { AvatarId } from '../../shared/avatarCatalog';
+import type {
+  AchievementId,
+  AchievementSnapshot,
+  AchievementSyncEnvelope,
+  DailyQuizAchievementEvent,
+} from '../../shared/achievements';
 
 export interface Question {
   id: string;
@@ -84,6 +90,10 @@ export interface QuizResultImmediate {
   statsRefreshAfterMs?: number;
   syncState?: SyncState;
   isOptimistic?: boolean;
+  achievementEvent?: DailyQuizAchievementEvent;
+  achievementSnapshot?: AchievementSnapshot;
+  newlyUnlockedAchievements?: AchievementId[];
+  rejectedAchievementIds?: AchievementId[];
 }
 
 // Result stored in DB/cache (compact boolean array)
@@ -97,6 +107,10 @@ export interface QuizResult {
   answers: boolean[];
   syncState?: SyncState;
   isOptimistic?: boolean;
+  achievementEvent?: DailyQuizAchievementEvent;
+  achievementSnapshot?: AchievementSnapshot;
+  newlyUnlockedAchievements?: AchievementId[];
+  rejectedAchievementIds?: AchievementId[];
 }
 
 export type LeaderboardPeriod = 'daily';
@@ -140,6 +154,7 @@ export interface UserStats {
   canChangeUsername: boolean;
   usernameChangeAvailableAt: string | null;
   avatarId?: AvatarId | null;
+  achievements?: AchievementSnapshot;
 }
 
 export interface UserProfile {
@@ -381,6 +396,8 @@ export interface PendingQuizSubmission {
   answers: AnswerWithTiming[];
   userProfile?: UserProfile;
   localResult: QuizResultImmediate;
+  achievementEvent?: DailyQuizAchievementEvent;
+  achievementSync?: AchievementSyncEnvelope;
   queuedAt: string;
 }
 

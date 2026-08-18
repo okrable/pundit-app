@@ -20,6 +20,7 @@ import type { GamesStackParamList } from '../navigation/GamesNavigator';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 import { getQuizDate } from '../utils/quizDate';
 import { isQuizForDate } from '../../shared/dailyQuiz';
+import { useAchievementStore } from '../state/useAchievementStore';
 
 const REVEAL_SUSPENSE_DELAY = 1000;
 const RESULT_HOLD_DELAY = 1650;
@@ -63,6 +64,17 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     resetQuiz,
   } = useQuizStore();
   const { user, isAuthenticated, token } = useAuthStore();
+  const setDailyGameActive = useAchievementStore((state) => state.setDailyGameActive);
+  const releaseDailyReveals = useAchievementStore((state) => state.releaseDailyReveals);
+
+  useEffect(() => {
+    const showingImmediateResults = Boolean(result?.date === getQuizDate());
+    const showingCompletedResult = Boolean(cachedResult?.date === getQuizDate());
+    setDailyGameActive(quizStarted && !showingImmediateResults && !showingCompletedResult);
+    if (showingImmediateResults || showingCompletedResult) void releaseDailyReveals();
+  }, [cachedResult, quizStarted, releaseDailyReveals, result?.date, setDailyGameActive]);
+
+  useEffect(() => () => setDailyGameActive(false), [setDailyGameActive]);
 
   const clearQuestionTimers = () => {
     if (revealTimer.current) {

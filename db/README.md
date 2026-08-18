@@ -22,14 +22,16 @@ db/
 │   ├── 013_social_backend_alignment.sql
 │   ├── 014_streak_projection_backfill.sql
 │   ├── 015_career_game_results.sql
-│   └── 016_profile_avatars.sql
+│   ├── 016_profile_avatars.sql
+│   └── 017_achievements.sql
 ├── audits/
 │   ├── identity_onboarding_pre.sql
 │   ├── identity_onboarding.sql
 │   ├── social_backend_pre.sql
 │   ├── social_backend.sql
 │   ├── streak_projection.sql
-│   └── profile_avatars.sql
+│   ├── profile_avatars.sql
+│   └── achievements.sql
 ├── queries/
 └── README.md
 ```
@@ -58,6 +60,7 @@ cockroach sql --url "$DATABASE_URL" < db/migrations/013_social_backend_alignment
 cockroach sql --url "$DATABASE_URL" < db/migrations/014_streak_projection_backfill.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/015_career_game_results.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/016_profile_avatars.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/017_achievements.sql
 ```
 
 Immediately after migration 016, run `npm run audit:profile-avatars`. The audit
@@ -79,6 +82,9 @@ updated client is released, its letter-avatar count should also be zero.
 | `friendships` | Symmetric friend relationships |
 | `api_rate_limits` | Shared fixed-window API throttling across serverless instances |
 | `analytics_events` | Anonymous aggregate product funnel events |
+| `user_achievements` | Durable authenticated achievement unlocks and reveal acknowledgements |
+| `user_achievement_progress` | Post-v2.9 achievement counters and dates |
+| `achievement_sync_receipts` | Applied client event IDs for retry-safe reconciliation |
 
 The `pu_player_ques` table is the legacy/pre-cutover daily quiz source and is
 not managed by these migrations. UK dates at or after the configured BigQuery
@@ -104,6 +110,8 @@ for results, challenges, users, and other transactional state.
 - `friendships` stores one ordered row per mutual relationship.
 - Friendship acceptance and removal are idempotent around that ordered row.
 - Analytics events contain no user IDs, email addresses, codes, answers, or free-form metadata.
+- Achievement progress begins at v2.9.0 and syncs through existing result,
+  migration, profile update, and profile-read paths; historical activity is not backfilled.
 
 ## Dependencies
 

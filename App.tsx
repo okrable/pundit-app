@@ -18,6 +18,7 @@ import { ResponsiveAppShell } from './app/components/ResponsiveLayout';
 import UsernameOnboardingScreen from './app/components/UsernameOnboardingScreen';
 import AuthSyncScreen from './app/components/AuthSyncScreen';
 import AuthSyncFailureScreen from './app/components/AuthSyncFailureScreen';
+import AchievementRevealHost from './app/components/AchievementRevealHost';
 import { useAuthStore } from './app/state/useAuthStore';
 import {
   shouldShowIdentityFailure,
@@ -156,6 +157,7 @@ function AppContent() {
           });
         }}
       />
+      <AchievementRevealHost />
     </SharedLinkProvider>
   );
 }

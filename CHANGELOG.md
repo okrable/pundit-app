@@ -2,6 +2,17 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.9.0 - Local-first achievements
+
+- Added eight daily and profile achievements with optimistic on-device evaluation,
+  retry-safe authenticated persistence, and current-result guest adoption.
+- Added stacked, reduced-motion-aware achievement reveals that wait for Daily
+  Quiz results but appear immediately for non-game actions.
+- Added an authenticated Me achievement collection with progress, mystery
+  badges, cross-device profile synchronization, and account-scoped caching.
+- Added additive achievement progress, unlock, and idempotency tables without
+  backfilling activity from before this release.
+
 ## v2.8.0 - Whose Journey launch and Challenge retirement
 
 - Launched the daily rank-6 Whose Journey game from the Games gallery with
