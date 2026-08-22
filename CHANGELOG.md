@@ -13,7 +13,8 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 - Kept Auth0 identity, usernames, question content, selected answers, invite
   codes, and free-form metadata outside the analytics contract.
 - Stabilized the preview by deduplicating authenticated achievement reveals and
-  making guest quiz clearing update persisted and live completion state together.
+  making one-tap guest quiz clearing update persisted and live completion state
+  together with inline success or failure feedback.
 
 ## v2.9.0 - Local-first achievements
 

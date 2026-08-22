@@ -10,7 +10,6 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
-  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,12 +41,22 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCopyingLogs, setIsCopyingLogs] = React.useState(false);
   const [isClearingGuestQuiz, setIsClearingGuestQuiz] = React.useState(false);
+  const [guestClearFeedback, setGuestClearFeedback] = React.useState<
+    'cleared' | 'error' | null
+  >(null);
+  const guestClearFeedbackTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [analyticsEnabled, setAnalyticsEnabled] = React.useState(true);
 
   React.useEffect(() => {
     if (!visible) return;
     void isProductAnalyticsEnabled().then(setAnalyticsEnabled);
   }, [visible]);
+
+  React.useEffect(() => () => {
+    if (guestClearFeedbackTimer.current) {
+      clearTimeout(guestClearFeedbackTimer.current);
+    }
+  }, []);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -98,45 +107,32 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
   };
 
   const clearGuestQuiz = async () => {
+    if (guestClearFeedbackTimer.current) {
+      clearTimeout(guestClearFeedbackTimer.current);
+      guestClearFeedbackTimer.current = null;
+    }
+    setGuestClearFeedback(null);
     setIsClearingGuestQuiz(true);
     try {
       await useQuizStore.getState().clearGuestTodayQuiz();
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.alert('Quiz cleared. You can now replay today\'s quiz.');
-      } else {
-        Alert.alert('Quiz Cleared', 'You can now replay today\'s quiz.');
-      }
-    } catch (clearError) {
-      const message = clearError instanceof Error
-        ? clearError.message
-        : 'Please try again after reopening the app.';
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.alert(`Unable to clear quiz. ${message}`);
-      } else {
-        Alert.alert('Unable to Clear Quiz', message);
-      }
+      setGuestClearFeedback('cleared');
+      guestClearFeedbackTimer.current = setTimeout(() => {
+        setGuestClearFeedback(null);
+        guestClearFeedbackTimer.current = null;
+      }, 3000);
+    } catch {
+      setGuestClearFeedback('error');
+      guestClearFeedbackTimer.current = setTimeout(() => {
+        setGuestClearFeedback(null);
+        guestClearFeedbackTimer.current = null;
+      }, 4000);
     } finally {
       setIsClearingGuestQuiz(false);
     }
   };
 
   const handleClearCache = () => {
-    const message = 'This will allow you to replay today\'s quiz. Your score will be reset. Continue?';
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if (window.confirm(message)) {
-        void clearGuestQuiz();
-      }
-      return;
-    }
-
-    Alert.alert("Clear Today's Quiz", message, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Clear',
-        style: 'destructive',
-        onPress: () => void clearGuestQuiz(),
-      },
-    ]);
+    void clearGuestQuiz();
   };
 
   const handleAnalyticsChange = async (enabled: boolean) => {
@@ -317,12 +313,26 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
                 <View style={styles.listItemContent}>
                   {isClearingGuestQuiz ? (
                     <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : guestClearFeedback === 'cleared' ? (
+                    <Ionicons name="checkmark-circle" size={22} color={theme.colors.correct} />
+                  ) : guestClearFeedback === 'error' ? (
+                    <Ionicons name="alert-circle" size={22} color={theme.colors.incorrect} />
                   ) : (
                     <Ionicons name="refresh-outline" size={22} color={theme.colors.textDark} />
                   )}
-                  <Text style={styles.listItemText}>Clear Today's Quiz</Text>
+                  <Text style={styles.listItemText}>
+                    {isClearingGuestQuiz
+                      ? 'Clearing quiz…'
+                      : guestClearFeedback === 'cleared'
+                        ? 'Quiz cleared'
+                        : guestClearFeedback === 'error'
+                          ? 'Unable to clear — try again'
+                          : "Clear Today's Quiz"}
+                  </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.mediumGray} />
+                {!isClearingGuestQuiz && !guestClearFeedback && (
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.mediumGray} />
+                )}
               </TouchableOpacity>
               <Text style={styles.helperText}>
                 Replay today's quiz (resets your score)
