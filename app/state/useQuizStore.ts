@@ -33,7 +33,11 @@ import { useProfileStore } from './useProfileStore';
 import { useLeaderboardStore } from './useLeaderboardStore';
 import { logError, logInfo, logWarn } from '../services/debugLog';
 import { calculateQuizPoints } from '../../shared/scoring';
-import { trackAnalyticsEvent } from '../services/analytics';
+import {
+  clearAnalyticsTiming,
+  getAnalyticsTimingDuration,
+  trackAnalyticsEvent,
+} from '../services/analytics';
 import { chooseReconciliationSource } from '../../shared/reconciliation';
 import { projectStreakAfterPlay } from '../../shared/streak';
 import {
@@ -620,8 +624,15 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
     trackAnalyticsEvent(
       'quiz_completed',
-      userId.startsWith('guest_') ? 'guest' : 'authenticated'
+      userId.startsWith('guest_') ? 'guest' : 'authenticated',
+      {
+        quizDate: localResult.date,
+        durationMs: getAnalyticsTimingDuration('daily-quiz-session'),
+        totalQuestions: localResult.totalQuestions,
+        score: localResult.score,
+      }
     );
+    clearAnalyticsTiming('daily-quiz-session');
 
     return localResult;
   },

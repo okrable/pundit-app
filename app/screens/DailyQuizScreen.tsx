@@ -15,7 +15,11 @@ import { getTodayQuizResult } from '../storage/quizStorage';
 import { theme } from '../theme/theme';
 import { useCenteredWebStyle, webContentWidth } from '../components/ResponsiveLayout';
 import { calculateQuizPoints } from '../../shared/scoring';
-import { trackAnalyticsEvent } from '../services/analytics';
+import {
+  getAnalyticsTimingDuration,
+  markAnalyticsTiming,
+  trackAnalyticsEvent,
+} from '../services/analytics';
 import type { GamesStackParamList } from '../navigation/GamesNavigator';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 import { getQuizDate } from '../utils/quizDate';
@@ -47,6 +51,11 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
   const revealTimer = useRef<NodeJS.Timeout | null>(null);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
   const questionExitTimer = useRef<NodeJS.Timeout | null>(null);
+  const firstQuestionReadySent = useRef(false);
+  const answeredCountRef = useRef(0);
+  const completedRef = useRef(false);
+  const actorTypeRef = useRef<'guest' | 'authenticated'>('guest');
+  const recapEventKeyRef = useRef<string | null>(null);
 
   const {
     quiz,
@@ -66,6 +75,8 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
   const { user, isAuthenticated, token } = useAuthStore();
   const setDailyGameActive = useAchievementStore((state) => state.setDailyGameActive);
   const releaseDailyReveals = useAchievementStore((state) => state.releaseDailyReveals);
+  actorTypeRef.current =
+    !quizUserId || quizUserId.startsWith('guest_') ? 'guest' : 'authenticated';
 
   useEffect(() => {
     const showingImmediateResults = Boolean(result?.date === getQuizDate());
@@ -102,6 +113,9 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     setTimeRemaining(TIMER_DURATION);
     setAnswerTimings({});
     setIsQuestionExiting(false);
+    firstQuestionReadySent.current = false;
+    answeredCountRef.current = 0;
+    completedRef.current = false;
   };
 
   useEffect(() => {
@@ -236,8 +250,28 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
       if (questionExitTimer.current) {
         clearTimeout(questionExitTimer.current);
       }
+      if (answeredCountRef.current > 0 && !completedRef.current) {
+        trackAnalyticsEvent('quiz_abandoned', actorTypeRef.current, {
+          quizDate: getQuizDate(),
+          durationMs: getAnalyticsTimingDuration('daily-quiz-session'),
+          questionNumber: answeredCountRef.current,
+          totalQuestions: useQuizStore.getState().quiz?.questions.length ?? 0,
+          exitReason: 'screen_exit',
+        });
+      }
     };
   }, []);
+
+  useEffect(() => {
+    const recapResult = result?.date === getQuizDate() ? result : cachedResult;
+    if (!recapResult || recapEventKeyRef.current === recapResult.quizId) return;
+    recapEventKeyRef.current = recapResult.quizId;
+    trackAnalyticsEvent('quiz_recap_viewed', actorTypeRef.current, {
+      quizDate: recapResult.date,
+      score: recapResult.score,
+      totalQuestions: recapResult.totalQuestions,
+    });
+  }, [cachedResult, result]);
 
   const handleSelectOption = (questionId: string, optionIndex: number) => {
     if (!answeringEnabled || showingResult || answers[questionId] !== undefined) return;
@@ -248,7 +282,11 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     if (Object.keys(answers).length === 0) {
       trackAnalyticsEvent(
         'quiz_started',
-        !quizUserId || quizUserId.startsWith('guest_') ? 'guest' : 'authenticated'
+        actorTypeRef.current,
+        {
+          quizDate: quiz.date,
+          totalQuestions: quiz.questions.length,
+        }
       );
     }
 
@@ -263,6 +301,14 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
 
     const isCorrect = currentQuestion.correctOptionIndex === optionIndex;
     const points = isCorrect ? calculateQuizPoints(capturedTime * 1000) : 0;
+    answeredCountRef.current = Object.keys(updatedAnswers).length;
+    trackAnalyticsEvent('quiz_question_answered', actorTypeRef.current, {
+      quizDate: quiz.date,
+      durationMs: (TIMER_DURATION - capturedTime) * 1000,
+      questionNumber: currentQuestionIndex + 1,
+      totalQuestions: quiz.questions.length,
+      score: points,
+    });
 
     if (revealTimer.current) {
       clearTimeout(revealTimer.current);
@@ -291,6 +337,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
           const isLastQuestion = currentQuestionIndex === (quiz?.questions.length ?? 0) - 1;
 
           if (isLastQuestion) {
+            completedRef.current = true;
             const formattedAnswers = Object.entries(updatedAnswers).map(
               ([qId, selectedOptionIndex]) => ({
                 questionId: qId,
@@ -318,6 +365,14 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
   const handleOptionsReady = () => {
     setAnsweringEnabled(true);
     setTimerActive(true);
+    if (currentQuestionIndex === 0 && !firstQuestionReadySent.current && quizIsCurrent) {
+      firstQuestionReadySent.current = true;
+      trackAnalyticsEvent('quiz_first_question_ready', actorTypeRef.current, {
+        quizDate: currentQuizDate,
+        durationMs: getAnalyticsTimingDuration('daily-quiz-session'),
+        source: 'unknown',
+      });
+    }
   };
 
   const currentQuizDate = getQuizDate();
@@ -338,6 +393,11 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
 
   const handleStartQuiz = () => {
     resetPlayState();
+    markAnalyticsTiming('daily-quiz-session');
+    trackAnalyticsEvent('quiz_start_requested', actorTypeRef.current, {
+      quizDate: getQuizDate(),
+      source: isQuizForDate(quiz, getQuizDate()) ? 'cache' : 'network',
+    });
     if (isQuizForDate(quiz, getQuizDate())) {
       setQuizStarted(true);
       return;

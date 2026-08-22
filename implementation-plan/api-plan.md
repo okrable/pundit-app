@@ -86,4 +86,9 @@ Functions and historical data remain preserved for a future redesign.
 - Core endpoints emit structured lifecycle logs with request IDs, endpoint names, status, user context where available, and duration.
 - Client-side debug logs capture API failures, auth transitions, bootstrap, daily-loop prefetch, and reconciliation behavior.
 - Sensitive submit, username, and invitation endpoints use shared database-backed fixed-window rate limits. Retired challenge endpoints return before rate-limit work.
-- `POST /trackEvent` accepts an allowlisted anonymous event name plus actor type, platform, app version, and app environment; it never accepts user identifiers or free-form metadata.
+- `POST /trackEvent` remains backward-compatible with legacy aggregate events.
+  Current clients add a random UUID installation identifier, tracking version,
+  and fixed typed properties for quiz date, source, duration, question count,
+  score, and exit reason. Auth0 IDs, usernames, answers, codes, and free-form
+  metadata are rejected.
+- Scheduled `purgeAnalyticsEvents` removes raw analytics rows older than 90 days.

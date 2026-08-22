@@ -82,6 +82,10 @@
   gains navigation focus.
 - Defensive auth retry: API requests can retry once after token refresh or mid-flight token change, and refresh-token rotation is protected by single-flight refresh.
 - Debuggability: persistent debug logs can be copied from Settings.
+- Product analytics: an installation-scoped random UUID is stored separately
+  from account state and accompanies only allowlisted typed events. It survives
+  logout, can be disabled or reset from Settings, is never derived from Auth0,
+  and is retained with raw events for at most 90 days.
 - Quiz completion ordering: local result, pending submission, and optimistic
   streak are published and persisted before the protected submission starts;
   authoritative success reconciles them before leaderboard refresh.

@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.9.0 local-first achievements
+> Last updated: v2.10.0 product analytics baseline
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -67,7 +67,13 @@ In plain English, this work delivered four connected changes:
 13. **v2.9.0 — local-first achievements:** shared client/server rules evaluate
     eight achievements from existing quiz and profile state. Local unlocks are
     optimistic and retry-safe, authenticated state reconciles through existing
-    requests, and Me presents the durable collection without achievement-only APIs.
+   requests, and Me presents the durable collection without achievement-only APIs.
+
+14. **v2.10.0 — product analytics baseline:** a random installation-scoped
+   identifier now connects allowlisted, typed product events without using Auth0
+   identity or free-form metadata. Settings provides opt-out/reset controls,
+   raw events expire after 90 days, and checked-in reports support operational
+   smoke testing now plus retention analysis when the player base is large enough.
 
 ## Product Status Snapshot
 
@@ -108,7 +114,7 @@ In plain English, this work delivered four connected changes:
 - Local-first achievement evaluation, result-safe stacked celebrations, and
   authenticated cross-device achievement persistence.
 - Shared database-backed rate limiting on sensitive endpoints.
-- Anonymous aggregate product funnel events.
+- Optional first-party pseudonymous funnel, performance, share, and return events.
 - Selective version-2 social cache invalidation that preserves gameplay state.
 
 ### Hardening Remaining

@@ -14,6 +14,8 @@ import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
 import PerfectScoreFireworks from './PerfectScoreFireworks';
 import { formatDailyQuizShare } from '../../shared/dailyQuiz';
 import { PERFECT_DAILY_SCORE } from '../../shared/scoring';
+import { trackAnalyticsEvent } from '../services/analytics';
+import { useAuthStore } from '../state/useAuthStore';
 
 const logoImage = require('../../assets/logo/dark/pundit-black.png');
 const celebrationImage = require('../../assets/images/Asset 9.png');
@@ -35,6 +37,7 @@ export default function ResultsScreen({
   quiz,
   onReturnToGames,
 }: ResultsScreenProps) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const summaryAnswers = useMemo<SummaryAnswer[]>(
     () =>
       result.answers.map((answer, index) => {
@@ -66,6 +69,15 @@ export default function ResultsScreen({
     });
 
     await Share.share({ message: shareText });
+    trackAnalyticsEvent(
+      'quiz_shared',
+      isAuthenticated ? 'authenticated' : 'guest',
+      {
+        quizDate: result.date,
+        score: result.score,
+        totalQuestions: result.totalQuestions,
+      }
+    );
   };
 
   return (

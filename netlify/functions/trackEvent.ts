@@ -1,19 +1,13 @@
 import type { Config, Context } from '@netlify/functions';
 import { query } from './lib/db';
 import { consumeRateLimit } from './lib/rateLimit';
+import {
+  isAnalyticsActorType,
+  isAnalyticsEventName,
+  isAnalyticsId,
+  normalizeAnalyticsProperties,
+} from '../../shared/analytics';
 
-const ALLOWED_EVENTS = new Set([
-  'quiz_started',
-  'quiz_completed',
-  'auth_completed',
-  'username_onboarding_shown',
-  'username_onboarding_completed',
-  'challenge_created',
-  'challenge_joined',
-  'challenge_submitted',
-]);
-
-const ALLOWED_ACTOR_TYPES = new Set(['guest', 'authenticated']);
 const ALLOWED_PLATFORMS = new Set(['ios', 'android', 'web']);
 const ALLOWED_ENVIRONMENTS = new Set(['production', 'preview', 'local']);
 
@@ -23,6 +17,9 @@ interface AnalyticsPayload {
   platform?: string;
   appVersion?: string;
   appEnvironment?: string;
+  analyticsId?: string;
+  trackingVersion?: number;
+  properties?: unknown;
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
@@ -76,19 +73,28 @@ export default async function trackEvent(
       platform,
       appVersion,
       appEnvironment,
+      analyticsId,
+      trackingVersion,
+      properties: rawProperties,
     } = payload;
+    const properties = normalizeAnalyticsProperties(rawProperties);
+    const hasNewTrackingEnvelope =
+      analyticsId !== undefined || trackingVersion !== undefined || rawProperties !== undefined;
 
     if (
       !eventName ||
-      !ALLOWED_EVENTS.has(eventName) ||
+      !isAnalyticsEventName(eventName) ||
       !actorType ||
-      !ALLOWED_ACTOR_TYPES.has(actorType) ||
+      !isAnalyticsActorType(actorType) ||
       !platform ||
       !ALLOWED_PLATFORMS.has(platform) ||
       !appVersion ||
       appVersion.length > 20 ||
       !appEnvironment ||
-      !ALLOWED_ENVIRONMENTS.has(appEnvironment)
+      !ALLOWED_ENVIRONMENTS.has(appEnvironment) ||
+      properties === null ||
+      (hasNewTrackingEnvelope &&
+        (!isAnalyticsId(analyticsId) || trackingVersion !== 1))
     ) {
       return jsonResponse(400, { error: 'Invalid analytics event' });
     }
@@ -99,10 +105,34 @@ export default async function trackEvent(
          actor_type,
          platform,
          app_version,
-         app_environment
+         app_environment,
+         analytics_id,
+         tracking_version,
+         quiz_date,
+         content_source,
+         duration_ms,
+         question_number,
+         total_questions,
+         score,
+         exit_reason
        )
-       VALUES ($1, $2, $3, $4, $5)`,
-      [eventName, actorType, platform, appVersion, appEnvironment]
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [
+        eventName,
+        actorType,
+        platform,
+        appVersion,
+        appEnvironment,
+        analyticsId ?? null,
+        trackingVersion ?? 0,
+        properties.quizDate ?? null,
+        properties.source ?? null,
+        properties.durationMs ?? null,
+        properties.questionNumber ?? null,
+        properties.totalQuestions ?? null,
+        properties.score ?? null,
+        properties.exitReason ?? null,
+      ]
     );
 
     console.info(

@@ -109,6 +109,17 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
   `achievement_sync_receipts` durably reconcile post-v2.9 local achievement
   events. `getUserStats` returns the authenticated snapshot for cross-device refresh.
 
+## Product Analytics
+
+- `analyticsId` is a locally generated random UUID that is not derived from or
+  stored in the Auth0 account model.
+- Legacy clients may omit the new envelope; current clients send
+  `trackingVersion: 1` and an allowlisted `properties` object.
+- Allowed properties are quiz date, cache/network source, bounded duration,
+  question number, total questions, score, and a fixed exit reason.
+- Free-form keys and identity/content values such as usernames, emails,
+  question text, answers, and invitation codes are rejected by the Function.
+
 ## Streak Status
 
 `UserStats` keeps the scalar `streak` for compatibility and adds

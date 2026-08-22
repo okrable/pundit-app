@@ -1,0 +1,47 @@
+# Product Analytics Baseline
+
+## Purpose
+
+Version 2.10 establishes first-party operational product telemetry before the
+Daily Quiz navigation and pacing change. It is not advertising attribution and
+it never joins the installation identifier to Auth0 identity. At the current
+single-digit player count, D1/D7 percentages are descriptive only and must not
+gate Release 1.
+
+## Event Contract
+
+- `app_ready`, `today_viewed`, `quiz_start_requested`, and
+  `quiz_first_question_ready` measure discovery and readiness.
+- `quiz_started`, `quiz_question_answered`, `quiz_abandoned`, and
+  `quiz_completed` measure the ranked funnel.
+- `quiz_recap_viewed` and `quiz_shared` measure the result loop.
+- `journey_started` measures bonus-game discovery.
+- Archive event names are reserved for the later archive release.
+- Existing auth/onboarding and retired Challenge names remain accepted for
+  installed-client compatibility.
+
+Properties are fixed typed columns. No event accepts arbitrary metadata,
+question text, selected answers, usernames, email addresses, Auth0 subjects, or
+invite codes.
+
+## Production Smoke Test
+
+1. Apply migration 018 before publishing the client.
+2. Confirm accepted v2.10 Production rows have `tracking_version = 1` and a
+   non-null `analytics_id` using `db/audits/product_analytics.sql`.
+3. Exercise guest, authenticated, logout/login, opt-out/reset, warm-cache,
+   completion, recap, share, and Journey paths on preview and Production.
+4. Confirm event sequences and durations are plausible on web, iOS, and Android.
+5. After the smoke test is stable, proceed to Release 1 without waiting for a
+   fixed number of days. Keep `db/queries/analytics_baseline.sql` for future
+   retention reporting once cohorts are large enough to be credible.
+
+## Privacy and Retention
+
+- Analytics is enabled by default to preserve the existing product-measurement
+  behavior and can be disabled or reset from Settings.
+- The random installation UUID survives sign-out but remains stored separately
+  from account credentials and profile state.
+- The scheduled retention Function deletes raw rows older than 90 days.
+- Resetting the identifier separates future events from earlier device activity
+  without changing the account, quiz cache, achievements, or debug log.

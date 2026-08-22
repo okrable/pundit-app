@@ -22,7 +22,8 @@
 - Debug-log export from Settings.
 - Uniform pull-request web previews and same-commit iOS validation.
 - Persistent retry for authenticated quiz and Journey submissions.
-- Anonymous aggregate product analytics.
+- Optional first-party product analytics with a random installation identifier,
+  typed allowlisted dimensions, device controls, and 90-day raw retention.
 
 ## Current Constraints
 

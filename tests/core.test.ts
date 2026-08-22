@@ -117,6 +117,12 @@ import {
   type AchievementSnapshot,
   type DailyQuizAchievementEvent,
 } from '../shared/achievements';
+import {
+  isAnalyticsActorType,
+  isAnalyticsEventName,
+  isAnalyticsId,
+  normalizeAnalyticsProperties,
+} from '../shared/analytics';
 
 function dailyAchievementEvent(
   date: string,
@@ -135,6 +141,42 @@ function dailyAchievementEvent(
     ...overrides,
   };
 }
+
+test('accepts only declared pseudonymous analytics envelope values', () => {
+  assert.equal(isAnalyticsEventName('quiz_start_requested'), true);
+  assert.equal(isAnalyticsEventName('arbitrary_event'), false);
+  assert.equal(isAnalyticsActorType('guest'), true);
+  assert.equal(isAnalyticsActorType('user-123'), false);
+  assert.equal(isAnalyticsId('2b5c2e94-39c4-4b56-b0bf-682c30d9fd39'), true);
+  assert.equal(isAnalyticsId('auth0|user-123'), false);
+});
+
+test('normalizes fixed analytics properties without accepting free-form metadata', () => {
+  assert.deepEqual(
+    normalizeAnalyticsProperties({
+      quizDate: '2026-08-22',
+      source: 'cache',
+      durationMs: 1250,
+      questionNumber: 1,
+      totalQuestions: 5,
+      score: 100,
+      exitReason: 'screen_exit',
+    }),
+    {
+      quizDate: '2026-08-22',
+      source: 'cache',
+      durationMs: 1250,
+      questionNumber: 1,
+      totalQuestions: 5,
+      score: 100,
+      exitReason: 'screen_exit',
+    }
+  );
+  assert.equal(normalizeAnalyticsProperties({ username: 'liam' }), null);
+  assert.equal(normalizeAnalyticsProperties({ answer: 'Player name' }), null);
+  assert.equal(normalizeAnalyticsProperties({ durationMs: -1 }), null);
+  assert.equal(normalizeAnalyticsProperties({ quizDate: '22-08-2026' }), null);
+});
 
 test('defines the complete achievement catalogue', () => {
   assert.equal(ACHIEVEMENTS.length, 8);

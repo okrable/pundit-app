@@ -73,7 +73,8 @@
 - [x] Preview build identification and environment-correct share links.
 - [x] Persistent challenge submission retry with idempotent server replay.
 - [x] Database-backed endpoint rate limits.
-- [x] Anonymous aggregate funnel analytics.
+- [x] First-party pseudonymous quiz funnel and retention analytics with typed
+  dimensions, device controls, raw-event retention, and baseline reports.
 
 ## Active Hardening
 
@@ -85,4 +86,5 @@
 
 1. Push notifications.
 2. Quiz archives and historical access.
-3. Use anonymous funnel telemetry to prioritize the next product wave.
+3. Smoke-test v2.10 analytics in Production, then proceed with the Daily Quiz
+   navigation and pacing refocus without using D1/D7 as a small-sample gate.

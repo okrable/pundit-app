@@ -2,6 +2,17 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.10.0 - Product analytics baseline
+
+- Added an optional random installation identifier and typed, allowlisted events
+  for Daily Quiz funnel, latency, sharing, Journey discovery, and return-rate measurement.
+- Added Settings controls to disable product analytics or reset the identifier
+  without affecting account or quiz data.
+- Added a backward-compatible analytics schema migration, 90-day scheduled raw
+  event cleanup, read-only audits, and future-ready retention reporting.
+- Kept Auth0 identity, usernames, question content, selected answers, invite
+  codes, and free-form metadata outside the analytics contract.
+
 ## v2.9.0 - Local-first achievements
 
 - Added eight daily and profile achievements with optimistic on-device evaluation,
