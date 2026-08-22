@@ -122,6 +122,8 @@ In plain English, this work delivered four connected changes:
 - Operational alert configuration and error-budget reporting.
 - Broader automated integration and UI coverage.
 - Test-account data governance while previews share production services.
+- Refresh-safe local Daily Quiz attempts that restore question, answer, score,
+  phase, and elapsed timer state without allowing answered questions to be retried.
 
 ## Canonical Docs in This Folder
 

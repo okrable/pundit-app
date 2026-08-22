@@ -84,7 +84,9 @@
 
 ## Next Feature Wave
 
-1. Push notifications.
-2. Quiz archives and historical access.
-3. Smoke-test v2.10 analytics in Production, then proceed with the Daily Quiz
+1. Persist active Daily Quiz attempts per user, date, and quiz so refresh restores
+   question, answers, score, phase, and elapsed timer state without enabling retries.
+2. Push notifications.
+3. Quiz archives and historical access.
+4. Smoke-test v2.10 analytics in Production, then proceed with the Daily Quiz
    navigation and pacing refocus without using D1/D7 as a small-sample gate.

@@ -15,6 +15,13 @@ import {
   setStoredAchievementState,
 } from '../storage/achievementStorage';
 import { logInfo, logWarn } from '../services/debugLog';
+import {
+  beginAchievementReveal,
+  dismissAchievementReveal,
+  enqueueAchievementReveals,
+  normalizeAchievementRevealQueues,
+  releaseDeferredAchievementReveals,
+} from '../../shared/achievementRevealPolicy';
 
 interface AchievementState extends StoredAchievementState {
   userId: string | null;
@@ -70,7 +77,13 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
 
   hydrate: async (userId) => {
     const saved = await getStoredAchievementState(userId);
-    set({ ...saved, userId, hydrated: true, activeRevealIds: [] });
+    const revealQueues = normalizeAchievementRevealQueues({
+      activeRevealIds: [],
+      immediateRevealIds: saved.immediateRevealIds,
+      deferredDailyRevealIds: saved.deferredDailyRevealIds,
+      locallyRevealedIds: saved.locallyRevealedIds,
+    }, saved.confirmedSnapshot.celebratedIds);
+    set({ ...saved, ...revealQueues, userId, hydrated: true });
     logInfo('achievements.cache.hydrated', { userId, pendingEvents: saved.pendingEvents.length });
   },
 
@@ -79,20 +92,15 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
     if (get().pendingEvents.some((item) => item.id === event.id)) return [];
 
     const evaluation = applyAchievementEvent(get().snapshot, event);
-    const unseen = evaluation.newlyUnlocked.filter(
-      (id) => !get().locallyRevealedIds.includes(id)
-    );
     set((state) => ({
+      ...enqueueAchievementReveals(
+        state,
+        evaluation.newlyUnlocked,
+        event.kind === 'daily-quiz' ? 'deferred' : 'immediate',
+        state.confirmedSnapshot.celebratedIds
+      ),
       snapshot: evaluation.snapshot,
       pendingEvents: [...state.pendingEvents, event],
-      deferredDailyRevealIds:
-        event.kind === 'daily-quiz'
-          ? unique([...state.deferredDailyRevealIds, ...unseen])
-          : state.deferredDailyRevealIds,
-      immediateRevealIds:
-        event.kind === 'avatar-change'
-          ? unique([...state.immediateRevealIds, ...unseen])
-          : state.immediateRevealIds,
     }));
     await persist(get());
     return evaluation.newlyUnlocked;
@@ -115,32 +123,35 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
       (id): id is AchievementId =>
         !serverSnapshot.celebratedIds.includes(id as AchievementId)
     );
-    const serverUnseen = unique([
+    const serverCandidates = unique([
       ...(options.newlyUnlocked ?? []),
       ...uncelebratedServerIds,
-    ]).filter(
-      (id) =>
-        !serverSnapshot.celebratedIds.includes(id) &&
-        !get().locallyRevealedIds.includes(id) &&
-        !get().deferredDailyRevealIds.includes(id)
-    );
-    set((state) => ({
-      confirmedSnapshot: serverSnapshot,
-      snapshot: merged,
-      pendingEvents: remaining,
-      immediateRevealIds: (options.deferReveal
-        ? state.immediateRevealIds
-        : unique([...state.immediateRevealIds, ...serverUnseen]))
-        .filter((id) => !rejected.includes(id)),
-      deferredDailyRevealIds: options.deferReveal
-        ? unique([...state.deferredDailyRevealIds, ...serverUnseen]).filter(
+    ]);
+    set((state) => {
+      const revealQueues = enqueueAchievementReveals(
+        {
+          activeRevealIds: state.activeRevealIds,
+          immediateRevealIds: state.immediateRevealIds.filter((id) => !rejected.includes(id)),
+          deferredDailyRevealIds: state.deferredDailyRevealIds.filter(
             (id) => !rejected.includes(id)
-          )
-        : state.deferredDailyRevealIds.filter((id) => !rejected.includes(id)),
-      pendingAcknowledgedIds: state.pendingAcknowledgedIds.filter(
-        (id) => !serverSnapshot.celebratedIds.includes(id)
-      ),
-    }));
+          ),
+          locallyRevealedIds: state.locallyRevealedIds,
+        },
+        serverCandidates,
+        options.deferReveal ? 'deferred' : 'immediate',
+        serverSnapshot.celebratedIds,
+        rejected
+      );
+      return {
+        ...revealQueues,
+        confirmedSnapshot: serverSnapshot,
+        snapshot: merged,
+        pendingEvents: remaining,
+        pendingAcknowledgedIds: state.pendingAcknowledgedIds.filter(
+          (id) => !serverSnapshot.celebratedIds.includes(id)
+        ),
+      };
+    });
     await persist(get());
   },
 
@@ -155,12 +166,11 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
 
   releaseDailyReveals: async () => {
     set((state) => ({
+      ...releaseDeferredAchievementReveals(
+        state,
+        state.confirmedSnapshot.celebratedIds
+      ),
       dailyGameActive: false,
-      immediateRevealIds: unique([
-        ...state.immediateRevealIds,
-        ...state.deferredDailyRevealIds.filter((id) => !state.locallyRevealedIds.includes(id)),
-      ]),
-      deferredDailyRevealIds: [],
     }));
     await persist(get());
   },
@@ -168,15 +178,14 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
   beginReveal: () => {
     const state = get();
     if (state.activeRevealIds.length > 0 || state.dailyGameActive || state.immediateRevealIds.length === 0) return;
-    set({ activeRevealIds: state.immediateRevealIds, immediateRevealIds: [] });
+    set(beginAchievementReveal(state, state.confirmedSnapshot.celebratedIds));
   },
 
   dismissReveal: async () => {
     const ids = get().activeRevealIds;
     if (ids.length === 0) return;
     set((state) => ({
-      activeRevealIds: [],
-      locallyRevealedIds: unique([...state.locallyRevealedIds, ...ids]),
+      ...dismissAchievementReveal(state, state.confirmedSnapshot.celebratedIds),
       pendingAcknowledgedIds: unique([...state.pendingAcknowledgedIds, ...ids]),
       snapshot: {
         ...state.snapshot,

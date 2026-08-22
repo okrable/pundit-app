@@ -118,6 +118,13 @@ import {
   type DailyQuizAchievementEvent,
 } from '../shared/achievements';
 import {
+  beginAchievementReveal,
+  dismissAchievementReveal,
+  enqueueAchievementReveals,
+  releaseDeferredAchievementReveals,
+  type AchievementRevealQueues,
+} from '../shared/achievementRevealPolicy';
+import {
   isAnalyticsActorType,
   isAnalyticsEventName,
   isAnalyticsId,
@@ -242,6 +249,80 @@ test('keeps cumulative milestones unavailable to guest achievement events', () =
   }
   assert.equal(snapshot.unlocked.dedication, undefined);
   assert.equal(snapshot.unlocked.veteran, undefined);
+});
+
+test('does not requeue authenticated daily achievements while their reveal is active', () => {
+  const initial: AchievementRevealQueues = {
+    activeRevealIds: [],
+    immediateRevealIds: [],
+    deferredDailyRevealIds: ['debut', 'sharpshooter', 'top-bins'],
+    locallyRevealedIds: [],
+  };
+  const released = releaseDeferredAchievementReveals(initial);
+  const active = beginAchievementReveal(released);
+  const reconciled = enqueueAchievementReveals(
+    active,
+    ['debut', 'sharpshooter', 'top-bins'],
+    'deferred'
+  );
+
+  assert.deepEqual(reconciled.activeRevealIds, [
+    'debut',
+    'sharpshooter',
+    'top-bins',
+  ]);
+  assert.deepEqual(reconciled.immediateRevealIds, []);
+  assert.deepEqual(reconciled.deferredDailyRevealIds, []);
+});
+
+test('dismissal removes duplicate achievement IDs from every reveal queue', () => {
+  const dismissed = dismissAchievementReveal({
+    activeRevealIds: ['debut', 'sharpshooter', 'top-bins'],
+    immediateRevealIds: ['debut'],
+    deferredDailyRevealIds: ['sharpshooter', 'top-bins'],
+    locallyRevealedIds: [],
+  });
+
+  assert.deepEqual(dismissed.activeRevealIds, []);
+  assert.deepEqual(dismissed.immediateRevealIds, []);
+  assert.deepEqual(dismissed.deferredDailyRevealIds, []);
+  assert.deepEqual(dismissed.locallyRevealedIds, [
+    'debut',
+    'sharpshooter',
+    'top-bins',
+  ]);
+
+  const reconciledAfterDismissal = enqueueAchievementReveals(
+    dismissed,
+    ['debut', 'sharpshooter', 'top-bins'],
+    'immediate'
+  );
+  assert.deepEqual(reconciledAfterDismissal.immediateRevealIds, []);
+});
+
+test('queues only valid unseen cross-device achievement reveals', () => {
+  const queues: AchievementRevealQueues = {
+    activeRevealIds: [],
+    immediateRevealIds: [],
+    deferredDailyRevealIds: [],
+    locallyRevealedIds: ['debut'],
+  };
+  const reconciled = enqueueAchievementReveals(
+    queues,
+    ['debut', 'dedication', 'veteran'],
+    'immediate',
+    ['dedication'],
+    ['veteran']
+  );
+
+  assert.deepEqual(reconciled.immediateRevealIds, []);
+
+  const unseen = enqueueAchievementReveals(
+    queues,
+    ['fashion-show'],
+    'immediate'
+  );
+  assert.deepEqual(unseen.immediateRevealIds, ['fashion-show']);
 });
 
 test('unlocks Fashion Show after three same-day avatar changes and resets the daily count', () => {

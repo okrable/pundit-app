@@ -59,6 +59,7 @@ interface QuizState {
   isQuizLoading: boolean;
   isSubmitting: boolean;
   isReconcilingIdentity: boolean;
+  guestResetVersion: number;
   setUserId: (userId: string) => void;
   hydrateFromCache: (userId: string, date?: string) => Promise<void>;
   fetchQuiz: (date?: string, options?: { force?: boolean }) => Promise<Quiz | null>;
@@ -75,6 +76,7 @@ interface QuizState {
     }
   ) => Promise<void>;
   retryPendingSubmission: () => Promise<void>;
+  clearGuestTodayQuiz: () => Promise<void>;
   resetQuiz: () => void;
 }
 
@@ -116,6 +118,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   isQuizLoading: false,
   isSubmitting: false,
   isReconcilingIdentity: false,
+  guestResetVersion: 0,
 
   setUserId: (userId: string) =>
     set((state) =>
@@ -931,6 +934,34 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       quizId: pending.quizId,
       localResult: retryResult,
     });
+  },
+
+  clearGuestTodayQuiz: async () => {
+    const userId = get().userId;
+    const authState = useAuthStore.getState();
+    if (!userId || !userId.startsWith('guest_') || authState.isAuthenticated) {
+      throw new Error('Only the active guest quiz can be cleared.');
+    }
+
+    await clearGuestCache();
+    const remainingResult = await getGuestTodayResult();
+    if (remainingResult) {
+      throw new Error('The saved guest quiz could not be cleared.');
+    }
+    if (get().userId !== userId || useAuthStore.getState().isAuthenticated) {
+      throw new Error('Your session changed while clearing the guest quiz.');
+    }
+
+    set((state) => ({
+      cachedResult: null,
+      result: null,
+      submitError: null,
+      quizError: null,
+      isSubmitting: false,
+      guestResetVersion: state.guestResetVersion + 1,
+    }));
+    await useProfileStore.getState().hydrateFromCache(userId);
+    logInfo('quiz.guest.today_cleared', { userId });
   },
 
   resetQuiz: () => set({

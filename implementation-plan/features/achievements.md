@@ -11,7 +11,9 @@ the canonical snapshot; there are no achievement-only API endpoints.
 
 Daily Quiz unlocks are queued until the immediate or restored result surface.
 Non-game unlocks appear after their triggering action succeeds. One app-level
-panel displays simultaneous unlocks as a reduced-motion-aware list.
+panel displays simultaneous unlocks as a reduced-motion-aware list. Local reveal
+queues and server reconciliation deduplicate active, queued, acknowledged, and
+server-celebrated IDs so a synchronized unlock is celebrated exactly once.
 
 Authenticated Me displays all eight achievements. Visible milestones expose
 progress while locked easter eggs retain mystery copy. Guests can earn the five

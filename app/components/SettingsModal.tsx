@@ -15,7 +15,7 @@ import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../state/useAuthStore';
-import { clearGuestCache } from '../storage/quizStorage';
+import { useQuizStore } from '../state/useQuizStore';
 import { theme } from '../theme/theme';
 import { clearDebugLogs, getDebugLogText, logInfo } from '../services/debugLog';
 import { logoutWithAuth0 } from '../services/authFlow';
@@ -40,6 +40,7 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
   const { user, isAuthenticated, error, clearError } = useAuthStore();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCopyingLogs, setIsCopyingLogs] = React.useState(false);
+  const [isClearingGuestQuiz, setIsClearingGuestQuiz] = React.useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = React.useState(true);
 
   React.useEffect(() => {
@@ -108,8 +109,20 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
           text: 'Clear',
           style: 'destructive',
           onPress: async () => {
-            await clearGuestCache();
-            Alert.alert('Cache Cleared', 'You can now replay today\'s quiz.');
+            setIsClearingGuestQuiz(true);
+            try {
+              await useQuizStore.getState().clearGuestTodayQuiz();
+              Alert.alert('Quiz Cleared', 'You can now replay today\'s quiz.');
+            } catch (clearError) {
+              Alert.alert(
+                'Unable to Clear Quiz',
+                clearError instanceof Error
+                  ? clearError.message
+                  : 'Please try again after reopening the app.'
+              );
+            } finally {
+              setIsClearingGuestQuiz(false);
+            }
           },
         },
       ]
@@ -286,9 +299,17 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
           {!isAuthenticated && ( 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>GUEST OPTIONS</Text>
-              <TouchableOpacity style={styles.listItem} onPress={handleClearCache}>
+              <TouchableOpacity
+                style={styles.listItem}
+                onPress={handleClearCache}
+                disabled={isClearingGuestQuiz}
+              >
                 <View style={styles.listItemContent}>
-                  <Ionicons name="refresh-outline" size={22} color={theme.colors.textDark} />
+                  {isClearingGuestQuiz ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : (
+                    <Ionicons name="refresh-outline" size={22} color={theme.colors.textDark} />
+                  )}
                   <Text style={styles.listItemText}>Clear Today's Quiz</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.mediumGray} />

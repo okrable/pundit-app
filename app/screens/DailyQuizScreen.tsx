@@ -65,6 +65,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     result,
     userId: quizUserId,
     isReconcilingIdentity,
+    guestResetVersion,
     fetchQuiz,
     completeQuiz,
     reconcileIdentity,
@@ -117,6 +118,13 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     answeredCountRef.current = 0;
     completedRef.current = false;
   };
+
+  useEffect(() => {
+    if (guestResetVersion === 0) return;
+    resetPlayState();
+    setQuizStarted(false);
+    setStartRequested(false);
+  }, [guestResetVersion]);
 
   useEffect(() => {
     const loadWarmState = async () => {
