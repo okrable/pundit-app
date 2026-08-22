@@ -33,6 +33,7 @@ import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 import { getQuizDate } from '../utils/quizDate';
 import { isQuizForDate } from '../../shared/dailyQuiz';
 import { getCareerResultForDate } from '../../shared/careerGame';
+import { markAnalyticsTiming, trackAnalyticsEvent } from '../services/analytics';
 
 type Props = NativeStackScreenProps<GamesStackParamList, 'GamesHome'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -111,6 +112,11 @@ export default function GamesHomeScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      trackAnalyticsEvent(
+        'today_viewed',
+        isAuthenticated ? 'authenticated' : 'guest',
+        { quizDate: getQuizDate() }
+      );
       const refresh = async () => {
         setIsHubRefreshing(true);
         try {
@@ -228,6 +234,31 @@ export default function GamesHomeScreen({ navigation }: Props) {
   const careerDisabled =
     careerTileState === 'loading' || careerTileState === 'unavailable';
 
+  const actorType = isAuthenticated ? 'authenticated' : 'guest';
+  const handleOpenQuiz = () => {
+    if (!currentCachedResult) {
+      markAnalyticsTiming('daily-quiz-session');
+      trackAnalyticsEvent('quiz_start_requested', actorType, {
+        quizDate: currentQuizDate,
+        source: quizAvailable ? 'cache' : 'network',
+      });
+    }
+    navigation.navigate(
+      'DailyQuiz',
+      currentCachedResult ? undefined : { autoStart: true }
+    );
+  };
+
+  const handleOpenJourney = () => {
+    if (!currentCareerResult) {
+      trackAnalyticsEvent('journey_started', actorType, {
+        quizDate: currentQuizDate,
+        source: careerAvailable ? 'cache' : 'network',
+      });
+    }
+    navigation.navigate('CareerGame');
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       <ScrollView
@@ -284,12 +315,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
                   ? 'Opens today’s quiz recap'
                   : 'Starts today’s five-question quiz'
               }
-              onPress={() =>
-                navigation.navigate(
-                  'DailyQuiz',
-                  hubState.quiz === 'completed' ? undefined : { autoStart: true }
-                )
-              }
+              onPress={handleOpenQuiz}
             />
           </GameRow>
 
@@ -318,7 +344,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
                   ? 'Opens today’s completed player journey'
                   : 'Starts today’s player journey game'
               }
-              onPress={() => navigation.navigate('CareerGame')}
+              onPress={handleOpenJourney}
             />
           </GameRow>
 

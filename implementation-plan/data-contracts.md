@@ -73,6 +73,10 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - Authenticated completion stores a user/quiz-scoped pending submission before
   contacting the server. Its optimistic result is replaced by the authoritative
   response or retained for a later retry.
+- Daily results may include a deterministic local achievement event and a
+  canonical `achievementSnapshot`. Quiz submission, guest migration, and avatar
+  update accept the same optional `achievementSync` envelope, so achievement
+  reconciliation adds no calculation-only API request.
 
 ## Database-Facing Model
 
@@ -101,6 +105,20 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - New client contracts use `PublicPlayer { userId, username, avatarId?, avatarUrl? }`.
 - Auth storage persists `username`, `usernameRequired`, `onboardingStatus`, and `avatarId`;
   missing legacy metadata is resynchronized before navigation.
+- `user_achievements`, `user_achievement_progress`, and
+  `achievement_sync_receipts` durably reconcile post-v2.9 local achievement
+  events. `getUserStats` returns the authenticated snapshot for cross-device refresh.
+
+## Product Analytics
+
+- `analyticsId` is a locally generated random UUID that is not derived from or
+  stored in the Auth0 account model.
+- Legacy clients may omit the new envelope; current clients send
+  `trackingVersion: 1` and an allowlisted `properties` object.
+- Allowed properties are quiz date, cache/network source, bounded duration,
+  question number, total questions, score, and a fixed exit reason.
+- Free-form keys and identity/content values such as usernames, emails,
+  question text, answers, and invitation codes are rejected by the Function.
 
 ## Streak Status
 

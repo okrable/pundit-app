@@ -1,8 +1,9 @@
 import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
-import { query } from './lib/db';
+import { query, withClient } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { getQuizDate } from './lib/quizDate';
 import { buildStreakStatus } from '../../shared/streak';
+import { getServerAchievementSnapshotForUser } from './lib/achievements';
 
 const handler: LambdaHandler = async (event) => {
   const headers = {
@@ -123,6 +124,9 @@ const handler: LambdaHandler = async (event) => {
     }
 
     const userStats = stats[0];
+    const achievements = await withClient((client) =>
+      getServerAchievementSnapshotForUser(client, userId)
+    );
     const today = getQuizDate();
     const streakStatus = buildStreakStatus(
       {
@@ -147,6 +151,7 @@ const handler: LambdaHandler = async (event) => {
         displayName: userStats.display_name,
         createdAt: userStats.created_at,
         avatarId: userStats.avatar_id,
+        achievements,
         canChangeUsername: false,
         usernameChangeAvailableAt: null,
       }),

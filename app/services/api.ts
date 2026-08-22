@@ -20,6 +20,13 @@ import {
   FriendsLeaderboardResponse,
 } from '../types';
 import type { AvatarId } from '../../shared/avatarCatalog';
+import type {
+  AchievementId,
+  AchievementSnapshot,
+  AchievementSyncEnvelope,
+  DailyQuizAchievementEvent,
+  AvatarChangeAchievementEvent,
+} from '../../shared/achievements';
 import { useAuthStore } from '../state/useAuthStore';
 import { logError, logInfo, logWarn } from './debugLog';
 import { getQuizDate } from '../utils/quizDate';
@@ -320,13 +327,14 @@ export async function submitQuiz(
   quizId: string,
   userId: string,
   answers: AnswerWithTiming[],
-  userProfile?: UserProfile
+  userProfile?: UserProfile,
+  achievementSync?: AchievementSyncEnvelope
 ): Promise<QuizResultImmediate> {
   return fetchApi<QuizResultImmediate>(
     '/submitQuiz',
     {
       method: 'POST',
-      body: JSON.stringify({ quizId, userId, answers, userProfile }),
+      body: JSON.stringify({ quizId, userId, answers, userProfile, achievementSync }),
     },
     {
       timeoutMs: SUBMIT_QUIZ_TIMEOUT_MS,
@@ -403,6 +411,9 @@ export interface MigrateGuestResultResponse {
   message?: string;
   streak: number;
   bestScore: number;
+  achievementSnapshot?: AchievementSnapshot;
+  newlyUnlockedAchievements?: AchievementId[];
+  rejectedAchievementIds?: AchievementId[];
 }
 
 export async function migrateGuestResult(
@@ -411,11 +422,22 @@ export async function migrateGuestResult(
   score: number,
   totalQuestions: number,
   answers: boolean[],
-  userProfile?: UserProfile
+  userProfile?: UserProfile,
+  achievementEvent?: DailyQuizAchievementEvent,
+  achievementSync?: AchievementSyncEnvelope
 ): Promise<MigrateGuestResultResponse> {
   return fetchApi<MigrateGuestResultResponse>('/migrateGuestResult', {
     method: 'POST',
-    body: JSON.stringify({ userId, quizId, score, totalQuestions, answers, userProfile }),
+    body: JSON.stringify({
+      userId,
+      quizId,
+      score,
+      totalQuestions,
+      answers,
+      userProfile,
+      achievementEvent,
+      achievementSync,
+    }),
   });
 }
 
@@ -440,15 +462,20 @@ export interface UpdateAvatarResponse {
   success: boolean;
   profile?: { avatarId: AvatarId };
   error?: string;
+  achievementSnapshot?: AchievementSnapshot;
+  newlyUnlockedAchievements?: AchievementId[];
+  rejectedAchievementIds?: AchievementId[];
 }
 
 export async function updateAvatar(
   userId: string,
-  avatarId: AvatarId
+  avatarId: AvatarId,
+  achievementEvent?: AvatarChangeAchievementEvent,
+  achievementSync?: AchievementSyncEnvelope
 ): Promise<UpdateAvatarResponse> {
   return fetchApi<UpdateAvatarResponse>('/updateProfile', {
     method: 'POST',
-    body: JSON.stringify({ userId, avatarId }),
+    body: JSON.stringify({ userId, avatarId, achievementEvent, achievementSync }),
   });
 }
 

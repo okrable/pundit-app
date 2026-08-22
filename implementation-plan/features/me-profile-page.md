@@ -1,7 +1,7 @@
 # Feature: Me Profile Page
 
 > Status: Implemented
-> Last updated: v2.8.0 Stats-section retirement
+> Last updated: v2.9.0 achievements
 
 ## Delivered
 
@@ -26,6 +26,9 @@
   lets the player choose any library avatar before username and avatar are
   confirmed atomically.
 - Guest-only options, including clear daily quiz cache, are hidden for authenticated users.
+- Authenticated Me shows the eight-card achievement collection below the
+  compact profile header. Earned badges sort newest-first, visible milestones
+  show progress, and locked easter eggs retain mystery hints.
 - Login uses the centralized auth flow and shows `AuthSyncScreen` while reconciliation/prefetch runs.
 - Completing a quiz publishes the projected post-play streak immediately; the
   authoritative submission result reconciles it in the background.

@@ -2,6 +2,32 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.10.0 - Product analytics baseline
+
+- Added an optional random installation identifier and typed, allowlisted events
+  for Daily Quiz funnel, latency, sharing, Journey discovery, and return-rate measurement.
+- Added Settings controls to disable product analytics or reset the identifier
+  without affecting account or quiz data.
+- Added a backward-compatible analytics schema migration, 90-day scheduled raw
+  event cleanup, read-only audits, and future-ready retention reporting.
+- Kept Auth0 identity, usernames, question content, selected answers, invite
+  codes, and free-form metadata outside the analytics contract.
+- Stabilized the preview by deduplicating authenticated achievement reveals and
+  making one-tap guest quiz clearing update persisted and live completion state
+  together with inline success or failure feedback.
+- Added branded Apple and Android home-screen icons for the installed web app.
+
+## v2.9.0 - Local-first achievements
+
+- Added eight daily and profile achievements with optimistic on-device evaluation,
+  retry-safe authenticated persistence, and current-result guest adoption.
+- Added stacked, reduced-motion-aware achievement reveals that wait for Daily
+  Quiz results but appear immediately for non-game actions.
+- Added an authenticated Me achievement collection with progress, mystery
+  badges, cross-device profile synchronization, and account-scoped caching.
+- Added additive achievement progress, unlock, and idempotency tables without
+  backfilling activity from before this release.
+
 ## v2.8.0 - Whose Journey launch and Challenge retirement
 
 - Launched the daily rank-6 Whose Journey game from the Games gallery with

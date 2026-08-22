@@ -19,6 +19,8 @@
 - Preview builds use designated test accounts against the configured production CockroachDB/Auth0 services.
 - Challenge remains retired across new and installed clients; its implementation
   and historical data are preserved without active mutations.
+- Product analytics uses a random device installation identifier that remains
+  separate from Auth0 identity, survives logout, and can be disabled or reset.
 
 ## Active TODOs
 
@@ -40,7 +42,7 @@
 
 ### Low Priority
 
-- [x] Add anonymous aggregate analytics for key funnel events.
+- [x] Add privacy-bounded pseudonymous analytics for funnel and return metrics.
 - [ ] Add production release tags so changelog milestones can be dated authoritatively.
 
 ## Known Limitations
@@ -52,6 +54,9 @@
 5. Display-name columns and response aliases remain until v2 is distributable
    natively and supported-client analytics show no pre-v2.0.0 use for 30
    consecutive days.
+6. Current single-digit usage is too small for D1/D7 percentages to gate a
+   release. Use controlled functional, performance, and session-sequence evidence
+   until there are enough eligible players for credible retention cohorts.
 
 ## Documentation Discipline
 

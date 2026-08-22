@@ -13,6 +13,8 @@ import { theme } from '../theme/theme';
 import { CachedQuizResult } from '../storage/quizStorage';
 import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
 import { formatDailyQuizShare } from '../../shared/dailyQuiz';
+import { trackAnalyticsEvent } from '../services/analytics';
+import { useAuthStore } from '../state/useAuthStore';
 
 interface CompletedQuizScreenProps {
   result: CachedQuizResult;
@@ -24,6 +26,7 @@ export default function CompletedQuizScreen({
   onReturnToGames,
 }: CompletedQuizScreenProps) {
   const { width } = useWindowDimensions();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   // Convert boolean array directly to emojis
   const emojis = result.answers.map(isCorrect => isCorrect ? '⚽️' : '❌').join('');
 
@@ -38,6 +41,15 @@ export default function CompletedQuizScreen({
       await Share.share({
         message: shareText,
       });
+      trackAnalyticsEvent(
+        'quiz_shared',
+        isAuthenticated ? 'authenticated' : 'guest',
+        {
+          quizDate: result.date,
+          score: result.score,
+          totalQuestions: result.totalQuestions,
+        }
+      );
     } catch (error) {
       console.error('Error sharing:', error);
     }

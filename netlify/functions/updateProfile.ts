@@ -1,7 +1,17 @@
 import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
-import { query } from './lib/db';
+import { query, queryWithClient, withTransaction } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { isAvatarId } from '../../shared/avatarCatalog';
+import type {
+  AchievementSyncEnvelope,
+  AvatarChangeAchievementEvent,
+} from '../../shared/achievements';
+import { getQuizDate } from './lib/quizDate';
+import {
+  applyServerAchievementAcknowledgements,
+  applyServerAchievementEvent,
+  getServerAchievementSnapshotForUser,
+} from './lib/achievements';
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
 
@@ -25,7 +35,19 @@ const handler: LambdaHandler = async (event) => {
   }
 
   try {
-    const { userId, displayName, avatarId } = JSON.parse(event.body || '{}');
+    const {
+      userId,
+      displayName,
+      avatarId,
+      achievementEvent,
+      achievementSync,
+    }: {
+      userId?: string;
+      displayName?: unknown;
+      avatarId?: unknown;
+      achievementEvent?: AvatarChangeAchievementEvent;
+      achievementSync?: AchievementSyncEnvelope;
+    } = JSON.parse(event.body || '{}');
 
     if (!userId) {
       return {
@@ -58,14 +80,59 @@ const handler: LambdaHandler = async (event) => {
         };
       }
 
-      const updated = await query<{ avatar_id: string }>(
-        `UPDATE users
-         SET avatar_id = $2
-         WHERE id = $1
-         RETURNING avatar_id`,
-        [userId, avatarId]
-      );
-      if (!updated[0]) {
+      const result = await withTransaction(async (client) => {
+        const current = await queryWithClient<{ avatar_id: string | null }>(
+          client,
+          'SELECT avatar_id FROM users WHERE id = $1 FOR UPDATE',
+          [userId]
+        );
+        if (!current[0]) return null;
+
+        const changed = current[0].avatar_id !== avatarId;
+        if (changed) {
+          await queryWithClient(
+            client,
+            'UPDATE users SET avatar_id = $2 WHERE id = $1',
+            [userId, avatarId]
+          );
+        }
+
+        const validClientEventId =
+          achievementEvent?.kind === 'avatar-change' &&
+          typeof achievementEvent.id === 'string' &&
+          achievementEvent.id.length > 0 &&
+          achievementEvent.id.length <= 200;
+        const canonicalEvent: AvatarChangeAchievementEvent = {
+          id: validClientEventId
+            ? achievementEvent.id
+            : `avatar:${userId}:${getQuizDate()}:${Date.now()}`,
+          kind: 'avatar-change',
+          occurredAt: new Date().toISOString(),
+          quizDate: getQuizDate(),
+          allowCumulative: true,
+        };
+        const achievements = changed
+          ? await applyServerAchievementEvent(
+              client,
+              userId,
+              canonicalEvent,
+              achievementSync
+            )
+          : await (async () => {
+              await applyServerAchievementAcknowledgements(
+                client,
+                userId,
+                achievementSync?.acknowledgedIds
+              );
+              return {
+                snapshot: await getServerAchievementSnapshotForUser(client, userId),
+                newlyUnlocked: [],
+                rejectedProposedIds: [],
+              };
+            })();
+        return { avatarId: avatarId as string, achievements };
+      });
+      if (!result) {
         return {
           statusCode: 404,
           headers,
@@ -78,7 +145,10 @@ const handler: LambdaHandler = async (event) => {
         headers,
         body: JSON.stringify({
           success: true,
-          profile: { avatarId: updated[0].avatar_id },
+          profile: { avatarId: result.avatarId },
+          achievementSnapshot: result.achievements.snapshot,
+          newlyUnlockedAchievements: result.achievements.newlyUnlocked,
+          rejectedAchievementIds: result.achievements.rejectedProposedIds,
         }),
       };
     }

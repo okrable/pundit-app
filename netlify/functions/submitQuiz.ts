@@ -7,6 +7,12 @@ import { enforceRateLimit } from './lib/rateLimit';
 import { requireCompletedIdentity } from './lib/identity';
 import { recomputeUserStreak } from './lib/streaks';
 import { getAnswerKeyRows, QuestionSourceError } from './lib/questionSource';
+import type { AchievementSyncEnvelope, DailyQuizAchievementEvent } from '../../shared/achievements';
+import {
+  applyServerAchievementEvent,
+  applyServerAchievementAcknowledgements,
+  getServerAchievementSnapshotForUser,
+} from './lib/achievements';
 
 interface SubmitQuizRequest {
   quizId: string;
@@ -21,6 +27,7 @@ interface SubmitQuizRequest {
     email?: string;
     avatarUrl?: string;
   };
+  achievementSync?: AchievementSyncEnvelope;
 }
 
 interface InsertedResultRow {
@@ -82,7 +89,7 @@ const handler: LambdaHandler = async (event) => {
 
   try {
     const body: SubmitQuizRequest = JSON.parse(event.body || '{}');
-    const { quizId, userId, answers } = body;
+    const { quizId, userId, answers, achievementSync } = body;
     logRequestStart({ endpoint: 'submitQuiz', requestId, userId });
 
     if (!quizId || !userId) {
@@ -211,6 +218,19 @@ const handler: LambdaHandler = async (event) => {
     }
 
     const correctCount = answersCorrect.filter(Boolean).length;
+    const achievementEvent: DailyQuizAchievementEvent = {
+      id: `daily:${quizId}`,
+      kind: 'daily-quiz',
+      occurredAt: new Date().toISOString(),
+      quizDate,
+      quizId,
+      score,
+      answersCorrect,
+      correctAtZero: detailedAnswers.some(
+        (answer, index) => answer.isCorrect && answers[index]?.timeRemainingMs === 0
+      ),
+      allowCumulative: true,
+    };
 
     const dbResult = await withTransaction(async (client) => {
       const dbTimings: Record<string, number> = {};
@@ -249,11 +269,22 @@ const handler: LambdaHandler = async (event) => {
         t = Date.now();
         const streakStatus = await recomputeUserStreak(client, userId, quizDate);
         dbMark('streak_recompute', t);
+        await applyServerAchievementAcknowledgements(
+          client,
+          userId,
+          achievementSync?.acknowledgedIds
+        );
+        const achievementSnapshot = await getServerAchievementSnapshotForUser(client, userId);
 
         return {
           kind: 'existing' as const,
           row: existing[0],
           streakStatus,
+          achievements: {
+            snapshot: achievementSnapshot,
+            newlyUnlocked: [],
+            rejectedProposedIds: [],
+          },
           timings: dbTimings,
         };
       }
@@ -274,12 +305,21 @@ const handler: LambdaHandler = async (event) => {
       t = Date.now();
       const streakStatus = await recomputeUserStreak(client, userId, quizDate);
       dbMark('streak_recompute', t);
+      t = Date.now();
+      const achievements = await applyServerAchievementEvent(
+        client,
+        userId,
+        achievementEvent,
+        achievementSync
+      );
+      dbMark('achievement_sync', t);
 
       return {
         kind: 'inserted_sync' as const,
         row: inserted[0],
         userStats: updatedUser[0],
         streakStatus,
+        achievements,
         timings: dbTimings,
       };
     });
@@ -300,6 +340,9 @@ const handler: LambdaHandler = async (event) => {
         streak: dbResult.streakStatus.current,
         bestScore: dbResult.row?.best_score ?? 0,
         statsPending: false,
+        achievementSnapshot: dbResult.achievements.snapshot,
+        newlyUnlockedAchievements: dbResult.achievements.newlyUnlocked,
+        rejectedAchievementIds: dbResult.achievements.rejectedProposedIds,
       };
     } else {
       responseBody = {
@@ -311,6 +354,9 @@ const handler: LambdaHandler = async (event) => {
         streak: dbResult.streakStatus.current,
         bestScore: dbResult.userStats?.best_score ?? score,
         statsPending: false,
+        achievementSnapshot: dbResult.achievements.snapshot,
+        newlyUnlockedAchievements: dbResult.achievements.newlyUnlocked,
+        rejectedAchievementIds: dbResult.achievements.rejectedProposedIds,
       };
     }
     mark('response_build');

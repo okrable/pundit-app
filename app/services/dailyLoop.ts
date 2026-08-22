@@ -4,6 +4,7 @@ import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import { useProfileStore } from '../state/useProfileStore';
 import { useQuizStore } from '../state/useQuizStore';
 import { useCareerGameStore } from '../state/useCareerGameStore';
+import { useAchievementStore } from '../state/useAchievementStore';
 import { clearPendingChallengeSubmission } from '../storage/pendingChallengeSubmission';
 import { logError, logInfo, logWarn } from './debugLog';
 import { isIdentityActivationCurrent } from '../../shared/clientIdentityPolicy';
@@ -58,6 +59,7 @@ export async function hydrateDailyLoopFromCache(userId: string): Promise<void> {
     useCareerGameStore.getState().hydrateFromCache(userId).then(() => {
       logInfo('dailyLoop.cache.hydrate.career.success', { userId });
     }),
+    useAchievementStore.getState().hydrate(userId),
     clearPendingChallengeSubmission().then(() => {
       logInfo('dailyLoop.cache.challenge_pending_cleared');
     }),
@@ -166,6 +168,7 @@ export async function syncAuthenticatedSession({
     logInfo('dailyLoop.authSync.start', { userId, source });
 
     try {
+      await useAchievementStore.getState().hydrate(userId);
       await useQuizStore.getState().reconcileIdentity(userId, userProfile);
       assertCurrentSession();
       await useCareerGameStore.getState().reconcileIdentity(userId);

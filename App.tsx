@@ -18,12 +18,14 @@ import { ResponsiveAppShell } from './app/components/ResponsiveLayout';
 import UsernameOnboardingScreen from './app/components/UsernameOnboardingScreen';
 import AuthSyncScreen from './app/components/AuthSyncScreen';
 import AuthSyncFailureScreen from './app/components/AuthSyncFailureScreen';
+import AchievementRevealHost from './app/components/AchievementRevealHost';
 import { useAuthStore } from './app/state/useAuthStore';
 import {
   shouldShowIdentityFailure,
   shouldShowIdentitySync,
   shouldShowUsernameOnboarding,
 } from './shared/clientIdentityPolicy';
+import { getAppLaunchDuration, trackAnalyticsEvent } from './app/services/analytics';
 
 const Stack = createNativeStackNavigator();
 const navigationRef = createNavigationContainerRef<any>();
@@ -156,6 +158,7 @@ function AppContent() {
           });
         }}
       />
+      <AchievementRevealHost />
     </SharedLinkProvider>
   );
 }
@@ -192,6 +195,7 @@ export default function App() {
   const fontsLoaded = useFonts();
   const authReady = useAuthInit();
   const appReady = useAppBootstrap(authReady);
+  const readyEventSent = React.useRef(false);
 
   React.useEffect(() => {
     void startDebugSession('app-launch');
@@ -221,6 +225,17 @@ export default function App() {
   React.useEffect(() => {
     logInfo('app.render.state', { fontsLoaded, authReady, appReady });
   }, [fontsLoaded, authReady, appReady]);
+
+  React.useEffect(() => {
+    if (!fontsLoaded || !authReady || !appReady || readyEventSent.current) return;
+    readyEventSent.current = true;
+    const authState = useAuthStore.getState();
+    trackAnalyticsEvent(
+      'app_ready',
+      authState.isAuthenticated ? 'authenticated' : 'guest',
+      { durationMs: getAppLaunchDuration(), source: 'unknown' }
+    );
+  }, [appReady, authReady, fontsLoaded]);
 
   if (!fontsLoaded || !authReady || !appReady) {
     return <BootstrapScreen />;

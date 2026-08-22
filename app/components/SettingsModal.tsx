@@ -9,18 +9,24 @@ import {
   Linking,
   Alert,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../state/useAuthStore';
-import { clearGuestCache } from '../storage/quizStorage';
+import { useQuizStore } from '../state/useQuizStore';
 import { theme } from '../theme/theme';
 import { clearDebugLogs, getDebugLogText, logInfo } from '../services/debugLog';
 import { logoutWithAuth0 } from '../services/authFlow';
 import { APP_VERSION } from '../constants/version';
 import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { IS_PREVIEW_BUILD } from '../constants/environment';
+import {
+  isProductAnalyticsEnabled,
+  resetAnalyticsIdentity,
+  setProductAnalyticsEnabled,
+} from '../storage/analyticsStorage';
 
 const DONATION_URL = process.env.EXPO_PUBLIC_DONATION_URL || 'https://www.buymeacoffee.com';
 const FEEDBACK_URL = process.env.EXPO_PUBLIC_FEEDBACK_URL || 'mailto:feedback@pundit-trivia.com';
@@ -34,6 +40,23 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
   const { user, isAuthenticated, error, clearError } = useAuthStore();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCopyingLogs, setIsCopyingLogs] = React.useState(false);
+  const [isClearingGuestQuiz, setIsClearingGuestQuiz] = React.useState(false);
+  const [guestClearFeedback, setGuestClearFeedback] = React.useState<
+    'cleared' | 'error' | null
+  >(null);
+  const guestClearFeedbackTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [analyticsEnabled, setAnalyticsEnabled] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!visible) return;
+    void isProductAnalyticsEnabled().then(setAnalyticsEnabled);
+  }, [visible]);
+
+  React.useEffect(() => () => {
+    if (guestClearFeedbackTimer.current) {
+      clearTimeout(guestClearFeedbackTimer.current);
+    }
+  }, []);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -83,21 +106,57 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
     );
   };
 
+  const clearGuestQuiz = async () => {
+    if (guestClearFeedbackTimer.current) {
+      clearTimeout(guestClearFeedbackTimer.current);
+      guestClearFeedbackTimer.current = null;
+    }
+    setGuestClearFeedback(null);
+    setIsClearingGuestQuiz(true);
+    try {
+      await useQuizStore.getState().clearGuestTodayQuiz();
+      setGuestClearFeedback('cleared');
+      guestClearFeedbackTimer.current = setTimeout(() => {
+        setGuestClearFeedback(null);
+        guestClearFeedbackTimer.current = null;
+      }, 3000);
+    } catch {
+      setGuestClearFeedback('error');
+      guestClearFeedbackTimer.current = setTimeout(() => {
+        setGuestClearFeedback(null);
+        guestClearFeedbackTimer.current = null;
+      }, 4000);
+    } finally {
+      setIsClearingGuestQuiz(false);
+    }
+  };
+
   const handleClearCache = () => {
+    void clearGuestQuiz();
+  };
+
+  const handleAnalyticsChange = async (enabled: boolean) => {
+    setAnalyticsEnabled(enabled);
+    try {
+      await setProductAnalyticsEnabled(enabled);
+    } catch {
+      setAnalyticsEnabled(!enabled);
+      Alert.alert('Unable to Save', 'Your analytics preference could not be updated.');
+    }
+  };
+
+  const handleResetAnalyticsIdentity = () => {
     Alert.alert(
-      "Clear Today's Quiz",
-      'This will allow you to replay today\'s quiz. Your score will be reset. Continue?',
+      'Reset Analytics Identifier',
+      'This separates future product activity from previous activity on this device. It does not affect your account or quiz progress.',
       [
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Clear',
+          text: 'Reset',
           style: 'destructive',
           onPress: async () => {
-            await clearGuestCache();
-            Alert.alert('Cache Cleared', 'You can now replay today\'s quiz.');
+            await resetAnalyticsIdentity();
+            Alert.alert('Identifier Reset', 'Future product analytics will use a new identifier.');
           },
         },
       ]
@@ -195,6 +254,38 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
             </TouchableOpacity>
           </View>
 
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>PRIVACY</Text>
+            <View style={styles.listItem}>
+              <View style={[styles.listItemContent, styles.analyticsPreferenceContent]}>
+                <Ionicons name="analytics-outline" size={22} color={theme.colors.textDark} />
+                <View style={styles.preferenceText}>
+                  <Text style={styles.listItemText}>Product Analytics</Text>
+                  <Text style={styles.preferenceDescription}>
+                    Helps improve speed and daily return rates using a random device identifier. No name, email, answers or advertising ID is collected.
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={analyticsEnabled}
+                onValueChange={(enabled) => void handleAnalyticsChange(enabled)}
+                trackColor={{ false: theme.colors.lightGray, true: theme.colors.primaryLight }}
+                thumbColor={analyticsEnabled ? theme.colors.accent : theme.colors.mediumGray}
+                accessibilityLabel="Product analytics"
+              />
+            </View>
+            <TouchableOpacity style={styles.listItem} onPress={handleResetAnalyticsIdentity}>
+              <View style={styles.listItemContent}>
+                <Ionicons name="refresh-outline" size={22} color={theme.colors.textDark} />
+                <Text style={styles.listItemText}>Reset Analytics Identifier</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.mediumGray} />
+            </TouchableOpacity>
+            <Text style={styles.helperText}>
+              Analytics is first-party, pseudonymous, optional, and kept separately from your Pundit account. Raw events are retained for 90 days.
+            </Text>
+          </View>
+
           {/* About Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>ABOUT</Text>
@@ -214,12 +305,34 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
           {!isAuthenticated && ( 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>GUEST OPTIONS</Text>
-              <TouchableOpacity style={styles.listItem} onPress={handleClearCache}>
+              <TouchableOpacity
+                style={styles.listItem}
+                onPress={handleClearCache}
+                disabled={isClearingGuestQuiz}
+              >
                 <View style={styles.listItemContent}>
-                  <Ionicons name="refresh-outline" size={22} color={theme.colors.textDark} />
-                  <Text style={styles.listItemText}>Clear Today's Quiz</Text>
+                  {isClearingGuestQuiz ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : guestClearFeedback === 'cleared' ? (
+                    <Ionicons name="checkmark-circle" size={22} color={theme.colors.correct} />
+                  ) : guestClearFeedback === 'error' ? (
+                    <Ionicons name="alert-circle" size={22} color={theme.colors.incorrect} />
+                  ) : (
+                    <Ionicons name="refresh-outline" size={22} color={theme.colors.textDark} />
+                  )}
+                  <Text style={styles.listItemText}>
+                    {isClearingGuestQuiz
+                      ? 'Clearing quiz…'
+                      : guestClearFeedback === 'cleared'
+                        ? 'Quiz cleared'
+                        : guestClearFeedback === 'error'
+                          ? 'Unable to clear — try again'
+                          : "Clear Today's Quiz"}
+                  </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.mediumGray} />
+                {!isClearingGuestQuiz && !guestClearFeedback && (
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.mediumGray} />
+                )}
               </TouchableOpacity>
               <Text style={styles.helperText}>
                 Replay today's quiz (resets your score)
@@ -336,6 +449,21 @@ const styles = StyleSheet.create({
   listItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  analyticsPreferenceContent: {
+    flex: 1,
+    marginRight: theme.spacing.md,
+  },
+  preferenceText: {
+    flex: 1,
+  },
+  preferenceDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+    marginLeft: theme.spacing.md,
+    marginTop: theme.spacing.xs,
   },
   listItemText: {
     fontSize: 15,

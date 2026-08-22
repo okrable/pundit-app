@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.8.0 Whose Journey launch and Challenge retirement
+> Last updated: v2.10.0 product analytics baseline
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -64,6 +64,17 @@ In plain English, this work delivered four connected changes:
     is replaced by a Coming Soon entry and fail-closed APIs, and Me no longer
     displays its Stats section.
 
+13. **v2.9.0 — local-first achievements:** shared client/server rules evaluate
+    eight achievements from existing quiz and profile state. Local unlocks are
+    optimistic and retry-safe, authenticated state reconciles through existing
+   requests, and Me presents the durable collection without achievement-only APIs.
+
+14. **v2.10.0 — product analytics baseline:** a random installation-scoped
+   identifier now connects allowlisted, typed product events without using Auth0
+   identity or free-form metadata. Settings provides opt-out/reset controls,
+   raw events expire after 90 days, and checked-in reports support operational
+   smoke testing now plus retention analysis when the player base is large enough.
+
 ## Product Status Snapshot
 
 ### Delivered
@@ -100,8 +111,10 @@ In plain English, this work delivered four connected changes:
 - Persistent retry for daily and Journey submissions.
 - Immediate local quiz completion and projected post-play streak before server
   reconciliation.
+- Local-first achievement evaluation, result-safe stacked celebrations, and
+  authenticated cross-device achievement persistence.
 - Shared database-backed rate limiting on sensitive endpoints.
-- Anonymous aggregate product funnel events.
+- Optional first-party pseudonymous funnel, performance, share, and return events.
 - Selective version-2 social cache invalidation that preserves gameplay state.
 
 ### Hardening Remaining
@@ -109,6 +122,8 @@ In plain English, this work delivered four connected changes:
 - Operational alert configuration and error-budget reporting.
 - Broader automated integration and UI coverage.
 - Test-account data governance while previews share production services.
+- Refresh-safe local Daily Quiz attempts that restore question, answer, score,
+  phase, and elapsed timer state without allowing answered questions to be retried.
 
 ## Canonical Docs in This Folder
 

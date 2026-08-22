@@ -8,6 +8,16 @@ import { logError, logInfo } from '../services/debugLog';
 import { getQuizDate } from '../utils/quizDate';
 import { buildStreakStatus } from '../../shared/streak';
 import type { AvatarId } from '../../shared/avatarCatalog';
+import {
+  applyAchievementEvent,
+  type AvatarChangeAchievementEvent,
+} from '../../shared/achievements';
+import { useAchievementStore } from './useAchievementStore';
+import {
+  clearPendingAvatarAchievementMutation,
+  getPendingAvatarAchievementMutation,
+  setPendingAvatarAchievementMutation,
+} from '../storage/achievementStorage';
 
 const GUEST_STATS: UserStats = {
   streak: 0,
@@ -114,6 +124,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         getTodayResult(userId),
       ]);
 
+      if (stats.achievements) {
+        await useAchievementStore.getState().reconcileServer(userId, stats.achievements);
+      }
+
       await setCachedUserStats(userId, stats);
       const refreshedCache = await getCachedUserStats(userId);
       const latestAuthState = useAuthStore.getState();
@@ -189,7 +203,29 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       throw new Error('Your session is no longer available.');
     }
 
-    const response = await updateAvatar(userId, avatarId);
+    const achievementEvent: AvatarChangeAchievementEvent =
+      (await getPendingAvatarAchievementMutation(userId, avatarId)) ?? {
+        id: `avatar:${userId}:${getQuizDate()}:${Date.now()}`,
+        kind: 'avatar-change',
+        occurredAt: new Date().toISOString(),
+        quizDate: getQuizDate(),
+        allowCumulative: true,
+      };
+    await setPendingAvatarAchievementMutation(userId, avatarId, achievementEvent);
+    const proposal = applyAchievementEvent(
+      useAchievementStore.getState().snapshot,
+      achievementEvent
+    );
+    const achievementSync = useAchievementStore.getState().buildSyncEnvelope(
+      achievementEvent.id,
+      proposal.newlyUnlocked
+    );
+    const response = await updateAvatar(
+      userId,
+      avatarId,
+      achievementEvent,
+      achievementSync
+    );
     if (!response.success || !response.profile?.avatarId) {
       throw new Error(response.error || 'Unable to save your avatar.');
     }
@@ -203,6 +239,19 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     }
 
     const confirmedAvatarId = response.profile.avatarId;
+    await clearPendingAvatarAchievementMutation(userId);
+    await useAchievementStore.getState().applyLocalEvent(userId, achievementEvent);
+    if (response.achievementSnapshot) {
+      await useAchievementStore.getState().reconcileServer(
+        userId,
+        response.achievementSnapshot,
+        {
+          acceptedEventId: achievementEvent.id,
+          newlyUnlocked: response.newlyUnlockedAchievements,
+          rejectedIds: response.rejectedAchievementIds,
+        }
+      );
+    }
     await latestAuthState.applyAvatar(confirmedAvatarId);
     const currentStats = get().statsUserId === userId ? get().stats : null;
     if (currentStats) {

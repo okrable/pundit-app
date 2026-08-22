@@ -3,6 +3,7 @@ import { auth0Config, fetchUserInfo, getAuthRedirectUri } from './auth0';
 import { syncAuthenticatedSession } from './dailyLoop';
 import { logError, logInfo, logWarn } from './debugLog';
 import { useAuthStore } from '../state/useAuthStore';
+import { useAchievementStore } from '../state/useAchievementStore';
 import { trackAnalyticsEvent } from './analytics';
 import { setUsername as setUsernameApi, syncIdentity } from './api';
 import type { SetUsernameResponse } from '../types';
@@ -279,5 +280,6 @@ export async function logoutWithAuth0(): Promise<void> {
   logInfo('auth.flow.logout.start');
   AuthSession.dismiss();
   await useAuthStore.getState().logout();
+  useAchievementStore.getState().reset();
   logInfo('auth.flow.logout.end');
 }

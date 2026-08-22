@@ -33,7 +33,11 @@ import { useProfileStore } from './useProfileStore';
 import { useLeaderboardStore } from './useLeaderboardStore';
 import { logError, logInfo, logWarn } from '../services/debugLog';
 import { calculateQuizPoints } from '../../shared/scoring';
-import { trackAnalyticsEvent } from '../services/analytics';
+import {
+  clearAnalyticsTiming,
+  getAnalyticsTimingDuration,
+  trackAnalyticsEvent,
+} from '../services/analytics';
 import { chooseReconciliationSource } from '../../shared/reconciliation';
 import { projectStreakAfterPlay } from '../../shared/streak';
 import {
@@ -41,6 +45,8 @@ import {
   isTransientQuizSubmissionFailure,
 } from '../../shared/quizSync';
 import { isQuizForDate } from '../../shared/dailyQuiz';
+import type { DailyQuizAchievementEvent } from '../../shared/achievements';
+import { useAchievementStore } from './useAchievementStore';
 
 interface QuizState {
   quiz: Quiz | null;
@@ -53,6 +59,7 @@ interface QuizState {
   isQuizLoading: boolean;
   isSubmitting: boolean;
   isReconcilingIdentity: boolean;
+  guestResetVersion: number;
   setUserId: (userId: string) => void;
   hydrateFromCache: (userId: string, date?: string) => Promise<void>;
   fetchQuiz: (date?: string, options?: { force?: boolean }) => Promise<Quiz | null>;
@@ -69,6 +76,7 @@ interface QuizState {
     }
   ) => Promise<void>;
   retryPendingSubmission: () => Promise<void>;
+  clearGuestTodayQuiz: () => Promise<void>;
   resetQuiz: () => void;
 }
 
@@ -110,6 +118,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   isQuizLoading: false,
   isSubmitting: false,
   isReconcilingIdentity: false,
+  guestResetVersion: 0,
 
   setUserId: (userId: string) =>
     set((state) =>
@@ -398,14 +407,38 @@ export const useQuizStore = create<QuizState>((set, get) => ({
           return;
         }
 
+        const guestAchievementEvent = guestResult.achievementEvent;
+        const guestAchievementSync = guestAchievementEvent
+          ? {
+              ...useAchievementStore.getState().buildSyncEnvelope(
+                guestAchievementEvent.id,
+                guestResult.newlyUnlockedAchievements ?? []
+              ),
+              acknowledgedIds: guestResult.newlyUnlockedAchievements ?? [],
+            }
+          : undefined;
         const migrationResult = await migrateGuestResult(
           userId,
           guestResult.quizId,
           guestResult.score,
           guestResult.totalQuestions,
           guestResult.answers,
-          userProfile ?? buildUserProfile()
+          userProfile ?? buildUserProfile(),
+          guestAchievementEvent,
+          guestAchievementSync
         );
+
+        if (migrationResult.achievementSnapshot) {
+          await useAchievementStore.getState().reconcileServer(
+            userId,
+            migrationResult.achievementSnapshot,
+            {
+              acceptedEventId: guestAchievementEvent?.id,
+              newlyUnlocked: migrationResult.newlyUnlockedAchievements,
+              rejectedIds: migrationResult.rejectedAchievementIds,
+            }
+          );
+        }
 
         if (!migrationResult.migrated) {
           const existingResult = await getTodayResult(userId);
@@ -517,6 +550,22 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       : currentStats
         ? projectStreakAfterPlay(currentStats.streakStatus)
         : 1;
+    const achievementEvent: DailyQuizAchievementEvent = {
+      id: `daily:${quiz.id}`,
+      kind: 'daily-quiz',
+      occurredAt: new Date().toISOString(),
+      quizDate: quiz.date,
+      quizId: quiz.id,
+      score,
+      answersCorrect: detailedAnswers.map((answer) => answer.isCorrect),
+      correctAtZero: detailedAnswers.some(
+        (answer, index) => answer.isCorrect && answers[index]?.timeRemainingMs === 0
+      ),
+      allowCumulative: !userId.startsWith('guest_'),
+    };
+    const locallyUnlocked = await useAchievementStore
+      .getState()
+      .applyLocalEvent(userId, achievementEvent);
     const localResult: QuizResultImmediate = {
       date: quiz.date,
       quizId: quiz.id,
@@ -528,10 +577,15 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       statsPending: !userId.startsWith('guest_'),
       syncState: userId.startsWith('guest_') ? 'synced' : 'pending',
       isOptimistic: true,
+      achievementEvent,
+      newlyUnlockedAchievements: locallyUnlocked,
     };
 
     const isGuest = userId.startsWith('guest_');
     const userProfile = buildUserProfile();
+    const achievementSync = useAchievementStore
+      .getState()
+      .buildSyncEnvelope(achievementEvent.id, locallyUnlocked);
     const persistPendingSubmission = isGuest
       ? Promise.resolve()
       : setPendingQuizSubmission({
@@ -540,6 +594,8 @@ export const useQuizStore = create<QuizState>((set, get) => ({
           answers,
           userProfile,
           localResult,
+          achievementEvent,
+          achievementSync,
           queuedAt: new Date().toISOString(),
         });
 
@@ -555,6 +611,8 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         answers: localResult.answers.map((answer) => answer.isCorrect),
         syncState: localResult.syncState,
         isOptimistic: localResult.isOptimistic,
+        achievementEvent,
+        newlyUnlockedAchievements: locallyUnlocked,
         cachedAt: new Date().toISOString(),
         userId,
       },
@@ -569,8 +627,15 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
     trackAnalyticsEvent(
       'quiz_completed',
-      userId.startsWith('guest_') ? 'guest' : 'authenticated'
+      userId.startsWith('guest_') ? 'guest' : 'authenticated',
+      {
+        quizDate: localResult.date,
+        durationMs: getAnalyticsTimingDuration('daily-quiz-session'),
+        totalQuestions: localResult.totalQuestions,
+        score: localResult.score,
+      }
     );
+    clearAnalyticsTiming('daily-quiz-session');
 
     return localResult;
   },
@@ -652,9 +717,23 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       }
 
       try {
-        const serverResult = await submitQuiz(submittedQuizId, userId, answers, profile);
+        const achievementEvent = submissionLocalResult?.achievementEvent;
+        const achievementSync = achievementEvent
+          ? useAchievementStore.getState().buildSyncEnvelope(
+              achievementEvent.id,
+              submissionLocalResult?.newlyUnlockedAchievements ?? []
+            )
+          : undefined;
+        const serverResult = await submitQuiz(
+          submittedQuizId,
+          userId,
+          answers,
+          profile,
+          achievementSync
+        );
         const mergedResult: QuizResultImmediate = {
           ...serverResult,
+          achievementEvent,
           syncState: 'synced',
           statsPending: false,
           isOptimistic: false,
@@ -662,6 +741,18 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
         await saveDailyQuizResult(mergedResult, userId, mergedResult.syncState);
         await clearPendingQuizSubmission({ userId, quizId: submittedQuizId });
+        if (serverResult.achievementSnapshot) {
+          await useAchievementStore.getState().reconcileServer(
+            userId,
+            serverResult.achievementSnapshot,
+            {
+              acceptedEventId: achievementEvent?.id,
+              newlyUnlocked: serverResult.newlyUnlockedAchievements,
+              rejectedIds: serverResult.rejectedAchievementIds,
+              deferReveal: true,
+            }
+          );
+        }
 
         if (
           isQuizSubmissionCurrent(
@@ -843,6 +934,34 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       quizId: pending.quizId,
       localResult: retryResult,
     });
+  },
+
+  clearGuestTodayQuiz: async () => {
+    const userId = get().userId;
+    const authState = useAuthStore.getState();
+    if (!userId || !userId.startsWith('guest_') || authState.isAuthenticated) {
+      throw new Error('Only the active guest quiz can be cleared.');
+    }
+
+    await clearGuestCache();
+    const remainingResult = await getGuestTodayResult();
+    if (remainingResult) {
+      throw new Error('The saved guest quiz could not be cleared.');
+    }
+    if (get().userId !== userId || useAuthStore.getState().isAuthenticated) {
+      throw new Error('Your session changed while clearing the guest quiz.');
+    }
+
+    set((state) => ({
+      cachedResult: null,
+      result: null,
+      submitError: null,
+      quizError: null,
+      isSubmitting: false,
+      guestResetVersion: state.guestResetVersion + 1,
+    }));
+    await useProfileStore.getState().hydrateFromCache(userId);
+    logInfo('quiz.guest.today_cleared', { userId });
   },
 
   resetQuiz: () => set({

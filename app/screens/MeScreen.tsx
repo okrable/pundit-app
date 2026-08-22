@@ -33,6 +33,7 @@ import StreakIcon from '../components/StreakIcon';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 import AvatarPickerModal from '../components/AvatarPickerModal';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
+import AchievementShowcase from '../components/AchievementShowcase';
 
 const EMPTY_STATS: UserStats = {
   streak: 0,
@@ -287,6 +288,8 @@ export default function MeScreen() {
           </View>
         </View>
 
+        <AchievementShowcase />
+
       </ScrollView>
 
       <SettingsModal
@@ -301,8 +304,8 @@ export default function MeScreen() {
           onClose={() => setAvatarPickerVisible(false)}
           onConfirm={async (avatarId) => {
             const confirmedAvatarId = await saveAvatar(avatarId);
-            await applyLeaderboardAvatar(user.sub, confirmedAvatarId);
             setAvatarPickerVisible(false);
+            await applyLeaderboardAvatar(user.sub, confirmedAvatarId);
           }}
         />
       ) : null}

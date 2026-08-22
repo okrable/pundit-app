@@ -32,6 +32,10 @@ function toCompactResult(result: QuizResultImmediate | QuizResult): QuizResult {
       answers: immediateResult.answers.map(a => a.isCorrect),
       syncState: immediateResult.syncState,
       isOptimistic: immediateResult.isOptimistic,
+      achievementEvent: immediateResult.achievementEvent,
+      achievementSnapshot: immediateResult.achievementSnapshot,
+      newlyUnlockedAchievements: immediateResult.newlyUnlockedAchievements,
+      rejectedAchievementIds: immediateResult.rejectedAchievementIds,
     };
   }
 
