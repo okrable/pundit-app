@@ -15,6 +15,7 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 - Stabilized the preview by deduplicating authenticated achievement reveals and
   making one-tap guest quiz clearing update persisted and live completion state
   together with inline success or failure feedback.
+- Added branded Apple and Android home-screen icons for the installed web app.
 
 ## v2.9.0 - Local-first achievements
 

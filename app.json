@@ -25,7 +25,7 @@
       "package": "com.anonymous.pundittemp"
     },
     "web": {
-      "favicon": "./assets/icon.png"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-secure-store",
