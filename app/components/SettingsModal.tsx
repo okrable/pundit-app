@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -96,37 +97,46 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
     );
   };
 
+  const clearGuestQuiz = async () => {
+    setIsClearingGuestQuiz(true);
+    try {
+      await useQuizStore.getState().clearGuestTodayQuiz();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert('Quiz cleared. You can now replay today\'s quiz.');
+      } else {
+        Alert.alert('Quiz Cleared', 'You can now replay today\'s quiz.');
+      }
+    } catch (clearError) {
+      const message = clearError instanceof Error
+        ? clearError.message
+        : 'Please try again after reopening the app.';
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(`Unable to clear quiz. ${message}`);
+      } else {
+        Alert.alert('Unable to Clear Quiz', message);
+      }
+    } finally {
+      setIsClearingGuestQuiz(false);
+    }
+  };
+
   const handleClearCache = () => {
-    Alert.alert(
-      "Clear Today's Quiz",
-      'This will allow you to replay today\'s quiz. Your score will be reset. Continue?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            setIsClearingGuestQuiz(true);
-            try {
-              await useQuizStore.getState().clearGuestTodayQuiz();
-              Alert.alert('Quiz Cleared', 'You can now replay today\'s quiz.');
-            } catch (clearError) {
-              Alert.alert(
-                'Unable to Clear Quiz',
-                clearError instanceof Error
-                  ? clearError.message
-                  : 'Please try again after reopening the app.'
-              );
-            } finally {
-              setIsClearingGuestQuiz(false);
-            }
-          },
-        },
-      ]
-    );
+    const message = 'This will allow you to replay today\'s quiz. Your score will be reset. Continue?';
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm(message)) {
+        void clearGuestQuiz();
+      }
+      return;
+    }
+
+    Alert.alert("Clear Today's Quiz", message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: () => void clearGuestQuiz(),
+      },
+    ]);
   };
 
   const handleAnalyticsChange = async (enabled: boolean) => {
