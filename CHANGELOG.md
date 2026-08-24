@@ -2,6 +2,14 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.10.1 - Friend invite loop hotfix
+
+- Consumed web friend and retired Challenge links after capture so accepting,
+  dismissing, or viewing an existing friendship cannot reopen the same modal
+  and exhaust the invite-preview rate limit.
+- Preserved pending friend invitations through sign-in and native deep-link
+  handling without changing friendship persistence or server APIs.
+
 ## v2.10.0 - Product analytics baseline
 
 - Added an optional random installation identifier and typed, allowlisted events

@@ -6,6 +6,7 @@ import { acceptFriendLink, getFriendInvite } from '../services/api';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
 import {
   getSharedCodeActionFromUrl,
+  getWebSharedCodeUrlReplacement,
   SharedCodeAction,
 } from '../services/sharedCode';
 import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
@@ -61,6 +62,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
   const [suspendedForSignIn, setSuspendedForSignIn] = useState(false);
   const actionKeyRef = useRef<string | null>(null);
   const isProcessingRef = useRef(false);
+  const hasHydratedInitialActionRef = useRef(false);
 
   const clearAction = useCallback(async () => {
     actionKeyRef.current = null;
@@ -87,7 +89,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
       return;
     }
     const key = `${action.kind}:${action.code}`;
-    if (actionKeyRef.current === key && pendingAction) return;
+    if (actionKeyRef.current === key) return;
     actionKeyRef.current = key;
     setPreview(null);
     setMessage(null);
@@ -96,34 +98,61 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
     setPhase('loading');
     await setPendingSharedAction(action);
     logInfo('shared_link.received', { kind: action.kind });
-  }, [onChallengeUnavailable, pendingAction]);
+  }, [onChallengeUnavailable]);
 
-  const handleUrl = useCallback((url: string) => {
+  const handleUrl = useCallback(async (url: string) => {
     const action = getSharedCodeActionFromUrl(url);
-    if (action) void openAction(action);
+    if (!action) return;
+
+    await openAction(action);
+
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const currentAction = getSharedCodeActionFromUrl(window.location.href);
+    if (
+      currentAction?.kind !== action.kind ||
+      currentAction.code !== action.code
+    ) {
+      return;
+    }
+    const replacement = getWebSharedCodeUrlReplacement(window.location.href);
+    if (replacement) {
+      window.history.replaceState(window.history.state, '', replacement);
+    }
   }, [openAction]);
 
   useEffect(() => {
-    void getPendingSharedAction().then((stored) => {
-      if (stored && !actionKeyRef.current) {
-        void openAction({ kind: stored.kind, code: stored.code });
+    if (hasHydratedInitialActionRef.current) return;
+    hasHydratedInitialActionRef.current = true;
+    let isActive = true;
+
+    const hydrateInitialAction = async () => {
+      const initialUrl =
+        Platform.OS === 'web' && typeof window !== 'undefined'
+          ? window.location.href
+          : await Linking.getInitialURL();
+      if (!isActive) return;
+
+      if (initialUrl && getSharedCodeActionFromUrl(initialUrl)) {
+        await handleUrl(initialUrl);
+        return;
       }
-    });
-  }, [openAction]);
 
-  useEffect(() => {
-    const getInitialUrl = async () => {
-      const url = await Linking.getInitialURL();
-      if (url) handleUrl(url);
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        handleUrl(window.location.href);
+      const stored = await getPendingSharedAction();
+      if (isActive && stored && !actionKeyRef.current) {
+        await openAction({ kind: stored.kind, code: stored.code });
       }
     };
-    void getInitialUrl();
-  }, [handleUrl]);
+
+    void hydrateInitialAction();
+    return () => {
+      isActive = false;
+    };
+  }, [handleUrl, openAction]);
 
   useEffect(() => {
-    const subscription = Linking.addEventListener('url', (event) => handleUrl(event.url));
+    const subscription = Linking.addEventListener('url', (event) => {
+      void handleUrl(event.url);
+    });
     return () => subscription.remove();
   }, [handleUrl]);
 
