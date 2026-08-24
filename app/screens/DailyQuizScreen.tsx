@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -24,459 +24,326 @@ import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 import { getQuizDate } from '../utils/quizDate';
 import { isQuizForDate } from '../../shared/dailyQuiz';
 import { useAchievementStore } from '../state/useAchievementStore';
-
-const REVEAL_SUSPENSE_DELAY = 1000;
-const RESULT_HOLD_DELAY = 1650;
-const QUESTION_EXIT_DELAY = 1700;
-const TIMER_DURATION = 20;
+import {
+  DAILY_QUIZ_REVEAL_DELAY_MS,
+  DAILY_QUIZ_TIMER_MS,
+  getDailyQuizRemainingSeconds,
+  normalizeDailyQuizAttempt,
+} from '../../shared/dailyQuizAttempt';
 
 type Props = NativeStackScreenProps<GamesStackParamList, 'DailyQuiz'>;
 
 export default function DailyQuizScreen({ navigation, route }: Props) {
   const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
   const centeredQuizStyle = useCenteredWebStyle(webContentWidth.quiz);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [showingResult, setShowingResult] = useState(false);
-  const [score, setScore] = useState(0);
-  const [quizStarted, setQuizStarted] = useState(false);
   const [startRequested, setStartRequested] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
-  const [timerActive, setTimerActive] = useState(false);
-  const [answeringEnabled, setAnsweringEnabled] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(TIMER_DURATION);
-  const [answerTimings, setAnswerTimings] = useState<Record<string, number>>({});
-  const [isQuestionExiting, setIsQuestionExiting] = useState(false);
-  const revealTimer = useRef<NodeJS.Timeout | null>(null);
-  const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
-  const questionExitTimer = useRef<NodeJS.Timeout | null>(null);
-  const firstQuestionReadySent = useRef(false);
-  const answeredCountRef = useRef(0);
-  const completedRef = useRef(false);
-  const actorTypeRef = useRef<'guest' | 'authenticated'>('guest');
+  const [timeRemaining, setTimeRemaining] = useState(20);
+  const completionStartedRef = useRef<string | null>(null);
+  const resumedAttemptRef = useRef<string | null>(null);
   const recapEventKeyRef = useRef<string | null>(null);
+  const firstQuestionReadySent = useRef(false);
 
   const {
-    quiz,
-    cachedResult,
-    quizError,
-    submitError,
-    result,
-    userId: quizUserId,
-    isReconcilingIdentity,
-    guestResetVersion,
-    fetchQuiz,
-    completeQuiz,
-    setUserId,
-    setCachedResult,
-    resetQuiz,
+    quiz, cachedResult, quizError, submitError, result,
+    userId: quizUserId, activeAttempt, activeAttemptSource, attemptError,
+    fetchQuiz, completeQuiz, setUserId, setCachedResult, resetQuiz,
+    beginDailyQuizAttempt, updateDailyQuizAttempt, hydrateActiveAttempt,
   } = useQuizStore();
   const { user, isAuthenticated } = useAuthStore();
-  const previousQuizUserIdRef = useRef<string | null>(null);
   const setDailyGameActive = useAchievementStore((state) => state.setDailyGameActive);
   const releaseDailyReveals = useAchievementStore((state) => state.releaseDailyReveals);
-  actorTypeRef.current =
-    !quizUserId || quizUserId.startsWith('guest_') ? 'guest' : 'authenticated';
+  const actorType = !quizUserId || quizUserId.startsWith('guest_')
+    ? 'guest' as const
+    : 'authenticated' as const;
+  const currentQuizDate = getQuizDate();
+  const quizIsCurrent = isQuizForDate(quiz, currentQuizDate);
+  const attemptIsCurrent = Boolean(
+    activeAttempt && activeAttempt.userId === quizUserId &&
+    activeAttempt.quizId === quiz?.id && activeAttempt.quizDate === currentQuizDate
+  );
 
   useEffect(() => {
-    const showingImmediateResults = Boolean(result?.date === getQuizDate());
-    const showingCompletedResult = Boolean(cachedResult?.date === getQuizDate());
-    setDailyGameActive(quizStarted && !showingImmediateResults && !showingCompletedResult);
-    if (showingImmediateResults || showingCompletedResult) void releaseDailyReveals();
-  }, [cachedResult, quizStarted, releaseDailyReveals, result?.date, setDailyGameActive]);
-
+    const showingResult = Boolean(result?.date === currentQuizDate);
+    const showingCached = Boolean(cachedResult?.date === currentQuizDate);
+    setDailyGameActive(attemptIsCurrent && !showingResult && !showingCached);
+    if (showingResult || showingCached) void releaseDailyReveals();
+  }, [attemptIsCurrent, cachedResult, currentQuizDate, releaseDailyReveals, result, setDailyGameActive]);
   useEffect(() => () => setDailyGameActive(false), [setDailyGameActive]);
-
-  const clearQuestionTimers = () => {
-    if (revealTimer.current) {
-      clearTimeout(revealTimer.current);
-      revealTimer.current = null;
+  useEffect(() => () => {
+    if (useQuizStore.getState().activeAttempt) {
+      useQuizStore.setState({ activeAttemptSource: 'cache' });
     }
-    if (autoAdvanceTimer.current) {
-      clearTimeout(autoAdvanceTimer.current);
-      autoAdvanceTimer.current = null;
-    }
-    if (questionExitTimer.current) {
-      clearTimeout(questionExitTimer.current);
-      questionExitTimer.current = null;
-    }
-  };
-
-  const resetPlayState = () => {
-    clearQuestionTimers();
-    setCurrentQuestionIndex(0);
-    setAnswers({});
-    setShowingResult(false);
-    setScore(0);
-    setTimerActive(false);
-    setAnsweringEnabled(false);
-    setTimeRemaining(TIMER_DURATION);
-    setAnswerTimings({});
-    setIsQuestionExiting(false);
-    firstQuestionReadySent.current = false;
-    answeredCountRef.current = 0;
-    completedRef.current = false;
-  };
-
-  useEffect(() => {
-    if (guestResetVersion === 0) return;
-    resetPlayState();
-    setQuizStarted(false);
-    setStartRequested(false);
-  }, [guestResetVersion]);
+  }, []);
 
   useEffect(() => {
     const loadWarmState = async () => {
       const userId = isAuthenticated && user ? user.sub : await getUserId();
       setUserId(userId);
-      void fetchQuiz();
+      await fetchQuiz();
     };
-
     void loadWarmState();
   }, [fetchQuiz, isAuthenticated, setUserId, user]);
 
-  useEffect(() => {
-    const previousUserId = previousQuizUserIdRef.current;
-    previousQuizUserIdRef.current = quizUserId;
-    if (!previousUserId || !quizUserId || previousUserId === quizUserId) return;
-
-    resetPlayState();
-    setQuizStarted(false);
-    setStartRequested(false);
-  }, [quizUserId]);
-
-  useEffect(() => {
-    if (startRequested && isQuizForDate(quiz, getQuizDate())) {
-      setQuizStarted(true);
-      setStartRequested(false);
-    }
-  }, [quiz, startRequested]);
-
-  useEffect(() => {
-    if (!route.params?.autoStart || cachedResult || quizStarted) {
-      return;
-    }
-
-    resetPlayState();
-    if (isQuizForDate(quiz, getQuizDate())) {
-      setQuizStarted(true);
-    } else {
-      setStartRequested(true);
-      void fetchQuiz();
-    }
-    navigation.setParams({ autoStart: false });
-  }, [
-    cachedResult,
-    fetchQuiz,
-    navigation,
-    quiz,
-    quizStarted,
-    route.params?.autoStart,
-  ]);
-
-  useEffect(() => {
-    if (quiz) {
-      resetPlayState();
-    } else {
-      resetPlayState();
-      setQuizStarted(false);
-    }
-  }, [quiz?.id]);
-
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      const syncCachedResult = async () => {
-        if (useQuizStore.getState().isReconcilingIdentity) {
-          return;
-        }
-
-        const userId = isAuthenticated && user ? user.sub : await getUserId();
-        const todayResult = await getTodayQuizResult(userId);
-
-        if (!isActive) {
-          return;
-        }
-
-        if (!todayResult && cachedResult) {
-          setCachedResult(null);
-          setQuizStarted(false);
-          resetPlayState();
-          resetQuiz();
-          void fetchQuiz();
-        } else if (todayResult && !cachedResult) {
-          setCachedResult(todayResult);
-        }
-      };
-
-      void syncCachedResult();
-
-      return () => {
-        isActive = false;
-      };
-    }, [cachedResult, fetchQuiz, isAuthenticated, resetQuiz, setCachedResult, user])
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        const state = useQuizStore.getState();
-        if (state.result && state.cachedResult) {
-          state.resetQuiz();
-        }
-      };
-    }, [])
-  );
-
-  useEffect(() => {
-    return () => {
-      if (revealTimer.current) {
-        clearTimeout(revealTimer.current);
-      }
-      if (autoAdvanceTimer.current) {
-        clearTimeout(autoAdvanceTimer.current);
-      }
-      if (questionExitTimer.current) {
-        clearTimeout(questionExitTimer.current);
-      }
-      if (answeredCountRef.current > 0 && !completedRef.current) {
-        trackAnalyticsEvent('quiz_abandoned', actorTypeRef.current, {
-          quizDate: getQuizDate(),
-          durationMs: getAnalyticsTimingDuration('daily-quiz-session'),
-          questionNumber: answeredCountRef.current,
-          totalQuestions: useQuizStore.getState().quiz?.questions.length ?? 0,
-          exitReason: 'screen_exit',
-        });
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    const syncCachedResult = async () => {
+      if (useQuizStore.getState().isReconcilingIdentity) return;
+      const userId = isAuthenticated && user ? user.sub : await getUserId();
+      const todayResult = await getTodayQuizResult(userId);
+      if (!active) return;
+      if (!todayResult && cachedResult) {
+        setCachedResult(null);
+        resetQuiz();
+        void fetchQuiz();
+      } else if (todayResult && !cachedResult) {
+        setCachedResult(todayResult);
       }
     };
-  }, []);
+    void syncCachedResult();
+    return () => { active = false; };
+  }, [cachedResult, fetchQuiz, isAuthenticated, resetQuiz, setCachedResult, user]));
+
+  useFocusEffect(useCallback(() => () => {
+    const state = useQuizStore.getState();
+    if (state.result && state.cachedResult) state.resetQuiz();
+  }, []));
+
+  const startAttempt = useCallback(async () => {
+    const attempt = await beginDailyQuizAttempt();
+    if (attempt) {
+      setStartRequested(false);
+    }
+  }, [beginDailyQuizAttempt]);
 
   useEffect(() => {
-    const recapResult = result?.date === getQuizDate() ? result : cachedResult;
+    if (startRequested && quizIsCurrent && quizUserId) void startAttempt();
+  }, [quizIsCurrent, quizUserId, startAttempt, startRequested]);
+
+  useEffect(() => {
+    if (!route.params?.autoStart || cachedResult || attemptIsCurrent) return;
+    navigation.setParams({ autoStart: false });
+    setStartRequested(true);
+    if (!quizIsCurrent) void fetchQuiz();
+  }, [attemptIsCurrent, cachedResult, fetchQuiz, navigation, quizIsCurrent, route.params?.autoStart]);
+
+  useEffect(() => {
+    if (!activeAttempt || !quiz || !attemptIsCurrent) return;
+    const key = `${activeAttempt.userId}:${activeAttempt.quizId}:${activeAttempt.startedAt}`;
+    if (activeAttemptSource === 'cache' && resumedAttemptRef.current !== key) {
+      resumedAttemptRef.current = key;
+      markAnalyticsTiming('daily-quiz-session');
+      trackAnalyticsEvent('quiz_attempt_resumed', actorType, {
+        quizDate: activeAttempt.quizDate,
+        questionNumber: activeAttempt.questionIndex + 1,
+        totalQuestions: quiz.questions.length,
+        source: 'cache',
+      });
+    }
+  }, [activeAttempt, activeAttemptSource, actorType, attemptIsCurrent, quiz]);
+
+  useEffect(() => {
+    if (!activeAttempt || !quiz || !attemptIsCurrent) return;
+    const normalized = normalizeDailyQuizAttempt(activeAttempt, quiz.questions.length);
+    if (normalized.phase !== activeAttempt.phase ||
+        normalized.questionIndex !== activeAttempt.questionIndex ||
+        normalized.score !== activeAttempt.score) {
+      void updateDailyQuizAttempt(() => normalized);
+      return;
+    }
+    if (activeAttempt.phaseEndsAt === null) return;
+    const delay = Math.max(activeAttempt.phaseEndsAt - Date.now(), 0);
+    const timer = setTimeout(() => {
+      void updateDailyQuizAttempt((attempt) =>
+        normalizeDailyQuizAttempt(attempt, quiz.questions.length));
+    }, Math.min(delay + 10, 2_147_000_000));
+    return () => clearTimeout(timer);
+  }, [activeAttempt, attemptIsCurrent, quiz, updateDailyQuizAttempt]);
+
+  useEffect(() => {
+    if (!activeAttempt || activeAttempt.phase !== 'answering') return;
+    const syncRemaining = () => setTimeRemaining(getDailyQuizRemainingSeconds(activeAttempt));
+    syncRemaining();
+    const timer = setInterval(syncRemaining, 250);
+    return () => clearInterval(timer);
+  }, [activeAttempt]);
+  useEffect(() => {
+    if (!activeAttempt || activeAttempt.phase === 'answering') return;
+    const currentQuestionId = quiz?.questions[activeAttempt.questionIndex]?.id;
+    const capturedMs = currentQuestionId
+      ? activeAttempt.answerTimings[currentQuestionId]
+      : undefined;
+    setTimeRemaining(
+      activeAttempt.phase === 'preparing'
+        ? 20
+        : Math.ceil((capturedMs ?? 0) / 1000)
+    );
+  }, [activeAttempt, quiz]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (!activeAttempt || !quiz) return;
+      if (nextState === 'active') void hydrateActiveAttempt(activeAttempt.userId, quiz);
+      else void updateDailyQuizAttempt((attempt) =>
+        normalizeDailyQuizAttempt(attempt, quiz.questions.length));
+    });
+    return () => subscription.remove();
+  }, [activeAttempt, hydrateActiveAttempt, quiz, updateDailyQuizAttempt]);
+
+  useEffect(() => {
+    if (!activeAttempt || !quiz || activeAttempt.phase !== 'completing' ||
+        completionStartedRef.current === activeAttempt.quizId) return;
+    completionStartedRef.current = activeAttempt.quizId;
+    const answers = quiz.questions.map((question) => ({
+      questionId: question.id,
+      selectedOptionIndex: activeAttempt.answers[question.id],
+      timeRemainingMs: activeAttempt.answerTimings[question.id] ?? 0,
+    }));
+    if (answers.some((answer) => answer.selectedOptionIndex === undefined)) {
+      completionStartedRef.current = null;
+      return;
+    }
+    void completeQuiz(answers).finally(() => { completionStartedRef.current = null; });
+  }, [activeAttempt, completeQuiz, quiz]);
+
+  useEffect(() => {
+    const recapResult = result?.date === currentQuizDate ? result : cachedResult;
     if (!recapResult || recapEventKeyRef.current === recapResult.quizId) return;
     recapEventKeyRef.current = recapResult.quizId;
-    trackAnalyticsEvent('quiz_recap_viewed', actorTypeRef.current, {
-      quizDate: recapResult.date,
-      score: recapResult.score,
+    trackAnalyticsEvent('quiz_recap_viewed', actorType, {
+      quizDate: recapResult.date, score: recapResult.score,
       totalQuestions: recapResult.totalQuestions,
     });
-  }, [cachedResult, result]);
-
-  const handleSelectOption = (questionId: string, optionIndex: number) => {
-    if (!answeringEnabled || showingResult || answers[questionId] !== undefined) return;
-
-    const currentQuestion = quiz?.questions[currentQuestionIndex];
-    if (!currentQuestion) return;
-
-    if (Object.keys(answers).length === 0) {
-      trackAnalyticsEvent(
-        'quiz_started',
-        actorTypeRef.current,
-        {
-          quizDate: quiz.date,
-          totalQuestions: quiz.questions.length,
-        }
-      );
-    }
-
-    setAnsweringEnabled(false);
-    setTimerActive(false);
-    const capturedTime = timeRemaining;
-    const updatedAnswers = { ...answers, [questionId]: optionIndex };
-    const updatedTimings = { ...answerTimings, [questionId]: capturedTime * 1000 };
-
-    setAnswers(updatedAnswers);
-    setAnswerTimings(updatedTimings);
-
-    const isCorrect = currentQuestion.correctOptionIndex === optionIndex;
-    const points = isCorrect ? calculateQuizPoints(capturedTime * 1000) : 0;
-    answeredCountRef.current = Object.keys(updatedAnswers).length;
-    trackAnalyticsEvent('quiz_question_answered', actorTypeRef.current, {
-      quizDate: quiz.date,
-      durationMs: (TIMER_DURATION - capturedTime) * 1000,
-      questionNumber: currentQuestionIndex + 1,
-      totalQuestions: quiz.questions.length,
-      score: points,
-    });
-
-    if (revealTimer.current) {
-      clearTimeout(revealTimer.current);
-    }
-    if (autoAdvanceTimer.current) {
-      clearTimeout(autoAdvanceTimer.current);
-    }
-    if (questionExitTimer.current) {
-      clearTimeout(questionExitTimer.current);
-    }
-
-    revealTimer.current = setTimeout(() => {
-      if (points > 0) {
-        setScore((prev) => prev + points);
-      }
-
-      setShowingResult(true);
-
-      autoAdvanceTimer.current = setTimeout(() => {
-        setIsQuestionExiting(true);
-
-        questionExitTimer.current = setTimeout(() => {
-          setShowingResult(false);
-          setIsQuestionExiting(false);
-
-          const isLastQuestion = currentQuestionIndex === (quiz?.questions.length ?? 0) - 1;
-
-          if (isLastQuestion) {
-            completedRef.current = true;
-            const formattedAnswers = Object.entries(updatedAnswers).map(
-              ([qId, selectedOptionIndex]) => ({
-                questionId: qId,
-                selectedOptionIndex,
-                timeRemainingMs: updatedTimings[qId] ?? 0,
-              })
-            );
-
-            void completeQuiz(formattedAnswers);
-          } else {
-            setTimerActive(false);
-            setAnsweringEnabled(false);
-            setTimeRemaining(TIMER_DURATION);
-            setCurrentQuestionIndex((prev) => prev + 1);
-          }
-        }, QUESTION_EXIT_DELAY);
-      }, RESULT_HOLD_DELAY);
-    }, REVEAL_SUSPENSE_DELAY);
-  };
-
-  const handleTimeUp = () => {
-    setTimerActive(false);
-  };
+  }, [actorType, cachedResult, currentQuizDate, result]);
 
   const handleOptionsReady = () => {
-    setAnsweringEnabled(true);
-    setTimerActive(true);
-    if (currentQuestionIndex === 0 && !firstQuestionReadySent.current && quizIsCurrent) {
+    if (!activeAttempt || activeAttempt.phase !== 'preparing') return;
+    const now = Date.now();
+    void updateDailyQuizAttempt((attempt) => ({
+      ...attempt, phase: 'answering', timerEndsAt: now + DAILY_QUIZ_TIMER_MS,
+      phaseEndsAt: null,
+    }));
+    if (activeAttempt.questionIndex === 0 && !firstQuestionReadySent.current && quiz) {
       firstQuestionReadySent.current = true;
-      trackAnalyticsEvent('quiz_first_question_ready', actorTypeRef.current, {
+      trackAnalyticsEvent('quiz_first_question_ready', actorType, {
         quizDate: currentQuizDate,
-        durationMs: getAnalyticsTimingDuration('daily-quiz-session'),
-        source: 'unknown',
+        durationMs: getAnalyticsTimingDuration('daily-quiz-session'), source: 'unknown',
       });
     }
   };
 
-  const currentQuizDate = getQuizDate();
-  const quizIsCurrent = isQuizForDate(quiz, currentQuizDate);
-  const totalQuestions = quizIsCurrent ? quiz?.questions.length ?? 0 : 0;
-  const currentQuestion = quizIsCurrent ? quiz?.questions[currentQuestionIndex] : undefined;
-  const currentAnswer =
-    currentQuestion && answers[currentQuestion.id] !== undefined
-      ? answers[currentQuestion.id]
-      : null;
-
-  const handleReturnToGames = () => {
-    resetPlayState();
-    setQuizStarted(false);
-    resetQuiz();
-    navigation.popToTop();
+  const handleSelectOption = (questionId: string, optionIndex: number) => {
+    if (!activeAttempt || activeAttempt.phase !== 'answering' || !quiz) return;
+    if (activeAttempt.answers[questionId] !== undefined) return;
+    const question = quiz.questions[activeAttempt.questionIndex];
+    if (!question || question.id !== questionId) return;
+    const now = Date.now();
+    const capturedTimeMs = Math.max((activeAttempt.timerEndsAt ?? now) - now, 0);
+    const points = question.correctOptionIndex === optionIndex
+      ? calculateQuizPoints(capturedTimeMs) : 0;
+    if (Object.keys(activeAttempt.answers).length === 0) {
+      trackAnalyticsEvent('quiz_started', actorType, {
+        quizDate: quiz.date, totalQuestions: quiz.questions.length,
+      });
+    }
+    trackAnalyticsEvent('quiz_question_answered', actorType, {
+      quizDate: quiz.date,
+      durationMs: Math.max(DAILY_QUIZ_TIMER_MS - capturedTimeMs, 0),
+      questionNumber: activeAttempt.questionIndex + 1,
+      totalQuestions: quiz.questions.length, score: points,
+    });
+    void updateDailyQuizAttempt((attempt) => ({
+      ...attempt,
+      answers: { ...attempt.answers, [questionId]: optionIndex },
+      answerTimings: { ...attempt.answerTimings, [questionId]: capturedTimeMs },
+      pendingPoints: points, phase: 'answer_locked', timerEndsAt: null,
+      phaseEndsAt: now + DAILY_QUIZ_REVEAL_DELAY_MS,
+    }));
   };
 
   const handleStartQuiz = () => {
-    resetPlayState();
     markAnalyticsTiming('daily-quiz-session');
-    trackAnalyticsEvent('quiz_start_requested', actorTypeRef.current, {
-      quizDate: getQuizDate(),
-      source: isQuizForDate(quiz, getQuizDate()) ? 'cache' : 'network',
+    trackAnalyticsEvent('quiz_start_requested', actorType, {
+      quizDate: currentQuizDate, source: quizIsCurrent ? 'cache' : 'network',
     });
-    if (isQuizForDate(quiz, getQuizDate())) {
-      setQuizStarted(true);
-      return;
-    }
-
     setStartRequested(true);
-    void fetchQuiz();
+    if (!quizIsCurrent) void fetchQuiz();
   };
-
-  const helperText = quizError
-    ? quizError
-    : submitError
-      ? submitError
-      : startRequested && !quizIsCurrent
-        ? 'Today’s questions are warming up.'
-        : null;
+  const handleRetryAttemptSave = () => {
+    if (activeAttempt?.phase === 'completing' && quiz) {
+      const answers = quiz.questions.map((question) => ({
+        questionId: question.id,
+        selectedOptionIndex: activeAttempt.answers[question.id],
+        timeRemainingMs: activeAttempt.answerTimings[question.id] ?? 0,
+      }));
+      if (!answers.some((answer) => answer.selectedOptionIndex === undefined)) {
+        void completeQuiz(answers);
+      }
+    } else if (activeAttempt) {
+      void updateDailyQuizAttempt((attempt) => ({ ...attempt }));
+    }
+    else if (quizIsCurrent) setStartRequested(true);
+  };
+  const handleReturnToGames = () => { resetQuiz(); navigation.popToTop(); };
 
   if (result?.date === currentQuizDate && quizIsCurrent && quiz) {
     return (
-      <ResultsScreen
-        result={result}
-        quiz={quiz}
-        onReturnToGames={handleReturnToGames}
-      />
+      <View style={styles.resultContainer}>
+        {attemptError ? (
+          <Pressable style={styles.saveError} onPress={handleRetryAttemptSave}>
+            <Text style={styles.saveErrorText}>{attemptError} Retry</Text>
+          </Pressable>
+        ) : null}
+        <ResultsScreen result={result} quiz={quiz} onReturnToGames={handleReturnToGames} />
+      </View>
     );
   }
-
   if (cachedResult?.date === currentQuizDate) {
-    return (
-      <CompletedQuizScreen
-        result={cachedResult}
-        onReturnToGames={handleReturnToGames}
-      />
-    );
+    return <CompletedQuizScreen result={cachedResult} onReturnToGames={handleReturnToGames} />;
+  }
+  const helperText = attemptError || quizError || submitError ||
+    (startRequested && !quizIsCurrent ? 'Today’s questions are warming up.' : null);
+  if (!attemptIsCurrent || !activeAttempt) {
+    return <WelcomeScreen onStartQuiz={handleStartQuiz}
+      isPreparing={startRequested && !quizIsCurrent} helperText={helperText} />;
+  }
+  if (!quizIsCurrent || !quiz) {
+    return <WelcomeScreen onStartQuiz={handleStartQuiz} isPreparing
+      helperText={helperText || 'Today’s quiz is still warming up.'} />;
   }
 
-  if (!quizStarted) {
-    return (
-      <WelcomeScreen
-        onStartQuiz={handleStartQuiz}
-        isPreparing={startRequested && !quizIsCurrent}
-        helperText={helperText}
-      />
-    );
-  }
-
-  if (!quizIsCurrent) {
-    return (
-      <WelcomeScreen
-        onStartQuiz={handleStartQuiz}
-        isPreparing
-        helperText={helperText || 'Today’s quiz is still warming up.'}
-      />
-    );
-  }
-
+  const currentQuestion = quiz.questions[activeAttempt.questionIndex];
+  const selectedOption = currentQuestion
+    ? activeAttempt.answers[currentQuestion.id] ?? null : null;
+  const showingResult = activeAttempt.phase === 'result_reveal' ||
+    activeAttempt.phase === 'exiting';
+  const answeringEnabled = activeAttempt.phase === 'answering' && !attemptError;
   return (
     <SafeAreaView style={styles.container} edges={safeAreaEdges}>
-      <Pressable
-        style={styles.pressable}
-        onPressIn={() => setIsHolding(true)}
-        onPressOut={() => setIsHolding(false)}
-      >
-        <ScrollView
-          style={styles.scrollView}
+      {attemptError ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Retry saving quiz progress"
+          style={styles.saveError} onPress={handleRetryAttemptSave}>
+          <Text style={styles.saveErrorText}>{attemptError} Retry</Text>
+        </Pressable>
+      ) : null}
+      <Pressable style={styles.pressable} onPressIn={() => setIsHolding(true)}
+        onPressOut={() => setIsHolding(false)}>
+        <ScrollView style={styles.scrollView}
           contentContainerStyle={[styles.contentContainer, centeredQuizStyle]}
-          showsVerticalScrollIndicator={false}
-        >
-          {currentQuestion && (
-            <QuestionCard
-              question={currentQuestion}
-              selectedOption={currentAnswer}
+          showsVerticalScrollIndicator={false}>
+          {currentQuestion ? (
+            <QuestionCard question={currentQuestion} selectedOption={selectedOption}
               onSelectOption={(optionIndex) => handleSelectOption(currentQuestion.id, optionIndex)}
-              disabled={!answeringEnabled}
-              isExiting={isQuestionExiting}
-              showResult={showingResult}
-              correctOptionIndex={currentQuestion.correctOptionIndex}
-              isHolding={isHolding}
-              onOptionsReady={handleOptionsReady}
-              questionNumber={currentQuestionIndex + 1}
-              totalQuestions={totalQuestions}
-              score={score}
-              timerDuration={TIMER_DURATION}
-              timerActive={timerActive}
-              timeRemaining={timeRemaining}
-              setTimeRemaining={setTimeRemaining}
-              onTimeUp={handleTimeUp}
-            />
-          )}
+              disabled={!answeringEnabled} isExiting={activeAttempt.phase === 'exiting'}
+              showResult={showingResult} correctOptionIndex={currentQuestion.correctOptionIndex}
+              isHolding={isHolding} onOptionsReady={handleOptionsReady}
+              revealImmediately={activeAttempt.phase !== 'preparing'}
+              questionNumber={activeAttempt.questionIndex + 1}
+              totalQuestions={quiz.questions.length} score={activeAttempt.score}
+              timerDuration={20} timerActive={activeAttempt.phase === 'answering' && timeRemaining > 0}
+              timeRemaining={timeRemaining} setTimeRemaining={setTimeRemaining}
+              onTimeUp={() => setTimeRemaining(0)} />
+          ) : null}
         </ScrollView>
       </Pressable>
     </SafeAreaView>
@@ -484,17 +351,20 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  resultContainer: { flex: 1 },
+  pressable: { flex: 1 },
+  scrollView: { flex: 1 },
+  contentContainer: { flexGrow: 1 },
+  saveError: {
+    backgroundColor: theme.colors.incorrect,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
   },
-  pressable: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    flexGrow: 1,
+  saveErrorText: {
+    color: theme.colors.white,
+    fontFamily: theme.fonts.gothamMedium,
+    fontSize: 13,
+    textAlign: 'center',
   },
 });

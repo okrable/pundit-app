@@ -64,6 +64,7 @@ interface QuestionCardProps {
   correctOptionIndex?: number;
   isHolding?: boolean;
   onOptionsReady?: () => void;
+  revealImmediately?: boolean;
   questionNumber: number;
   totalQuestions: number;
   score: number;
@@ -86,6 +87,7 @@ interface OptionTileProps {
   minHeight: number;
   padding: number;
   useSingleColumn: boolean;
+  animateEntry: boolean;
 }
 
 function OptionTile({
@@ -100,6 +102,7 @@ function OptionTile({
   minHeight,
   padding,
   useSingleColumn,
+  animateEntry,
 }: OptionTileProps) {
   const scale = useSharedValue(1);
 
@@ -162,7 +165,11 @@ function OptionTile({
       ]}
     >
       <Animated.View
-        entering={FadeIn.duration(OPTION_FADE_DURATION).delay(index * OPTION_STAGGER_DELAY)}
+        entering={
+          animateEntry
+            ? FadeIn.duration(OPTION_FADE_DURATION).delay(index * OPTION_STAGGER_DELAY)
+            : undefined
+        }
       >
         <Pressable
           style={({ pressed }) => [
@@ -200,6 +207,7 @@ export default function QuestionCard({
   correctOptionIndex,
   isHolding = false,
   onOptionsReady,
+  revealImmediately = false,
   questionNumber,
   totalQuestions,
   score,
@@ -257,6 +265,11 @@ export default function QuestionCard({
     }
 
     const fullText = question.prompt;
+    if (revealImmediately) {
+      setDisplayedText(fullText);
+      setIsTypingComplete(true);
+      return;
+    }
     let currentIndex = 0;
 
     const typeNextChar = () => {
@@ -286,7 +299,7 @@ export default function QuestionCard({
         clearTimeout(optionReadyTimer.current);
       }
     };
-  }, [question.id, question.options.length, question.prompt]);
+  }, [question.id, question.options.length, question.prompt, revealImmediately]);
 
   useEffect(() => {
     if (selectedOption === null) {
@@ -453,6 +466,7 @@ export default function QuestionCard({
                     minHeight={layout.optionMinHeight}
                     padding={layout.optionPadding}
                     useSingleColumn={layout.useSingleColumnOptions}
+                    animateEntry={!revealImmediately}
                   />
                 );
               })}

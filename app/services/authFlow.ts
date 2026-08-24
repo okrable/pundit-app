@@ -4,6 +4,7 @@ import { syncAuthenticatedSession } from './dailyLoop';
 import { logError, logInfo, logWarn } from './debugLog';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAchievementStore } from '../state/useAchievementStore';
+import { useQuizStore } from '../state/useQuizStore';
 import { trackAnalyticsEvent } from './analytics';
 import { setUsername as setUsernameApi, syncIdentity } from './api';
 import type { SetUsernameResponse } from '../types';
@@ -309,6 +310,16 @@ export async function loginWithAuth0({
 export async function logoutWithAuth0(): Promise<void> {
   logInfo('auth.flow.logout.start');
   AuthSession.dismiss();
+  try {
+    await useQuizStore.getState().clearActiveAttempt();
+  } catch (error) {
+    logError('auth.flow.logout.attempt_clear.error', error);
+    useQuizStore.setState({
+      activeAttempt: null,
+      activeAttemptSource: null,
+      attemptError: null,
+    });
+  }
   await useAuthStore.getState().logout();
   useAchievementStore.getState().reset();
   logInfo('auth.flow.logout.end');

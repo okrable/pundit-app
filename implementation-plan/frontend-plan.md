@@ -116,6 +116,13 @@ DailyQuizScreen
 
 The immediate summary is shown only after completing a daily quiz in the current session. Returning later uses the completed/cached state.
 
+An unfinished Daily Quiz is persisted locally for the active identity and date.
+The Games tile shows Continue, and reopening or foregrounding restores the locked
+answer, score, phase, and elapsed wall-clock timer. Pre-timer prompt reveal safely
+restarts without starting the clock. Logout, account changes, guest clearing,
+date rollover, or incompatible content discard the attempt rather than moving it
+between identities.
+
 Both result surfaces use the same daily share formatter. Quiz numbers are
 derived from the London quiz date with 1 July 2026 as number 1; standard
 scores use the trophy challenge copy and 500 uses the goat perfect-score copy.

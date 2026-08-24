@@ -6,6 +6,7 @@ export const ANALYTICS_EVENT_NAMES = [
   'quiz_first_question_ready',
   'quiz_started',
   'quiz_question_answered',
+  'quiz_attempt_resumed',
   'quiz_abandoned',
   'quiz_completed',
   'quiz_recap_viewed',

@@ -2,6 +2,15 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.12.0 - Refresh-safe Daily Quiz attempts
+
+- Persisted unfinished Daily Quiz attempts per identity, date, and quiz so
+  refreshes, app restarts, backgrounding, and deliberate exits cannot reset progress.
+- Restored elapsed wall-clock timers, locked answers, scores, reveal phases, and
+  completion safely without allowing answered questions to be retried.
+- Added a Continue state to the Games tile, durable completion handoff, retryable
+  local-save failures, and privacy-bounded attempt-resume analytics.
+
 ## v2.11.0 - Fast authenticated startup
 
 - Released previously complete cached account shells before token restoration

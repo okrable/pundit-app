@@ -11,6 +11,7 @@ WITH recent AS (
 SELECT
   count(DISTINCT analytics_id) FILTER (WHERE event_name = 'today_viewed') AS today_viewers,
   count(DISTINCT analytics_id) FILTER (WHERE event_name = 'quiz_start_requested') AS quiz_starters,
+  count(DISTINCT analytics_id) FILTER (WHERE event_name = 'quiz_attempt_resumed') AS quiz_resumers,
   count(DISTINCT analytics_id) FILTER (WHERE event_name = 'quiz_completed') AS quiz_completers,
   count(DISTINCT analytics_id) FILTER (WHERE event_name = 'quiz_shared') AS quiz_sharers,
   round(
@@ -19,6 +20,19 @@ SELECT
     1
   ) AS start_to_complete_percent
 FROM recent;
+
+SELECT
+  platform,
+  app_version,
+  count(*) FILTER (WHERE event_name = 'quiz_attempt_resumed') AS resume_events,
+  count(DISTINCT analytics_id) FILTER (WHERE event_name = 'quiz_attempt_resumed') AS resumed_players,
+  count(DISTINCT analytics_id) FILTER (WHERE event_name = 'quiz_completed') AS completing_players
+FROM analytics_events
+WHERE app_environment = 'production'
+  AND event_name IN ('quiz_attempt_resumed', 'quiz_completed')
+  AND occurred_at >= now() - INTERVAL '7 days'
+GROUP BY platform, app_version
+ORDER BY app_version DESC, platform;
 
 WITH activity AS (
   SELECT DISTINCT analytics_id, quiz_date
