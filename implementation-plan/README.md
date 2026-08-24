@@ -75,6 +75,11 @@ In plain English, this work delivered four connected changes:
    raw events expire after 90 days, and checked-in reports support operational
    smoke testing now plus retention analysis when the player base is large enough.
 
+15. **v2.10.1 — friend invite loop hotfix:** web share URLs are consumed after
+    their action is safely persisted, preventing accepted or dismissed friend
+    invitations from reopening until preview requests are rate-limited. Native
+    deep links and guest-to-auth invitation continuation remain unchanged.
+
 ## Product Status Snapshot
 
 ### Delivered

@@ -7,6 +7,7 @@ import { chooseReconciliationSource } from '../shared/reconciliation';
 import {
   buildShareUrl,
   getSharedCodeActionFromUrl,
+  getWebSharedCodeUrlReplacement,
   resolveSharedCode,
 } from '../app/services/sharedCode';
 import { getSiteUrl } from '../netlify/functions/lib/siteUrl';
@@ -1103,6 +1104,53 @@ test('resolves challenge and friend codes from text and URLs', () => {
   assert.equal(
     buildShareUrl('c', 'abc-234', 'https://preview.example/'),
     'https://preview.example/c/ABC234'
+  );
+});
+
+test('consumes web shared-code URLs without discarding unrelated URL state', () => {
+  assert.equal(
+    getWebSharedCodeUrlReplacement(
+      'https://pundittrivia.com/f/ABCD2345?utm_source=friend#games'
+    ),
+    '/?utm_source=friend#games'
+  );
+  assert.equal(
+    getWebSharedCodeUrlReplacement(
+      'https://pundittrivia.com/add-friend/ABCD2345?ref=share'
+    ),
+    '/?ref=share'
+  );
+  assert.equal(
+    getWebSharedCodeUrlReplacement(
+      'https://pundittrivia.com/c/ABC234?utm_campaign=challenge'
+    ),
+    '/?utm_campaign=challenge'
+  );
+  assert.equal(
+    getWebSharedCodeUrlReplacement(
+      'https://pundittrivia.com/challenge/ABC234#challenge'
+    ),
+    '/#challenge'
+  );
+  assert.equal(
+    getWebSharedCodeUrlReplacement(
+      'https://pundittrivia.com/games?invite=ABCD2345&theme=dark#today'
+    ),
+    '/games?theme=dark#today'
+  );
+  assert.equal(
+    getWebSharedCodeUrlReplacement(
+      'https://pundittrivia.com/?code=ABCD2345&challenge=ABC234&keep=yes'
+    ),
+    '/?keep=yes'
+  );
+  assert.equal(
+    getWebSharedCodeUrlReplacement('https://pundittrivia.com/games?keep=yes'),
+    null
+  );
+  assert.equal(
+    getWebSharedCodeUrlReplacement('pundit-app://add-friend/ABCD2345'),
+    null
   );
 });
 

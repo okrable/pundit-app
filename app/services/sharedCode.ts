@@ -65,6 +65,36 @@ export function getSharedCodeActionFromUrl(url: string): SharedCodeAction | null
   return null;
 }
 
+export function getWebSharedCodeUrlReplacement(url: string): string | null {
+  try {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return null;
+    }
+    if (!getSharedCodeActionFromUrl(url)) {
+      return null;
+    }
+
+    const firstPathPart = parsedUrl.pathname.split('/').filter(Boolean)[0];
+    if (
+      firstPathPart === 'f' ||
+      firstPathPart === 'add-friend' ||
+      firstPathPart === 'c' ||
+      firstPathPart === 'challenge'
+    ) {
+      parsedUrl.pathname = '/';
+    }
+
+    parsedUrl.searchParams.delete('code');
+    parsedUrl.searchParams.delete('challenge');
+    parsedUrl.searchParams.delete('invite');
+
+    return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 export function buildShareUrl(path: 'c' | 'f', code: string, fallbackOrigin: string): string {
   const origin = fallbackOrigin.replace(/\/$/, '');
   return `${origin}/${path}/${normalizeSharedCode(code)}`;
