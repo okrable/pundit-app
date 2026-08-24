@@ -29,9 +29,11 @@ import {
   isIdentityActivationCurrent,
   resolveStoredIdentityStatus,
   shouldBlockAuthenticatedNavigation,
+  shouldFailIdentityAfterActivationError,
   shouldShowIdentityFailure,
   shouldShowIdentitySync,
   shouldShowUsernameOnboarding,
+  shouldResumeAuthenticatedReconciliation,
 } from '../shared/clientIdentityPolicy';
 import {
   canReuseFriendLink,
@@ -79,6 +81,10 @@ import {
   authorizeUser,
   classifyAuth0VerificationFailure,
 } from '../netlify/functions/lib/auth';
+import {
+  AUTH_VERIFICATION_CACHE_TTL_MS,
+  createBlobAuthVerificationCache,
+} from '../netlify/functions/lib/authVerificationCache';
 import {
   getCareerTileState,
   getGamesHubCompletionState,
@@ -945,13 +951,19 @@ test('keeps temporary Auth0 userinfo failures distinct from invalid tokens', asy
   } as unknown as Parameters<typeof authorizeUser>[0];
 
   process.env.AUTH0_DOMAIN = 'example.auth0.com';
+  const unavailableCache = {
+    has: async () => false,
+    remember: async () => undefined,
+  };
 
   try {
     globalThis.fetch = async () => new Response(null, {
       status: 429,
       headers: { 'Retry-After': '10' },
     });
-    const unavailable = await authorizeUser(event, 'auth0|player', {});
+    const unavailable = await authorizeUser(event, 'auth0|player', {}, {
+      verificationCache: unavailableCache,
+    });
     assert.equal(unavailable.response?.statusCode, 503);
     assert.equal(unavailable.response?.headers?.['Retry-After'], '10');
     assert.deepEqual(JSON.parse(unavailable.response?.body ?? '{}'), {
@@ -960,7 +972,9 @@ test('keeps temporary Auth0 userinfo failures distinct from invalid tokens', asy
     });
 
     globalThis.fetch = async () => new Response(null, { status: 401 });
-    const invalid = await authorizeUser(event, 'auth0|player', {});
+    const invalid = await authorizeUser(event, 'auth0|player', {}, {
+      verificationCache: unavailableCache,
+    });
     assert.equal(invalid.response?.statusCode, 401);
     assert.deepEqual(JSON.parse(invalid.response?.body ?? '{}'), {
       error: 'Invalid or expired access token',
@@ -973,6 +987,82 @@ test('keeps temporary Auth0 userinfo failures distinct from invalid tokens', asy
       process.env.AUTH0_DOMAIN = originalDomain;
     }
   }
+});
+
+test('reuses one verified Auth0 result across protected requests for the same token owner', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalDomain = process.env.AUTH0_DOMAIN;
+  const event = {
+    headers: { authorization: 'Bearer shared-token' },
+  } as unknown as Parameters<typeof authorizeUser>[0];
+  const cachedOwners = new Map<string, string>();
+  const verificationCache = {
+    has: async (accessToken: string, expectedUserId: string) =>
+      cachedOwners.get(accessToken) === expectedUserId,
+    remember: async (accessToken: string, verifiedUserId: string) => {
+      cachedOwners.set(accessToken, verifiedUserId);
+    },
+  };
+  let userInfoRequests = 0;
+
+  process.env.AUTH0_DOMAIN = 'example.auth0.com';
+
+  try {
+    globalThis.fetch = async () => {
+      userInfoRequests += 1;
+      return Response.json({
+        sub: 'auth0|player',
+        email: 'player@example.com',
+        email_verified: true,
+      });
+    };
+
+    const first = await authorizeUser(event, 'auth0|player', {}, { verificationCache });
+    const second = await authorizeUser(event, 'auth0|player', {}, { verificationCache });
+
+    assert.equal(first.response, null);
+    assert.equal(second.response, null);
+    assert.equal(second.user?.sub, 'auth0|player');
+    assert.equal(userInfoRequests, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalDomain === undefined) {
+      delete process.env.AUTH0_DOMAIN;
+    } else {
+      process.env.AUTH0_DOMAIN = originalDomain;
+    }
+  }
+});
+
+test('stores only expiring digests in the shared Auth0 verification cache', async () => {
+  const values = new Map<string, unknown>();
+  let now = 1_000;
+  const cache = createBlobAuthVerificationCache({
+    now: () => now,
+    getVerificationStore: () => ({
+      get: async (key) => values.get(key) ?? null,
+      setJSON: async (key, value) => {
+        values.set(key, value);
+      },
+      delete: async (key) => {
+        values.delete(key);
+      },
+    }),
+  });
+
+  await cache.remember('raw-access-token', 'auth0|player');
+
+  assert.equal(values.size, 1);
+  const [[storedKey, storedValue]] = [...values.entries()];
+  assert.equal(storedKey.includes('raw-access-token'), false);
+  assert.equal(JSON.stringify(storedValue).includes('raw-access-token'), false);
+  assert.equal(JSON.stringify(storedValue).includes('auth0|player'), false);
+  assert.equal(await cache.has('raw-access-token', 'auth0|player'), true);
+  assert.equal(await cache.has('raw-access-token', 'auth0|other'), false);
+
+  now += AUTH_VERIFICATION_CACHE_TTL_MS + 1;
+  assert.equal(await cache.has('raw-access-token', 'auth0|player'), false);
+  assert.equal(values.size, 0);
 });
 
 test('selects the platform navigator and safely falls back when native tabs are unavailable', () => {
@@ -1336,6 +1426,11 @@ test('restores and gates authenticated identity before protected work', () => {
   assert.equal(shouldShowIdentityFailure(true, 'complete', 'failed'), true);
   assert.equal(shouldShowIdentitySync(true, 'complete', 'syncing', true), false);
   assert.equal(shouldShowIdentityFailure(true, 'complete', 'failed', true), false);
+  assert.equal(shouldResumeAuthenticatedReconciliation('complete', 'failed'), true);
+  assert.equal(shouldResumeAuthenticatedReconciliation('complete', 'syncing'), false);
+  assert.equal(shouldResumeAuthenticatedReconciliation('failed', 'failed'), false);
+  assert.equal(shouldFailIdentityAfterActivationError(false), true);
+  assert.equal(shouldFailIdentityAfterActivationError(true), false);
   assert.equal(buildIdentityActivationKey('auth0|player', 4), 'auth0|player:4');
   assert.notEqual(
     buildIdentityActivationKey('auth0|player', 4),

@@ -1,4 +1,8 @@
 import type { HandlerEvent, HandlerResponse } from '@netlify/functions';
+import {
+  authVerificationCache,
+  type AuthVerificationCache,
+} from './authVerificationCache';
 
 export interface Auth0UserInfo {
   sub: string;
@@ -13,6 +17,10 @@ interface Auth0UserInfoPayload extends Partial<Auth0UserInfo> {
 
 interface AuthorizeOptions {
   allowGuest?: boolean;
+}
+
+interface AuthorizeUserOptions {
+  verificationCache?: AuthVerificationCache;
 }
 
 export type Auth0VerificationFailureKind = 'invalid' | 'unavailable';
@@ -116,7 +124,8 @@ export type AuthorizedUserResult =
 export async function authorizeUser(
   event: HandlerEvent,
   expectedUserId: string,
-  headers: Record<string, string>
+  headers: Record<string, string>,
+  options: AuthorizeUserOptions = {}
 ): Promise<AuthorizedUserResult> {
   const token = getBearerToken(event);
   if (!token) {
@@ -127,6 +136,14 @@ export async function authorizeUser(
         headers,
         body: JSON.stringify({ error: 'Missing or invalid Authorization header' }),
       },
+    };
+  }
+
+  const verificationCache = options.verificationCache ?? authVerificationCache;
+  if (await verificationCache.has(token, expectedUserId)) {
+    return {
+      user: { sub: expectedUserId },
+      response: null,
     };
   }
 
@@ -166,6 +183,8 @@ export async function authorizeUser(
       },
     };
   }
+
+  await verificationCache.remember(token, userInfo.sub);
 
   return { user: userInfo, response: null };
 }

@@ -42,6 +42,15 @@ normal tabs. An eligible restored shell remains usable while the pipeline runs:
 8. Release interactive login from `AuthSyncScreen`; restored sessions were not
    held behind it.
 
+The first successful protected Function verification stores a 60-second,
+strongly consistent site-scoped verification entry. Its key and value contain
+only SHA-256 digests of the opaque access token and verified Auth0 subject, plus
+an expiry timestamp; no raw token, Auth0 subject, username, or profile claim is
+stored. Other Functions for that token owner reuse the entry rather than each
+calling Auth0 `/userinfo`, whose per-user sustained limit is lower than the
+normal reconciliation fan-out. Cache failure falls back to Auth0 and never
+grants access without successful verification.
+
 Screens do not process AuthSession responses directly. Me/profile stays
 cached-first with explicit refresh, while League Tables deliberately forces a
 friends refresh whenever the screen gains navigation focus.
@@ -55,7 +64,10 @@ Protected work uses one verified-session rule: authenticated status, token,
 complete identity, matching operation owner, and unchanged auth-state version.
 Pending invitations wait for that rule and resume automatically. A temporary
 restored-session sync failure keeps cached navigation visible with an accessible
-Retry banner; interactive login keeps the blocking failure screen.
+Retry banner; interactive login keeps the blocking failure screen. Once identity
+synchronization has succeeded, a later profile, leaderboard, result, or Journey
+refresh failure does not demote that identity. Retry resumes the failed
+reconciliation pipeline without repeating `/syncIdentity`.
 
 ## Cache Strategy
 

@@ -85,6 +85,19 @@ export function shouldShowIdentityFailure(
   );
 }
 
+export function shouldResumeAuthenticatedReconciliation(
+  identityStatus: ClientIdentityStatus,
+  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed'
+): boolean {
+  return identityStatus === 'complete' && authSyncStatus === 'failed';
+}
+
+export function shouldFailIdentityAfterActivationError(
+  verifiedIdentityReady: boolean
+): boolean {
+  return !verifiedIdentityReady;
+}
+
 export interface VerifiedSessionState {
   isAuthenticated: boolean;
   authStatus: 'anonymous' | 'restoring' | 'authenticated' | 'reauthRequired';

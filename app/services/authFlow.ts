@@ -11,6 +11,8 @@ import type { AvatarId } from '../../shared/avatarCatalog';
 import {
   buildIdentityActivationKey,
   isIdentityActivationCurrent,
+  shouldFailIdentityAfterActivationError,
+  shouldResumeAuthenticatedReconciliation,
 } from '../../shared/clientIdentityPolicy';
 
 export type AuthFlowIntent = 'signup' | 'login';
@@ -79,32 +81,45 @@ export async function activateAuthenticatedSession({
       return false;
     }
 
-    authState.beginIdentitySync(source);
+    const isReconciliationRetry = shouldResumeAuthenticatedReconciliation(
+      authState.identityStatus,
+      authState.authSyncStatus
+    );
+    let verifiedIdentityReady = isReconciliationRetry;
+
+    if (isReconciliationRetry) {
+      logInfo('auth.flow.identity.resume_reconciliation', { userId, source });
+    } else {
+      authState.beginIdentitySync(source);
+    }
     logInfo('auth.flow.identity.start', { userId, intent, source });
 
     try {
-      const identity = await syncIdentity(userId, intent);
-      const latestAuthState = useAuthStore.getState();
-      if (!isCurrentActivation(userId, authStateVersion)) {
-        logWarn('auth.flow.identity.discarded_stale', { userId, source });
-        return false;
-      }
+      if (!isReconciliationRetry) {
+        const identity = await syncIdentity(userId, intent);
+        const latestAuthState = useAuthStore.getState();
+        if (!isCurrentActivation(userId, authStateVersion)) {
+          logWarn('auth.flow.identity.discarded_stale', { userId, source });
+          return false;
+        }
 
-      if (!identity.usernameRequired && !identity.username) {
-        throw new Error('Identity synchronization did not return a username');
-      }
+        if (!identity.usernameRequired && !identity.username) {
+          throw new Error('Identity synchronization did not return a username');
+        }
 
-      if (!identity.usernameRequired && identity.username) {
-        latestAuthState.beginAuthSync(source);
-      }
-      await latestAuthState.applyIdentity(identity);
-      if (!isCurrentActivation(userId, authStateVersion)) {
-        logWarn('auth.flow.identity.discarded_after_apply', { userId, source });
-        return false;
-      }
-      if (identity.usernameRequired || !identity.username) {
-        logInfo('auth.flow.identity.username_required', { userId, source });
-        return false;
+        if (!identity.usernameRequired && identity.username) {
+          latestAuthState.beginAuthSync(source);
+        }
+        await latestAuthState.applyIdentity(identity);
+        if (!isCurrentActivation(userId, authStateVersion)) {
+          logWarn('auth.flow.identity.discarded_after_apply', { userId, source });
+          return false;
+        }
+        if (identity.usernameRequired || !identity.username) {
+          logInfo('auth.flow.identity.username_required', { userId, source });
+          return false;
+        }
+        verifiedIdentityReady = true;
       }
 
       await syncAuthenticatedSession({
@@ -121,7 +136,10 @@ export async function activateAuthenticatedSession({
       return true;
     } catch (error) {
       const latestAuthState = useAuthStore.getState();
-      if (isCurrentActivation(userId, authStateVersion)) {
+      if (
+        isCurrentActivation(userId, authStateVersion) &&
+        shouldFailIdentityAfterActivationError(verifiedIdentityReady)
+      ) {
         latestAuthState.failIdentitySync(
           error instanceof Error ? error.message : 'Unable to synchronize your account'
         );

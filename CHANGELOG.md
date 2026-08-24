@@ -8,6 +8,12 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
   and reconciliation, without exposing protected requests to unverified sessions.
 - Kept cached navigation usable through temporary background sync failures with
   a compact Retry banner, while invalid restoration rebinds guest caches first.
+- Reused successful Auth0 verification briefly across protected Functions so
+  startup reconciliation cannot exhaust the per-user `/userinfo` rate limit;
+  cached entries contain only one-way token and subject digests.
+- Kept a verified identity eligible for protected work when only optional data
+  refresh failed, and made Retry resume reconciliation without repeating the
+  already successful identity synchronization.
 - Allowed Daily Quiz and Journey completion during restoration, with durable
   account-partitioned submission queues that retry after verification.
 - Added `app_shell_ready` alongside the unchanged full-readiness `app_ready`
