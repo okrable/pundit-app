@@ -118,6 +118,14 @@ import {
   isQuizForDate,
 } from '../shared/dailyQuiz';
 import {
+  DAILY_QUIZ_EXIT_DELAY_MS,
+  DAILY_QUIZ_RESULT_HOLD_MS,
+  createDailyQuizAttempt,
+  getDailyQuizRemainingSeconds,
+  isDailyQuizAttemptCompatible,
+  normalizeDailyQuizAttempt,
+} from '../shared/dailyQuizAttempt';
+import {
   ACHIEVEMENTS,
   applyAchievementEvent,
   createEmptyAchievementSnapshot,
@@ -159,6 +167,7 @@ function dailyAchievementEvent(
 test('accepts only declared pseudonymous analytics envelope values', () => {
   assert.equal(isAnalyticsEventName('app_shell_ready'), true);
   assert.equal(isAnalyticsEventName('quiz_start_requested'), true);
+  assert.equal(isAnalyticsEventName('quiz_attempt_resumed'), true);
   assert.equal(isAnalyticsEventName('arbitrary_event'), false);
   assert.equal(isAnalyticsActorType('guest'), true);
   assert.equal(isAnalyticsActorType('user-123'), false);
@@ -835,6 +844,10 @@ test('omits an unavailable career game without changing the daily quiz', () => {
 test('keeps daily quiz and career completion states independent', () => {
   assert.deepEqual(getGamesHubCompletionState(false, false), {
     quiz: 'available',
+    career: 'available',
+  });
+  assert.deepEqual(getGamesHubCompletionState(false, false, true), {
+    quiz: 'in_progress',
     career: 'available',
   });
   assert.deepEqual(getGamesHubCompletionState(true, false), {
@@ -1764,4 +1777,70 @@ test('classifies active, at-risk, inactive, and not-started streaks', () => {
       asOfQuizDate: '2026-07-25',
     }
   );
+});
+
+test('creates identity-scoped compatible Daily Quiz attempts', () => {
+  const quiz = {
+    id: 'quiz-2026-08-24',
+    date: '2026-08-24',
+    questions: [
+      { id: 'q1', prompt: 'Question?', options: ['A', 'B'], correctOptionIndex: 0 },
+      { id: 'q2', prompt: 'Next?', options: ['C', 'D'], correctOptionIndex: 1 },
+    ],
+  };
+  const attempt = createDailyQuizAttempt('guest_test', quiz, 1_000);
+  assert.equal(attempt.phase, 'preparing');
+  assert.equal(attempt.startedAt, 1_000);
+  assert.equal(isDailyQuizAttemptCompatible(attempt, 'guest_test', quiz, quiz.date), true);
+  assert.equal(isDailyQuizAttemptCompatible(attempt, 'auth0|other', quiz, quiz.date), false);
+  assert.equal(
+    isDailyQuizAttemptCompatible(attempt, 'guest_test', {
+      ...quiz,
+      questions: [{ ...quiz.questions[0], options: ['B', 'A'] }, quiz.questions[1]],
+    }, quiz.date),
+    false
+  );
+});
+
+test('restores the Daily Quiz timer from elapsed wall-clock time', () => {
+  const quiz = {
+    id: 'quiz-2026-08-24', date: '2026-08-24',
+    questions: [{ id: 'q1', prompt: 'Question?', options: ['A', 'B'], correctOptionIndex: 0 }],
+  };
+  const attempt = {
+    ...createDailyQuizAttempt('guest_test', quiz, 1_000),
+    phase: 'answering' as const,
+    timerEndsAt: 21_000,
+  };
+  assert.equal(getDailyQuizRemainingSeconds(attempt, 6_500), 15);
+  assert.equal(getDailyQuizRemainingSeconds(attempt, 25_000), 0);
+});
+
+test('normalizes elapsed answer phases without retrying an answered question', () => {
+  const quiz = {
+    id: 'quiz-2026-08-24', date: '2026-08-24',
+    questions: [
+      { id: 'q1', prompt: 'Question?', options: ['A', 'B'], correctOptionIndex: 0 },
+      { id: 'q2', prompt: 'Next?', options: ['C', 'D'], correctOptionIndex: 1 },
+    ],
+  };
+  const lockedAt = 2_000;
+  const locked = {
+    ...createDailyQuizAttempt('guest_test', quiz, 1_000),
+    answers: { q1: 0 },
+    answerTimings: { q1: 15_000 },
+    pendingPoints: 80,
+    phase: 'answer_locked' as const,
+    phaseEndsAt: lockedAt,
+  };
+  const revealed = normalizeDailyQuizAttempt(locked, quiz.questions.length, lockedAt);
+  assert.equal(revealed.phase, 'result_reveal');
+  assert.equal(revealed.score, 80);
+  assert.equal(revealed.pendingPoints, 0);
+
+  const advancedAt = lockedAt + DAILY_QUIZ_RESULT_HOLD_MS + DAILY_QUIZ_EXIT_DELAY_MS;
+  const advanced = normalizeDailyQuizAttempt(locked, quiz.questions.length, advancedAt);
+  assert.equal(advanced.phase, 'preparing');
+  assert.equal(advanced.questionIndex, 1);
+  assert.deepEqual(advanced.answers, { q1: 0 });
 });

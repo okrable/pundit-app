@@ -1,12 +1,13 @@
-export type HubModeState = 'available' | 'completed';
+export type HubModeState = 'available' | 'in_progress' | 'completed';
 export type CareerTileState = HubModeState | 'loading' | 'unavailable';
 
 export function getGamesHubCompletionState(
   hasQuizResult: boolean,
-  hasCareerResult: boolean
+  hasCareerResult: boolean,
+  hasQuizAttempt = false
 ): { quiz: HubModeState; career: HubModeState } {
   return {
-    quiz: hasQuizResult ? 'completed' : 'available',
+    quiz: hasQuizResult ? 'completed' : hasQuizAttempt ? 'in_progress' : 'available',
     career: hasCareerResult ? 'completed' : 'available',
   };
 }

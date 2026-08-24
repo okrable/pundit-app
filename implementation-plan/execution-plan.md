@@ -75,6 +75,8 @@
 - [x] Database-backed endpoint rate limits.
 - [x] First-party pseudonymous quiz funnel and retention analytics with typed
   dimensions, device controls, raw-event retention, and baseline reports.
+- [x] Identity-scoped active Daily Quiz attempts with wall-clock timer restoration,
+  locked-answer recovery, Continue entry points, and durable completion handoff.
 
 ## Active Hardening
 
@@ -84,9 +86,6 @@
 
 ## Next Feature Wave
 
-1. Persist active Daily Quiz attempts per user, date, and quiz so refresh restores
-   question, answers, score, phase, and elapsed timer state without enabling retries.
+1. Evaluate v2.12 resume-to-completion analytics after the controlled Production smoke.
 2. Push notifications.
 3. Quiz archives and historical access.
-4. Smoke-test v2.10 analytics in Production, then proceed with the Daily Quiz
-   navigation and pacing refocus without using D1/D7 as a small-sample gate.

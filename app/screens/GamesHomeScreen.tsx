@@ -100,6 +100,8 @@ export default function GamesHomeScreen({ navigation }: Props) {
     cachedResult,
     quizError,
     isQuizLoading,
+    activeAttempt,
+    userId: quizUserId,
     fetchQuiz,
     setUserId,
     setCachedResult,
@@ -192,7 +194,13 @@ export default function GamesHomeScreen({ navigation }: Props) {
     isQuizForDate(quiz, currentQuizDate) && Boolean(quiz?.careerGame);
   const hubState = getGamesHubCompletionState(
     Boolean(currentCachedResult),
-    Boolean(currentCareerResult)
+    Boolean(currentCareerResult),
+    Boolean(
+      activeAttempt &&
+      activeAttempt.userId === quizUserId &&
+      activeAttempt.quizDate === currentQuizDate &&
+      activeAttempt.quizId === quiz?.id
+    )
   );
   const careerTileState = getCareerTileState({
     hasGame: careerAvailable,
@@ -203,11 +211,13 @@ export default function GamesHomeScreen({ navigation }: Props) {
   const quizActionLabel =
     hubState.quiz === 'completed'
       ? 'View recap'
-      : quizAvailable
-        ? 'Kick Off'
-        : isDailyPayloadLoading
-          ? 'Warming up'
-          : 'Unavailable';
+      : hubState.quiz === 'in_progress'
+        ? 'Continue'
+        : quizAvailable
+          ? 'Kick Off'
+          : isDailyPayloadLoading
+            ? 'Warming up'
+            : 'Unavailable';
   const quizActionTone =
     quizAvailable || hubState.quiz === 'completed'
       ? 'primary'
@@ -236,7 +246,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
 
   const actorType = isAuthenticated ? 'authenticated' : 'guest';
   const handleOpenQuiz = () => {
-    if (!currentCachedResult) {
+    if (!currentCachedResult && hubState.quiz !== 'in_progress') {
       markAnalyticsTiming('daily-quiz-session');
       trackAnalyticsEvent('quiz_start_requested', actorType, {
         quizDate: currentQuizDate,
@@ -245,7 +255,9 @@ export default function GamesHomeScreen({ navigation }: Props) {
     }
     navigation.navigate(
       'DailyQuiz',
-      currentCachedResult ? undefined : { autoStart: true }
+      currentCachedResult || hubState.quiz === 'in_progress'
+        ? undefined
+        : { autoStart: true }
     );
   };
 

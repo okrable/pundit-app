@@ -17,6 +17,8 @@ gate Release 1.
   measure discovery and gameplay readiness.
 - `quiz_started`, `quiz_question_answered`, `quiz_abandoned`, and
   `quiz_completed` measure the ranked funnel.
+- `quiz_attempt_resumed` measures persisted-attempt recovery and Continue usage;
+  ordinary refresh, backgrounding, and navigation no longer count as abandonment.
 - `quiz_recap_viewed` and `quiz_shared` measure the result loop.
 - `journey_started` measures bonus-game discovery.
 - Archive event names are reserved for the later archive release.
@@ -43,6 +45,10 @@ For v2.11 startup evaluation, the baseline query reports `app_shell_ready` and
 `app_ready` p50/p75 by actor type, platform, and app version. The event is an
 additive tracking-version 1 event and carries only the existing typed duration
 and source fields.
+
+For v2.12 attempt-integrity evaluation, the baseline query reports resume and
+completion counts by platform and app version. No selected answer, question
+content, account identifier, or new free-form property is collected.
 
 ## Privacy and Retention
 

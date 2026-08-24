@@ -48,6 +48,17 @@ import { isQuizForDate } from '../../shared/dailyQuiz';
 import type { DailyQuizAchievementEvent } from '../../shared/achievements';
 import { useAchievementStore } from './useAchievementStore';
 import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
+import {
+  createDailyQuizAttempt,
+  DailyQuizAttempt,
+  isDailyQuizAttemptCompatible,
+  normalizeDailyQuizAttempt,
+} from '../../shared/dailyQuizAttempt';
+import {
+  clearDailyQuizAttempt,
+  getDailyQuizAttempt,
+  saveDailyQuizAttempt,
+} from '../storage/dailyQuizAttemptStorage';
 
 interface ReconcileIdentityOptions {
   holdInteractiveHandoff?: boolean;
@@ -65,6 +76,10 @@ interface QuizState {
   isSubmitting: boolean;
   isReconcilingIdentity: boolean;
   guestResetVersion: number;
+  activeAttempt: DailyQuizAttempt | null;
+  activeAttemptSource: 'new' | 'cache' | null;
+  attemptError: string | null;
+  isAttemptHydrating: boolean;
   setUserId: (userId: string) => void;
   hydrateFromCache: (userId: string, date?: string) => Promise<void>;
   fetchQuiz: (date?: string, options?: { force?: boolean }) => Promise<Quiz | null>;
@@ -86,6 +101,12 @@ interface QuizState {
   ) => Promise<void>;
   retryPendingSubmission: () => Promise<void>;
   clearGuestTodayQuiz: () => Promise<void>;
+  hydrateActiveAttempt: (userId: string, quiz?: Quiz | null) => Promise<DailyQuizAttempt | null>;
+  beginDailyQuizAttempt: () => Promise<DailyQuizAttempt | null>;
+  updateDailyQuizAttempt: (
+    update: (attempt: DailyQuizAttempt) => DailyQuizAttempt
+  ) => Promise<DailyQuizAttempt | null>;
+  clearActiveAttempt: (userId?: string) => Promise<void>;
   resetQuiz: () => void;
 }
 
@@ -143,8 +164,18 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   isSubmitting: false,
   isReconcilingIdentity: false,
   guestResetVersion: 0,
+  activeAttempt: null,
+  activeAttemptSource: null,
+  attemptError: null,
+  isAttemptHydrating: false,
 
-  setUserId: (userId: string) =>
+  setUserId: (userId: string) => {
+    const previousUserId = get().userId;
+    if (previousUserId && previousUserId !== userId) {
+      void clearDailyQuizAttempt(previousUserId).catch((error) => {
+        logError('quiz.attempt.identity_clear.error', error);
+      });
+    }
     set((state) =>
       state.userId === userId
         ? { userId }
@@ -153,8 +184,13 @@ export const useQuizStore = create<QuizState>((set, get) => ({
             result: null,
             submitError: null,
             isSubmitting: false,
+            activeAttempt: null,
+            activeAttemptSource: null,
+            attemptError: null,
+            isAttemptHydrating: false,
           }
-    ),
+    );
+  },
 
   hydrateFromCache: async (userId: string, date?: string) => {
     const targetDate = date || getQuizDate();
@@ -187,6 +223,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       cachedResult,
       quizError: null,
     });
+    await get().hydrateActiveAttempt(userId, quizCache?.data ?? null);
     logInfo('quiz.cache.hydrate.success', {
       userId,
       targetDate,
@@ -194,6 +231,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       responseDate: quizCache?.data.date,
       source: quizCache?.data ? 'local-cache' : 'none',
       hasCachedResult: Boolean(cachedResult),
+      hasActiveAttempt: Boolean(get().activeAttempt),
     });
   },
 
@@ -280,6 +318,10 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         quizCache: cachedQuiz,
         quizError: null,
       });
+      const activeUserId = get().userId;
+      if (activeUserId) {
+        await get().hydrateActiveAttempt(activeUserId, cachedQuiz.data);
+      }
       return cachedQuiz.data;
     }
 
@@ -320,6 +362,10 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         isQuizLoading: false,
         quizError: null,
       });
+      const activeUserId = get().userId;
+      if (activeUserId) {
+        await get().hydrateActiveAttempt(activeUserId, quiz);
+      }
       logInfo('quiz.fetch.success', {
         targetDate,
         responseDate: quiz.date,
@@ -340,6 +386,10 @@ export const useQuizStore = create<QuizState>((set, get) => ({
           isQuizLoading: false,
           quizError: error.message,
         });
+        const activeUserId = get().userId;
+        if (activeUserId && cachedQuiz?.data) {
+          await get().hydrateActiveAttempt(activeUserId, cachedQuiz.data);
+        }
         return cachedQuiz?.data ?? null;
       }
 
@@ -348,11 +398,26 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         isQuizLoading: false,
         quizError: error instanceof Error ? error.message : 'Failed to fetch quiz',
       });
+      const activeUserId = get().userId;
+      if (activeUserId && cachedQuiz?.data) {
+        await get().hydrateActiveAttempt(activeUserId, cachedQuiz.data);
+      }
       return cachedQuiz?.data ?? null;
     }
   },
 
-  setCachedResult: (cachedResult: CachedQuizResult | null) => set({ cachedResult }),
+  setCachedResult: (cachedResult: CachedQuizResult | null) => {
+    set({ cachedResult });
+    const { activeAttempt, quiz, userId } = get();
+    if (
+      cachedResult &&
+      activeAttempt?.quizId === cachedResult.quizId &&
+      quiz &&
+      userId
+    ) {
+      void get().hydrateActiveAttempt(userId, quiz);
+    }
+  },
 
   reconcileIdentity: async (
     userId: string,
@@ -705,6 +770,31 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   completeQuiz: async (answers: AnswerWithTiming[]) => {
     const originatingUserId = get().userId;
     const localResult = await get().createLocalResult(answers);
+    if (localResult && originatingUserId) {
+      const [durableResult, durablePending] = await Promise.all([
+        getTodayQuizResult(originatingUserId),
+        originatingUserId.startsWith('guest_')
+          ? Promise.resolve(null)
+          : getPendingQuizSubmission(originatingUserId),
+      ]);
+      const completionIsDurable =
+        durableResult?.quizId === localResult.quizId &&
+        (originatingUserId.startsWith('guest_') ||
+          durablePending?.quizId === localResult.quizId);
+      if (!completionIsDurable) {
+        set({
+          attemptError: 'Your completed quiz could not be saved. It will retry locally.',
+        });
+        logWarn('quiz.attempt.completion_not_durable', {
+          userId: originatingUserId,
+          quizId: localResult.quizId,
+          hasResult: durableResult?.quizId === localResult.quizId,
+          hasPendingSubmission: durablePending?.quizId === localResult.quizId,
+        });
+        return;
+      }
+      await get().clearActiveAttempt(originatingUserId);
+    }
     if (
       !localResult ||
       !originatingUserId ||
@@ -1033,6 +1123,168 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     });
   },
 
+  hydrateActiveAttempt: async (userId: string, suppliedQuiz?: Quiz | null) => {
+    set({ isAttemptHydrating: true });
+    try {
+      const storedAttempt = await getDailyQuizAttempt(userId);
+      if (get().userId !== userId) return null;
+
+      if (!storedAttempt) {
+        set({
+          activeAttempt: null,
+          activeAttemptSource: null,
+          attemptError: null,
+          isAttemptHydrating: false,
+        });
+        return null;
+      }
+
+      const quiz = suppliedQuiz === undefined ? get().quiz : suppliedQuiz;
+      if (!quiz) {
+        set({ isAttemptHydrating: false });
+        return null;
+      }
+
+      const today = getQuizDate();
+      const completedResult =
+        get().result?.quizId === storedAttempt.quizId
+          ? get().result
+          : get().cachedResult?.quizId === storedAttempt.quizId
+            ? get().cachedResult
+            : null;
+      const pendingCompletion =
+        completedResult &&
+        !userId.startsWith('guest_') &&
+        completedResult.syncState !== 'synced'
+          ? await getPendingQuizSubmission(userId)
+          : null;
+      const completionIsDurable = Boolean(
+        completedResult &&
+          (userId.startsWith('guest_') ||
+            completedResult.syncState === 'synced' ||
+            pendingCompletion?.quizId === storedAttempt.quizId)
+      );
+      if (
+        completionIsDurable ||
+        !isDailyQuizAttemptCompatible(storedAttempt, userId, quiz, today)
+      ) {
+        await clearDailyQuizAttempt(userId);
+        if (get().userId === userId) {
+          set({
+            activeAttempt: null,
+            activeAttemptSource: null,
+            attemptError: null,
+            isAttemptHydrating: false,
+          });
+        }
+        logInfo('quiz.attempt.discarded', {
+          userId,
+          quizId: storedAttempt.quizId,
+          reason: completionIsDurable ? 'completed' : 'incompatible',
+        });
+        return null;
+      }
+
+      const normalized = normalizeDailyQuizAttempt(
+        storedAttempt,
+        quiz.questions.length
+      );
+      await saveDailyQuizAttempt(normalized);
+      if (get().userId !== userId) return null;
+      set({
+        activeAttempt: normalized,
+        activeAttemptSource: 'cache',
+        attemptError: null,
+        isAttemptHydrating: false,
+      });
+      logInfo('quiz.attempt.hydrated', {
+        userId,
+        quizId: normalized.quizId,
+        phase: normalized.phase,
+        questionIndex: normalized.questionIndex,
+      });
+      return normalized;
+    } catch (error) {
+      if (get().userId === userId) {
+        set({
+          activeAttempt: null,
+          activeAttemptSource: null,
+          attemptError: 'Your saved progress could not be loaded. Try again.',
+          isAttemptHydrating: false,
+        });
+      }
+      logError('quiz.attempt.hydrate.error', error);
+      return null;
+    }
+  },
+
+  beginDailyQuizAttempt: async () => {
+    const { quiz, userId, cachedResult } = get();
+    const today = getQuizDate();
+    if (
+      !quiz ||
+      !userId ||
+      cachedResult?.date === today ||
+      !isQuizForDate(quiz, today)
+    ) {
+      return null;
+    }
+
+    const attempt = createDailyQuizAttempt(userId, quiz);
+    set({ attemptError: null });
+    try {
+      await saveDailyQuizAttempt(attempt);
+      if (get().userId !== userId) {
+        await clearDailyQuizAttempt(userId);
+        return null;
+      }
+      set({ activeAttempt: attempt, activeAttemptSource: 'new' });
+      return attempt;
+    } catch (error) {
+      if (get().userId === userId) {
+        set({
+          activeAttempt: null,
+          activeAttemptSource: null,
+          attemptError: 'Your progress could not be saved. Try again.',
+        });
+      }
+      logError('quiz.attempt.start.error', error);
+      return null;
+    }
+  },
+
+  updateDailyQuizAttempt: async (update) => {
+    const current = get().activeAttempt;
+    if (!current || get().userId !== current.userId) return null;
+    const updated = { ...update(current), updatedAt: Date.now() };
+    set({ activeAttempt: updated, attemptError: null });
+    try {
+      await saveDailyQuizAttempt(updated);
+      if (
+        get().userId !== updated.userId ||
+        get().activeAttempt?.startedAt !== updated.startedAt
+      ) {
+        return null;
+      }
+      return updated;
+    } catch (error) {
+      if (get().userId === updated.userId) {
+        set({ attemptError: 'Progress could not be saved. Tap to retry.' });
+      }
+      logError('quiz.attempt.save.error', error);
+      return null;
+    }
+  },
+
+  clearActiveAttempt: async (requestedUserId?: string) => {
+    const userId = requestedUserId ?? get().activeAttempt?.userId ?? get().userId;
+    if (!userId) return;
+    await clearDailyQuizAttempt(userId);
+    if (get().activeAttempt?.userId === userId) {
+      set({ activeAttempt: null, activeAttemptSource: null, attemptError: null });
+    }
+  },
+
   clearGuestTodayQuiz: async () => {
     const userId = get().userId;
     const authState = useAuthStore.getState();
@@ -1040,7 +1292,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       throw new Error('Only the active guest quiz can be cleared.');
     }
 
-    await clearGuestCache();
+    await Promise.all([clearGuestCache(), clearDailyQuizAttempt(userId)]);
     const remainingResult = await getGuestTodayResult();
     if (remainingResult) {
       throw new Error('The saved guest quiz could not be cleared.');
@@ -1055,6 +1307,9 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       submitError: null,
       quizError: null,
       isSubmitting: false,
+      activeAttempt: null,
+      activeAttemptSource: null,
+      attemptError: null,
       guestResetVersion: state.guestResetVersion + 1,
     }));
     await useProfileStore.getState().hydrateFromCache(userId);
