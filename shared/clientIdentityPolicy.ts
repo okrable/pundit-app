@@ -59,10 +59,12 @@ export function shouldShowUsernameOnboarding(
 export function shouldShowIdentitySync(
   isAuthenticated: boolean,
   identityStatus: ClientIdentityStatus,
-  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed'
+  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed',
+  restoredShellEligible = false
 ): boolean {
   return (
     isAuthenticated &&
+    !restoredShellEligible &&
     authSyncStatus !== 'failed' &&
     (identityStatus === 'unknown' ||
       identityStatus === 'syncing' ||
@@ -73,17 +75,41 @@ export function shouldShowIdentitySync(
 export function shouldShowIdentityFailure(
   isAuthenticated: boolean,
   identityStatus: ClientIdentityStatus,
-  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed'
+  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed',
+  restoredShellEligible = false
 ): boolean {
   return (
     isAuthenticated &&
+    !restoredShellEligible &&
     (identityStatus === 'failed' || authSyncStatus === 'failed')
   );
 }
 
+export interface VerifiedSessionState {
+  isAuthenticated: boolean;
+  authStatus: 'anonymous' | 'restoring' | 'authenticated' | 'reauthRequired';
+  identityStatus: ClientIdentityStatus;
+  token?: string | null;
+  userId?: string | null;
+  authStateVersion: number;
+}
+
+export interface VerifiedSessionExpectation {
+  userId: string;
+  authStateVersion?: number;
+}
+
 export function canProcessProtectedAction(
-  isAuthenticated: boolean,
-  identityStatus: ClientIdentityStatus
+  current: VerifiedSessionState,
+  expected: VerifiedSessionExpectation
 ): boolean {
-  return isAuthenticated && identityStatus === 'complete';
+  return (
+    current.isAuthenticated &&
+    current.authStatus === 'authenticated' &&
+    current.identityStatus === 'complete' &&
+    Boolean(current.token) &&
+    current.userId === expected.userId &&
+    (expected.authStateVersion === undefined ||
+      current.authStateVersion === expected.authStateVersion)
+  );
 }

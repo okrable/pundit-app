@@ -80,6 +80,12 @@ In plain English, this work delivered four connected changes:
     invitations from reopening until preview requests are rate-limited. Native
     deep links and guest-to-auth invitation continuation remain unchanged.
 
+16. **v2.11.0 — fast authenticated startup:** previously complete cached
+    accounts release their local shell before Auth0 restoration and account
+    reconciliation finish. Protected work remains token-verified, temporary
+    refresh failures retain cached navigation with Retry, and Daily Quiz or
+    Journey completions queue locally under the correct account.
+
 ## Product Status Snapshot
 
 ### Delivered

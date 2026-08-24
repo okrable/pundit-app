@@ -35,6 +35,7 @@ interface AuthFlowUser {
 
 let inflightLogin: Promise<AuthFlowUser | null> | null = null;
 const inflightIdentityActivations = new Map<string, Promise<boolean>>();
+const completedIdentityActivations = new Set<string>();
 
 function isCurrentActivation(userId: string, authStateVersion: number): boolean {
   const authState = useAuthStore.getState();
@@ -65,6 +66,10 @@ export async function activateAuthenticatedSession({
   const authState = useAuthStore.getState();
   const authStateVersion = authState.authStateVersion;
   const activationKey = buildIdentityActivationKey(userId, authStateVersion);
+  if (completedIdentityActivations.has(activationKey)) {
+    logInfo('auth.flow.identity.skip_already_complete', { userId, source });
+    return true;
+  }
   const existingActivation = inflightIdentityActivations.get(activationKey);
   if (existingActivation) return existingActivation;
 
@@ -112,6 +117,7 @@ export async function activateAuthenticatedSession({
         return false;
       }
       logInfo('auth.flow.identity.complete', { userId, source });
+      completedIdentityActivations.add(activationKey);
       return true;
     } catch (error) {
       const latestAuthState = useAuthStore.getState();
@@ -175,7 +181,13 @@ export async function completeUsernameOnboarding(
 }
 
 export async function retryIdentityActivation(): Promise<boolean> {
-  const authState = useAuthStore.getState();
+  let authState = useAuthStore.getState();
+  if (!authState.token && authState.user?.sub && authState.identitySource === 'restore') {
+    const restored = await authState.restoreAuthState();
+    if (!restored) return false;
+    authState = useAuthStore.getState();
+  }
+
   if (!authState.user?.sub || !authState.token) {
     return false;
   }

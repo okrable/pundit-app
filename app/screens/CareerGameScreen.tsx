@@ -33,17 +33,28 @@ const logoImage = require('../../assets/logo/dark/pundit-black.png');
 export default function CareerGameScreen({ navigation }: Props) {
   const safeAreaEdges = useMainTabSafeAreaEdges(['top', 'bottom']);
   const inputRef = useRef<TextInput>(null);
+  const previousGameUserIdRef = useRef<string | null>(null);
   const [guess, setGuess] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const { quiz, fetchQuiz, isQuizLoading } = useQuizStore();
   const { user, isAuthenticated } = useAuthStore();
   const {
+    userId: gameUserId,
     result,
     error,
     setUserId,
     hydrateFromCache,
     completeGame,
   } = useCareerGameStore();
+
+  useEffect(() => {
+    const previousUserId = previousGameUserIdRef.current;
+    previousGameUserIdRef.current = gameUserId;
+    if (!previousUserId || !gameUserId || previousUserId === gameUserId) return;
+    setGuess('');
+    setFeedback(null);
+    Keyboard.dismiss();
+  }, [gameUserId]);
 
   useEffect(() => {
     const prepare = async () => {

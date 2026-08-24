@@ -2,6 +2,17 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.11.0 - Fast authenticated startup
+
+- Released previously complete cached account shells before token restoration
+  and reconciliation, without exposing protected requests to unverified sessions.
+- Kept cached navigation usable through temporary background sync failures with
+  a compact Retry banner, while invalid restoration rebinds guest caches first.
+- Allowed Daily Quiz and Journey completion during restoration, with durable
+  account-partitioned submission queues that retry after verification.
+- Added `app_shell_ready` alongside the unchanged full-readiness `app_ready`
+  milestone and startup percentile reporting by actor, platform, and version.
+
 ## v2.10.1 - Friend invite loop hotfix
 
 - Consumed web friend and retired Challenge links after capture so accepting,

@@ -18,6 +18,24 @@ import {
   getPendingAvatarAchievementMutation,
   setPendingAvatarAchievementMutation,
 } from '../storage/achievementStorage';
+import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
+
+let latestProfileHydrationRequest = 0;
+
+function hasVerifiedProfileSession(userId: string, authStateVersion?: number): boolean {
+  const authState = useAuthStore.getState();
+  return canProcessProtectedAction(
+    {
+      isAuthenticated: authState.isAuthenticated,
+      authStatus: authState.authStatus,
+      identityStatus: authState.identityStatus,
+      token: authState.token,
+      userId: authState.user?.sub,
+      authStateVersion: authState.authStateVersion,
+    },
+    { userId, authStateVersion }
+  );
+}
 
 const GUEST_STATS: UserStats = {
   streak: 0,
@@ -45,7 +63,7 @@ interface ProfileState {
   loading: boolean;
   error: string | null;
   hydrateFromCache: (userId: string) => Promise<void>;
-  revalidate: (userId: string) => Promise<void>;
+  revalidate: (userId: string, options?: { propagateError?: boolean }) => Promise<void>;
   applyServerStats: (stats: UserStats) => Promise<void>;
   saveAvatar: (avatarId: AvatarId) => Promise<AvatarId>;
   markPlayedToday: (result: QuizResultImmediate | QuizResult, userId: string) => Promise<void>;
@@ -61,11 +79,17 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   error: null,
 
   hydrateFromCache: async (userId: string) => {
+    const requestId = ++latestProfileHydrationRequest;
     logInfo('profile.cache.hydrate.start', { userId });
     const [cachedStats, todayResult] = await Promise.all([
       userId.startsWith('guest_') ? Promise.resolve(null) : getCachedUserStats(userId),
       getTodayQuizResult(userId),
     ]);
+
+    if (requestId !== latestProfileHydrationRequest) {
+      logInfo('profile.cache.hydrate.discarded_stale', { userId, requestId });
+      return;
+    }
 
     set({
       statsUserId: userId,
@@ -81,9 +105,17 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     });
   },
 
-  revalidate: async (userId: string) => {
+  revalidate: async (userId: string, options = {}) => {
     const startedAuthState = useAuthStore.getState();
     const startedAuthVersion = startedAuthState.authStateVersion;
+
+    if (
+      !userId.startsWith('guest_') &&
+      !hasVerifiedProfileSession(userId, startedAuthVersion)
+    ) {
+      logInfo('profile.revalidate.waiting_for_verified_session', { userId });
+      return;
+    }
 
     logInfo('profile.revalidate.start', { userId, authStateVersion: startedAuthVersion });
     set({ loading: true, error: null });
@@ -104,21 +136,6 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         return;
       }
 
-      const authState = useAuthStore.getState();
-      if (!authState.token || authState.user?.sub !== userId) {
-        logInfo('profile.revalidate.skipped_no_matching_auth', {
-          userId,
-          authUserId: authState.user?.sub,
-          hasToken: Boolean(authState.token),
-        });
-        set({
-          statsUserId: userId,
-          playedToday: Boolean(todayResult),
-          loading: false,
-        });
-        return;
-      }
-
       const [stats, remoteTodayResult] = await Promise.all([
         getUserStats(userId),
         getTodayResult(userId),
@@ -132,8 +149,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       const refreshedCache = await getCachedUserStats(userId);
       const latestAuthState = useAuthStore.getState();
       if (
-        latestAuthState.authStateVersion !== startedAuthVersion ||
-        latestAuthState.user?.sub !== userId
+        !hasVerifiedProfileSession(userId, startedAuthVersion)
       ) {
         logInfo('profile.revalidate.discarded_stale_success', {
           userId,
@@ -175,6 +191,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         loading: false,
         error: error instanceof Error ? error.message : 'Failed to refresh profile',
       });
+      if (options.propagateError) throw error;
     }
   },
 
@@ -199,7 +216,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     const startedAuthState = useAuthStore.getState();
     const userId = startedAuthState.user?.sub;
     const authStateVersion = startedAuthState.authStateVersion;
-    if (!userId || !startedAuthState.token) {
+    if (!userId || !hasVerifiedProfileSession(userId, authStateVersion)) {
       throw new Error('Your session is no longer available.');
     }
 
@@ -232,8 +249,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
     const latestAuthState = useAuthStore.getState();
     if (
-      latestAuthState.authStateVersion !== authStateVersion ||
-      latestAuthState.user?.sub !== userId
+      !hasVerifiedProfileSession(userId, authStateVersion)
     ) {
       throw new Error('Your session changed. Please try again.');
     }

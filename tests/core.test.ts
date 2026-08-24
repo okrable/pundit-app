@@ -151,6 +151,7 @@ function dailyAchievementEvent(
 }
 
 test('accepts only declared pseudonymous analytics envelope values', () => {
+  assert.equal(isAnalyticsEventName('app_shell_ready'), true);
   assert.equal(isAnalyticsEventName('quiz_start_requested'), true);
   assert.equal(isAnalyticsEventName('arbitrary_event'), false);
   assert.equal(isAnalyticsActorType('guest'), true);
@@ -1284,14 +1285,57 @@ test('restores and gates authenticated identity before protected work', () => {
   assert.equal(shouldBlockAuthenticatedNavigation(true, 'failed'), true);
   assert.equal(shouldBlockAuthenticatedNavigation(true, 'complete'), false);
   assert.equal(shouldBlockAuthenticatedNavigation(false, 'unknown'), false);
-  assert.equal(canProcessProtectedAction(true, 'complete'), true);
-  assert.equal(canProcessProtectedAction(true, 'syncing'), false);
+  const verifiedSession = {
+    isAuthenticated: true,
+    authStatus: 'authenticated' as const,
+    identityStatus: 'complete' as const,
+    token: 'token',
+    userId: 'auth0|player',
+    authStateVersion: 4,
+  };
+  assert.equal(
+    canProcessProtectedAction(verifiedSession, {
+      userId: 'auth0|player',
+      authStateVersion: 4,
+    }),
+    true
+  );
+  assert.equal(
+    canProcessProtectedAction(
+      { ...verifiedSession, token: null },
+      { userId: 'auth0|player', authStateVersion: 4 }
+    ),
+    false
+  );
+  assert.equal(
+    canProcessProtectedAction(
+      { ...verifiedSession, identityStatus: 'syncing' },
+      { userId: 'auth0|player', authStateVersion: 4 }
+    ),
+    false
+  );
+  assert.equal(
+    canProcessProtectedAction(verifiedSession, {
+      userId: 'auth0|other',
+      authStateVersion: 4,
+    }),
+    false
+  );
+  assert.equal(
+    canProcessProtectedAction(verifiedSession, {
+      userId: 'auth0|player',
+      authStateVersion: 5,
+    }),
+    false
+  );
   assert.equal(shouldShowUsernameOnboarding(true, 'username_required'), true);
   assert.equal(shouldShowUsernameOnboarding(true, 'syncing'), false);
   assert.equal(shouldShowIdentitySync(true, 'unknown', 'idle'), true);
   assert.equal(shouldShowIdentitySync(true, 'complete', 'syncing'), true);
   assert.equal(shouldShowIdentityFailure(true, 'failed', 'idle'), true);
   assert.equal(shouldShowIdentityFailure(true, 'complete', 'failed'), true);
+  assert.equal(shouldShowIdentitySync(true, 'complete', 'syncing', true), false);
+  assert.equal(shouldShowIdentityFailure(true, 'complete', 'failed', true), false);
   assert.equal(buildIdentityActivationKey('auth0|player', 4), 'auth0|player:4');
   assert.notEqual(
     buildIdentityActivationKey('auth0|player', 4),

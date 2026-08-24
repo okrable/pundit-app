@@ -129,7 +129,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Token refresh failed:', errorData);
-      return null;
+      if (response.status === 400 || response.status === 401) return null;
+      throw new Error(`Auth0 token refresh is temporarily unavailable (${response.status})`);
     }
 
     const data = await response.json();
@@ -139,7 +140,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
     };
   } catch (error) {
     console.error('Error refreshing token:', error);
-    return null;
+    throw error;
   }
 }
 
@@ -163,12 +164,13 @@ export async function fetchUserInfo(accessToken: string): Promise<{
 
     if (!response.ok) {
       console.error('Failed to fetch user info');
-      return null;
+      if (response.status === 401 || response.status === 403) return null;
+      throw new Error(`Auth0 user info is temporarily unavailable (${response.status})`);
     }
 
     return await response.json();
   } catch (error) {
     console.error('Error fetching user info:', error);
-    return null;
+    throw error;
   }
 }

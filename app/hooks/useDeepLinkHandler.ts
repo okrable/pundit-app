@@ -54,7 +54,15 @@ function getFriendUnavailableMessage(preview: FriendInvitePreviewResponse): stri
 
 export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {}) {
   const { onChallengeUnavailable } = options;
-  const { user, isAuthenticated, isInitialized, identityStatus } = useAuthStore();
+  const {
+    user,
+    token,
+    isAuthenticated,
+    isInitialized,
+    authStatus,
+    identityStatus,
+    authStateVersion,
+  } = useAuthStore();
   const [pendingAction, setPendingActionState] = useState<SharedCodeAction | null>(null);
   const [phase, setPhase] = useState<SharedLinkPhase>('idle');
   const [preview, setPreview] = useState<SharedLinkPreview | null>(null);
@@ -163,11 +171,40 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
       !user?.sub ||
       isProcessingRef.current
     ) return;
+    const expectedAuthStateVersion = useAuthStore.getState().authStateVersion;
+    const startedAuthState = useAuthStore.getState();
+    if (
+      !canProcessProtectedAction(
+        {
+          isAuthenticated: startedAuthState.isAuthenticated,
+          authStatus: startedAuthState.authStatus,
+          identityStatus: startedAuthState.identityStatus,
+          token: startedAuthState.token,
+          userId: startedAuthState.user?.sub,
+          authStateVersion: startedAuthState.authStateVersion,
+        },
+        { userId: user.sub, authStateVersion: expectedAuthStateVersion }
+      )
+    ) return;
     isProcessingRef.current = true;
     setPhase('loading');
     setMessage(null);
     try {
       const data = await getFriendInvite(pendingAction.code, user.sub);
+      const latestAuthState = useAuthStore.getState();
+      if (
+        !canProcessProtectedAction(
+          {
+            isAuthenticated: latestAuthState.isAuthenticated,
+            authStatus: latestAuthState.authStatus,
+            identityStatus: latestAuthState.identityStatus,
+            token: latestAuthState.token,
+            userId: latestAuthState.user?.sub,
+            authStateVersion: latestAuthState.authStateVersion,
+          },
+          { userId: user.sub, authStateVersion: expectedAuthStateVersion }
+        )
+      ) return;
       setPreview({ kind: 'friendInvite', data });
       if (data.state === 'already_friends') {
         setMessage(`You and ${data.inviter?.username || 'this player'} are already friends.`);
@@ -191,13 +228,33 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
 
   useEffect(() => {
     if (!pendingAction || !isInitialized) return;
-    if (!canProcessProtectedAction(isAuthenticated, identityStatus) || !user?.sub) {
-      if (!suspendedForSignIn) setPhase('sign_in_required');
+    if (
+      !user?.sub ||
+      !canProcessProtectedAction(
+        {
+          isAuthenticated,
+          authStatus,
+          identityStatus,
+          token,
+          userId: user.sub,
+          authStateVersion,
+        },
+        { userId: user.sub, authStateVersion }
+      )
+    ) {
+      if (
+        !suspendedForSignIn &&
+        (!isAuthenticated || authStatus === 'anonymous' || authStatus === 'reauthRequired')
+      ) {
+        setPhase('sign_in_required');
+      }
       return;
     }
     if (suspendedForSignIn) setSuspendedForSignIn(false);
     if (!preview && !isProcessingRef.current) void loadPreview();
   }, [
+    authStateVersion,
+    authStatus,
     identityStatus,
     isAuthenticated,
     isInitialized,
@@ -205,6 +262,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
     pendingAction,
     preview,
     suspendedForSignIn,
+    token,
     user?.sub,
   ]);
 
@@ -215,11 +273,39 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
       !user?.sub ||
       isProcessingRef.current
     ) return;
+    const expectedAuthStateVersion = authStateVersion;
+    if (
+      !canProcessProtectedAction(
+        {
+          isAuthenticated,
+          authStatus,
+          identityStatus,
+          token,
+          userId: user.sub,
+          authStateVersion,
+        },
+        { userId: user.sub, authStateVersion: expectedAuthStateVersion }
+      )
+    ) return;
     isProcessingRef.current = true;
     setPhase('accepting');
     setMessage(null);
     try {
       const response = await acceptFriendLink(pendingAction.code, user.sub);
+      const latestAuthState = useAuthStore.getState();
+      if (
+        !canProcessProtectedAction(
+          {
+            isAuthenticated: latestAuthState.isAuthenticated,
+            authStatus: latestAuthState.authStatus,
+            identityStatus: latestAuthState.identityStatus,
+            token: latestAuthState.token,
+            userId: latestAuthState.user?.sub,
+            authStateVersion: latestAuthState.authStateVersion,
+          },
+          { userId: user.sub, authStateVersion: expectedAuthStateVersion }
+        )
+      ) return;
       await useLeaderboardStore.getState().invalidateFriends(user.sub);
       setMessage(
         response.alreadyFriends
@@ -236,7 +322,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
     } finally {
       isProcessingRef.current = false;
     }
-  }, [pendingAction, user?.sub]);
+  }, [authStateVersion, authStatus, identityStatus, isAuthenticated, pendingAction, token, user?.sub]);
 
   const retry = useCallback(() => {
     setPreview(null);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,7 +7,6 @@ import QuestionCard from '../components/QuestionCard';
 import ResultsScreen from '../components/ResultsScreen';
 import WelcomeScreen from '../components/WelcomeScreen';
 import CompletedQuizScreen from '../components/CompletedQuizScreen';
-import AuthSyncScreen from '../components/AuthSyncScreen';
 import { useQuizStore } from '../state/useQuizStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
@@ -68,12 +67,12 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     guestResetVersion,
     fetchQuiz,
     completeQuiz,
-    reconcileIdentity,
     setUserId,
     setCachedResult,
     resetQuiz,
   } = useQuizStore();
-  const { user, isAuthenticated, token } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const previousQuizUserIdRef = useRef<string | null>(null);
   const setDailyGameActive = useAchievementStore((state) => state.setDailyGameActive);
   const releaseDailyReveals = useAchievementStore((state) => state.releaseDailyReveals);
   actorTypeRef.current =
@@ -137,6 +136,16 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
   }, [fetchQuiz, isAuthenticated, setUserId, user]);
 
   useEffect(() => {
+    const previousUserId = previousQuizUserIdRef.current;
+    previousQuizUserIdRef.current = quizUserId;
+    if (!previousUserId || !quizUserId || previousUserId === quizUserId) return;
+
+    resetPlayState();
+    setQuizStarted(false);
+    setStartRequested(false);
+  }, [quizUserId]);
+
+  useEffect(() => {
     if (startRequested && isQuizForDate(quiz, getQuizDate())) {
       setQuizStarted(true);
       setStartRequested(false);
@@ -173,33 +182,6 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
       setQuizStarted(false);
     }
   }, [quiz?.id]);
-
-  useLayoutEffect(() => {
-    if (!isAuthenticated || !user) {
-      return;
-    }
-
-    resetPlayState();
-    setQuizStarted(false);
-
-    if (!token) {
-      return;
-    }
-
-    void reconcileIdentity(user.sub, {
-      email: user.email,
-      avatarUrl: user.picture,
-    });
-  }, [isAuthenticated, reconcileIdentity, token, user]);
-
-  useLayoutEffect(() => {
-    if (!isReconcilingIdentity) {
-      return;
-    }
-
-    resetPlayState();
-    setQuizStarted(false);
-  }, [isReconcilingIdentity]);
 
   useFocusEffect(
     useCallback(() => {
@@ -422,19 +404,6 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
       : startRequested && !quizIsCurrent
         ? 'Today’s questions are warming up.'
         : null;
-
-  const shouldShowReconciliation =
-    isReconcilingIdentity ||
-    Boolean(isAuthenticated && user?.sub && token && quizUserId !== user.sub);
-
-  if (shouldShowReconciliation) {
-    return (
-      <AuthSyncScreen
-        title="Syncing your play..."
-        subtitle="Just getting today’s result ready."
-      />
-    );
-  }
 
   if (result?.date === currentQuizDate && quizIsCurrent && quiz) {
     return (
