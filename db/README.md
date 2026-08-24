@@ -24,7 +24,8 @@ db/
 │   ├── 015_career_game_results.sql
 │   ├── 016_profile_avatars.sql
 │   ├── 017_achievements.sql
-│   └── 018_pseudonymous_product_analytics.sql
+│   ├── 018_pseudonymous_product_analytics.sql
+│   └── 019_leaderboard_analytics.sql
 ├── audits/
 │   ├── identity_onboarding_pre.sql
 │   ├── identity_onboarding.sql
@@ -63,6 +64,7 @@ cockroach sql --url "$DATABASE_URL" < db/migrations/015_career_game_results.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/016_profile_avatars.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/017_achievements.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/018_pseudonymous_product_analytics.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/019_leaderboard_analytics.sql
 ```
 
 Immediately after migration 016, run `npm run audit:profile-avatars`. The audit

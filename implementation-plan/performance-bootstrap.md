@@ -89,7 +89,8 @@ reconciliation pipeline without repeating `/syncIdentity`.
 ### Profile and Leaderboards
 
 - Profile stats are cached per authenticated user.
-- Friends and global leaderboards are cached separately.
+- Friends and global leaderboards are cached separately by period, London
+  period anchor, and account. Weekly data is loaded only when selected.
 - Quiz envelopes use schema version 3; profile and leaderboard resources retain
   their independently versioned schemas.
 - Me and League Tables render cached or placeholder content before background refresh.

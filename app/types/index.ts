@@ -113,7 +113,8 @@ export interface QuizResult {
   rejectedAchievementIds?: AchievementId[];
 }
 
-export type LeaderboardPeriod = 'daily';
+export type LeaderboardPeriod = 'daily' | 'weekly';
+export type LeaderboardScope = 'global' | 'friends';
 
 export interface PublicPlayer {
   userId: string;
@@ -131,12 +132,15 @@ export interface LeaderboardEntry {
   gamesPlayed: number;
   streak: number;
   rank: number;
+  hasPlayedPeriod: boolean;
   avatarId?: AvatarId | null;
 }
 
 export interface GlobalLeaderboardResponse {
   period: LeaderboardPeriod;
   quizDate: string;
+  periodStart: string;
+  periodEnd: string;
   leaderboard: LeaderboardEntry[];
 }
 
@@ -333,15 +337,19 @@ export interface FriendsLeaderboardEntry {
   streak: number;
   rank: number | null;
   hasPlayedToday: boolean;
+  hasPlayedPeriod: boolean;
   avatarId?: AvatarId | null;
 }
 
 export interface FriendsLeaderboardResponse {
   period: LeaderboardPeriod;
   quizDate: string;
+  periodStart: string;
+  periodEnd: string;
   leaderboard: FriendsLeaderboardEntry[];
   totalFriends: number;
   friendsPlayedToday: number;
+  friendsPlayedPeriod: number;
 }
 
 export interface CreateFriendLinkResponse {

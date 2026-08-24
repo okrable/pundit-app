@@ -145,6 +145,11 @@ import {
   isAnalyticsId,
   normalizeAnalyticsProperties,
 } from '../shared/analytics';
+import {
+  getLeaderboardCachePartitionKey,
+  getLeaderboardDateWindow,
+  parseLeaderboardPeriod,
+} from '../shared/leaderboard';
 
 function dailyAchievementEvent(
   date: string,
@@ -168,6 +173,8 @@ test('accepts only declared pseudonymous analytics envelope values', () => {
   assert.equal(isAnalyticsEventName('app_shell_ready'), true);
   assert.equal(isAnalyticsEventName('quiz_start_requested'), true);
   assert.equal(isAnalyticsEventName('quiz_attempt_resumed'), true);
+  assert.equal(isAnalyticsEventName('leaderboard_viewed'), true);
+  assert.equal(isAnalyticsEventName('leaderboard_filter_changed'), true);
   assert.equal(isAnalyticsEventName('arbitrary_event'), false);
   assert.equal(isAnalyticsActorType('guest'), true);
   assert.equal(isAnalyticsActorType('user-123'), false);
@@ -185,6 +192,8 @@ test('normalizes fixed analytics properties without accepting free-form metadata
       totalQuestions: 5,
       score: 100,
       exitReason: 'screen_exit',
+      leaderboardScope: 'friends',
+      leaderboardPeriod: 'weekly',
     }),
     {
       quizDate: '2026-08-22',
@@ -194,12 +203,56 @@ test('normalizes fixed analytics properties without accepting free-form metadata
       totalQuestions: 5,
       score: 100,
       exitReason: 'screen_exit',
+      leaderboardScope: 'friends',
+      leaderboardPeriod: 'weekly',
     }
   );
   assert.equal(normalizeAnalyticsProperties({ username: 'liam' }), null);
   assert.equal(normalizeAnalyticsProperties({ answer: 'Player name' }), null);
   assert.equal(normalizeAnalyticsProperties({ durationMs: -1 }), null);
   assert.equal(normalizeAnalyticsProperties({ quizDate: '22-08-2026' }), null);
+  assert.equal(normalizeAnalyticsProperties({ leaderboardScope: 'private' }), null);
+  assert.equal(normalizeAnalyticsProperties({ leaderboardPeriod: 'monthly' }), null);
+});
+
+test('parses leaderboard periods with daily compatibility fallback', () => {
+  assert.equal(parseLeaderboardPeriod('weekly'), 'weekly');
+  assert.equal(parseLeaderboardPeriod('daily'), 'daily');
+  assert.equal(parseLeaderboardPeriod(undefined), 'daily');
+  assert.equal(parseLeaderboardPeriod('monthly'), 'daily');
+});
+
+test('calculates London quiz-date leaderboard windows across boundaries', () => {
+  assert.deepEqual(getLeaderboardDateWindow('2026-08-24', 'weekly'), {
+    quizDate: '2026-08-24',
+    previousQuizDate: '2026-08-23',
+    periodStart: '2026-08-24',
+    periodEnd: '2026-08-30',
+  });
+  assert.deepEqual(getLeaderboardDateWindow('2026-08-30', 'weekly'), {
+    quizDate: '2026-08-30',
+    previousQuizDate: '2026-08-29',
+    periodStart: '2026-08-24',
+    periodEnd: '2026-08-30',
+  });
+  assert.equal(getLeaderboardDateWindow('2027-01-01', 'weekly').periodStart, '2026-12-28');
+  assert.equal(getLeaderboardDateWindow('2027-01-01', 'weekly').periodEnd, '2027-01-03');
+  assert.equal(getLeaderboardDateWindow('2026-03-01', 'weekly').periodStart, '2026-02-23');
+});
+
+test('partitions leaderboard caches by scope, period, anchor, and account', () => {
+  assert.equal(
+    getLeaderboardCachePartitionKey('global', 'daily', '2026-08-24'),
+    'leaderboard_global_daily_2026-08-24_public'
+  );
+  assert.notEqual(
+    getLeaderboardCachePartitionKey('friends', 'weekly', '2026-08-24', 'user-a'),
+    getLeaderboardCachePartitionKey('friends', 'weekly', '2026-08-24', 'user-b')
+  );
+  assert.notEqual(
+    getLeaderboardCachePartitionKey('friends', 'weekly', '2026-08-24', 'user-a'),
+    getLeaderboardCachePartitionKey('friends', 'weekly', '2026-08-31', 'user-a')
+  );
 });
 
 test('defines the complete achievement catalogue', () => {

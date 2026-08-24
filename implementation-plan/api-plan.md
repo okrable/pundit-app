@@ -48,13 +48,16 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 
 ## Leaderboard APIs
 
-- `GET /getLeaderboard?period=daily&limit=100`
-- `GET /getFriendsLeaderboard?userId=...&period=daily`
-- Legacy `period=weekly` requests are tolerated and return daily leaderboard data.
-- Leaderboard responses include `period`, `quizDate`, ranked entries, and each
-  player's current `avatarId`.
+- `GET /getLeaderboard?period=daily|weekly&limit=100`
+- `GET /getFriendsLeaderboard?userId=...&period=daily|weekly`
+- Missing or invalid periods default to Daily for installed-client compatibility.
+- Responses include `period`, `quizDate`, `periodStart`, `periodEnd`, ranked
+  entries, and each player's current `avatarId`. Older today-specific fields
+  remain alongside the new period-specific played counts.
 - Global leaderboards are public to guests and authenticated users; persisted rankings include completed authenticated username identities only.
-- Friends leaderboards require a completed username identity and include the current user plus friends, with unplayed users shown unranked.
+- Weekly scores sum the current London Monday-to-Sunday window and rank by total
+  score, games played, earliest final contributing submission, then user ID.
+- Friends leaderboards require a completed username identity and include the current user plus every friend, with unplayed users shown unranked.
 - `username` is the canonical name. Deprecated `displayName` fields temporarily contain the username for installed-client compatibility.
 
 ## Challenge APIs
@@ -93,6 +96,6 @@ Functions and historical data remain preserved for a future redesign.
 - `POST /trackEvent` remains backward-compatible with legacy aggregate events.
   Current clients add a random UUID installation identifier, tracking version,
   and fixed typed properties for quiz date, source, duration, question count,
-  score, and exit reason. Auth0 IDs, usernames, answers, codes, and free-form
-  metadata are rejected.
+  score, exit reason, leaderboard scope, and leaderboard period. Auth0 IDs,
+  usernames, answers, codes, and free-form metadata are rejected.
 - Scheduled `purgeAnalyticsEvents` removes raw analytics rows older than 90 days.

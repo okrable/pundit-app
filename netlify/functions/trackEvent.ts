@@ -114,9 +114,11 @@ export default async function trackEvent(
          question_number,
          total_questions,
          score,
-         exit_reason
+         exit_reason,
+         leaderboard_scope,
+         leaderboard_period
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
         eventName,
         actorType,
@@ -132,6 +134,8 @@ export default async function trackEvent(
         properties.totalQuestions ?? null,
         properties.score ?? null,
         properties.exitReason ?? null,
+        properties.leaderboardScope ?? null,
+        properties.leaderboardPeriod ?? null,
       ]
     );
 

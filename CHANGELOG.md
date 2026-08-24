@@ -2,6 +2,15 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.13.0 - Global and weekly leaderboards
+
+- Replaced separate Friends and Global tabs with one Global-first leaderboard,
+  Daily/Weekly controls, and an authenticated Friends-only filter.
+- Added London Monday-to-Sunday score aggregation, deterministic weekly ranks,
+  unranked friends who have not played, and current-player highlighting.
+- Partitioned stale-first caches by scope, period, week anchor, and account, and
+  added privacy-bounded filter analytics through migration 019.
+
 ## v2.12.0 - Refresh-safe Daily Quiz attempts
 
 - Persisted unfinished Daily Quiz attempts per identity, date, and quiz so

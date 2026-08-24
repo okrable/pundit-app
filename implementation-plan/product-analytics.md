@@ -24,6 +24,8 @@ gate Release 1.
 - Archive event names are reserved for the later archive release.
 - Existing auth/onboarding and retired Challenge names remain accepted for
   installed-client compatibility.
+- `leaderboard_viewed` and `leaderboard_filter_changed` measure Daily/Weekly and
+  Global/Friends-only use through fixed enum columns added by migration 019.
 
 Properties are fixed typed columns. No event accepts arbitrary metadata,
 question text, selected answers, usernames, email addresses, Auth0 subjects, or
@@ -49,6 +51,10 @@ and source fields.
 For v2.12 attempt-integrity evaluation, the baseline query reports resume and
 completion counts by platform and app version. No selected answer, question
 content, account identifier, or new free-form property is collected.
+
+For v2.13 leaderboard evaluation, apply migration 019 before exercising the
+preview. The baseline query groups view and filter events by scope, period,
+platform, and app version; tracking remains version 1.
 
 ## Privacy and Retention
 

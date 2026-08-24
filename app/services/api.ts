@@ -31,6 +31,7 @@ import { useAuthStore } from '../state/useAuthStore';
 import { logError, logInfo, logWarn } from './debugLog';
 import { getQuizDate } from '../utils/quizDate';
 import { buildDailyQuizPath } from '../../shared/dailyQuiz';
+import { getLeaderboardDateWindow } from '../../shared/leaderboard';
 
 function resolveApiBaseUrl(): string {
   if (
@@ -280,6 +281,7 @@ function normalizeLeaderboardEntry(entry: LeaderboardEntry): LeaderboardEntry {
     gamesPlayed: Number(entry.gamesPlayed ?? 1),
     streak: Number(entry.streak ?? 0),
     rank: Number(entry.rank ?? 0),
+    hasPlayedPeriod: entry.hasPlayedPeriod ?? true,
   };
 }
 
@@ -289,9 +291,12 @@ function normalizeGlobalLeaderboardResponse(
 ): GlobalLeaderboardResponse {
   if (Array.isArray(data)) {
     const quizDate = getQuizDate();
+    const dates = getLeaderboardDateWindow(quizDate, period);
     return {
       period,
       quizDate,
+      periodStart: dates.periodStart,
+      periodEnd: dates.periodEnd,
       leaderboard: data.map((entry) => normalizeLeaderboardEntry(entry)),
     };
   }
@@ -299,6 +304,8 @@ function normalizeGlobalLeaderboardResponse(
   return {
     ...data,
     period: data.period ?? period,
+    periodStart: data.periodStart ?? getLeaderboardDateWindow(data.quizDate, period).periodStart,
+    periodEnd: data.periodEnd ?? getLeaderboardDateWindow(data.quizDate, period).periodEnd,
     leaderboard: data.leaderboard.map((entry) => normalizeLeaderboardEntry(entry)),
   };
 }
@@ -308,17 +315,22 @@ function normalizeFriendsLeaderboardResponse(
   period: LeaderboardPeriod
 ): FriendsLeaderboardResponse {
   const quizDate = data.quizDate ?? getQuizDate();
+  const dates = getLeaderboardDateWindow(quizDate, period);
 
   return {
     ...data,
     period: data.period ?? period,
     quizDate,
+    periodStart: data.periodStart ?? dates.periodStart,
+    periodEnd: data.periodEnd ?? dates.periodEnd,
+    friendsPlayedPeriod: data.friendsPlayedPeriod ?? data.friendsPlayedToday ?? 0,
     leaderboard: data.leaderboard.map((entry) => ({
       ...entry,
       score: Number(entry.score ?? 0),
       gamesPlayed: Number(entry.gamesPlayed ?? (entry.hasPlayedToday ? 1 : 0)),
       streak: Number(entry.streak ?? 0),
       rank: entry.rank === null ? null : Number(entry.rank ?? 0),
+      hasPlayedPeriod: entry.hasPlayedPeriod ?? entry.hasPlayedToday,
     })),
   };
 }
@@ -361,10 +373,10 @@ export async function finalizeQuizStats(
 }
 
 export async function getLeaderboard(
+  period: LeaderboardPeriod = 'daily',
   limit = 100
 ): Promise<GlobalLeaderboardResponse> {
-  const period: LeaderboardPeriod = 'daily';
-  const data = await fetchApi<GlobalLeaderboardResponse | LeaderboardEntry[]>(`/getLeaderboard?period=daily&limit=${limit}`, undefined, {
+  const data = await fetchApi<GlobalLeaderboardResponse | LeaderboardEntry[]>(`/getLeaderboard?period=${period}&limit=${limit}`, undefined, {
     timeoutMs: LEADERBOARD_TIMEOUT_MS,
   });
   return normalizeGlobalLeaderboardResponse(data, period);
@@ -542,11 +554,11 @@ export async function removeFriend(
 }
 
 export async function getFriendsLeaderboard(
-  userId: string
+  userId: string,
+  period: LeaderboardPeriod = 'daily'
 ): Promise<FriendsLeaderboardResponse> {
-  const period: LeaderboardPeriod = 'daily';
   const data = await fetchApi<FriendsLeaderboardResponse>(
-    `/getFriendsLeaderboard?userId=${userId}&period=daily`,
+    `/getFriendsLeaderboard?userId=${encodeURIComponent(userId)}&period=${period}`,
     undefined,
     {
       timeoutMs: LEADERBOARD_TIMEOUT_MS,

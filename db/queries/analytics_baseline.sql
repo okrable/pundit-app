@@ -92,3 +92,19 @@ WHERE app_environment = 'production'
   AND occurred_at >= now() - INTERVAL '7 days'
 GROUP BY event_name, platform
 ORDER BY event_name, platform;
+
+-- Release 2 leaderboard filter usage. Run after migration 019.
+SELECT
+  event_name,
+  leaderboard_scope,
+  leaderboard_period,
+  platform,
+  app_version,
+  count(*) AS events,
+  count(DISTINCT analytics_id) AS players
+FROM analytics_events
+WHERE app_environment = 'production'
+  AND event_name IN ('leaderboard_viewed', 'leaderboard_filter_changed')
+  AND occurred_at >= now() - INTERVAL '7 days'
+GROUP BY event_name, leaderboard_scope, leaderboard_period, platform, app_version
+ORDER BY app_version DESC, event_name, leaderboard_scope, leaderboard_period, platform;

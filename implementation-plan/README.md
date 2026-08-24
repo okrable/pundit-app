@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.10.0 product analytics baseline
+> Last updated: v2.13.0 global and weekly leaderboards
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -112,12 +112,12 @@ In plain English, this work delivered four connected changes:
 - Server-resolved username identities across friends, persisted leaderboards, and challenges.
 - Centralized auth flow with post-login quiz reconciliation and first data prefetch behind `AuthSyncScreen`.
 - Guest-to-auth daily result migration/adoption where applicable.
-- Daily global leaderboard, friends leaderboard, and friend links. Challenge
+- Global Daily/Weekly leaderboard, authenticated Friends-only filtering, and friend links. Challenge
   implementation and history are preserved but retired from active use.
 - Branded bootstrap, stale-first cache hydration, and debug-log export.
 - Mobile-first web shell aligned with the native bottom-tab layout.
-- Date-aware daily leaderboard caches with forced refresh after authenticated submissions.
-- Friends-leaderboard refresh after friendship mutations and League Tables focus.
+- Scope-, period-, date-, and account-partitioned leaderboard caches with stale-first refresh.
+- Friends-leaderboard invalidation after friendship mutations.
 - Pull-request CI, uniform Netlify previews, and same-commit web/iOS validation gates.
 - Persistent retry for daily and Journey submissions.
 - Immediate local quiz completion and projected post-play streak before server

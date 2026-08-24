@@ -91,6 +91,9 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - `career_game_results` stores independent career-game completion and does not
   contribute to quiz scores, streaks, profile aggregates, or leaderboards.
 - Daily leaderboards rank a single `quiz_date` by score, then earliest submission time, then user id.
+- Weekly leaderboards sum scores across the current London Monday-to-Sunday
+  window and rank by total, games played, earliest final contributing
+  submission, then user id. Future days have no rows.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
 - Challenge tables and user aggregate columns are retained without mutation
   while all challenge endpoints are retired with HTTP `410`.
@@ -116,7 +119,8 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - Legacy clients may omit the new envelope; current clients send
   `trackingVersion: 1` and an allowlisted `properties` object.
 - Allowed properties are quiz date, cache/network source, bounded duration,
-  question number, total questions, score, and a fixed exit reason.
+  question number, total questions, score, a fixed exit reason, leaderboard
+  scope, and leaderboard period.
 - Free-form keys and identity/content values such as usernames, emails,
   question text, answers, and invitation codes are rejected by the Function.
 
