@@ -34,6 +34,7 @@ import {
   type RootStackParamList,
 } from './app/navigation/rootNavigation';
 import { consumePendingPlayerProfile } from './app/storage/playerProfileContinuation';
+import { useSocialStore } from './app/state/useSocialStore';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -108,6 +109,29 @@ function AppContent() {
       { userId: auth.user.sub, authStateVersion: auth.authStateVersion }
     )) return;
 
+    void useSocialStore.getState().refreshRequests(auth.user.sub);
+  }, [
+    auth.authStateVersion,
+    auth.authStatus,
+    auth.identityStatus,
+    auth.isAuthenticated,
+    auth.token,
+    auth.user?.sub,
+  ]);
+
+  React.useEffect(() => {
+    if (!auth.user?.sub || !canProcessProtectedAction(
+      {
+        isAuthenticated: auth.isAuthenticated,
+        authStatus: auth.authStatus,
+        identityStatus: auth.identityStatus,
+        token: auth.token,
+        userId: auth.user.sub,
+        authStateVersion: auth.authStateVersion,
+      },
+      { userId: auth.user.sub, authStateVersion: auth.authStateVersion }
+    )) return;
+
     void consumePendingPlayerProfile().then((pending) => {
       if (!pending || !rootNavigationRef.isReady()) return;
       rootNavigationRef.navigate('PlayerProfile', {
@@ -131,6 +155,21 @@ function AppContent() {
       logInfo('app.state.change', { nextState, hasSeenActiveState: hasSeenActiveState.current });
       if (nextState === 'active' && hasSeenActiveState.current) {
         void prefetchDailyLoop({ mode: 'public-warm' });
+        const currentAuth = useAuthStore.getState();
+        const userId = currentAuth.user?.sub;
+        if (userId && canProcessProtectedAction(
+          {
+            isAuthenticated: currentAuth.isAuthenticated,
+            authStatus: currentAuth.authStatus,
+            identityStatus: currentAuth.identityStatus,
+            token: currentAuth.token,
+            userId,
+            authStateVersion: currentAuth.authStateVersion,
+          },
+          { userId, authStateVersion: currentAuth.authStateVersion }
+        )) {
+          void useSocialStore.getState().refreshRequests(userId);
+        }
       }
 
       if (nextState === 'active') {

@@ -14,6 +14,18 @@ export type FriendRelationshipState =
   | 'incoming_pending'
   | 'friends';
 
+export function hasPendingIncomingFriendRequests(input: {
+  ownerId: string | null;
+  currentUserId?: string | null;
+  incomingCount: number;
+}): boolean {
+  return Boolean(
+    input.currentUserId
+      && input.ownerId === input.currentUserId
+      && input.incomingCount > 0
+  );
+}
+
 export type SendFriendRequestDecision =
   | 'self'
   | 'already_friends'

@@ -25,6 +25,7 @@ interface SocialState {
   loading: boolean;
   error: string | null;
   refresh: (userId: string) => Promise<void>;
+  refreshRequests: (userId: string) => Promise<void>;
   sendRequest: (userId: string, playerId: string) => Promise<FriendRelationshipResponse>;
   respondRequest: (
     userId: string,
@@ -85,6 +86,25 @@ export const useSocialStore = create<SocialState>((set, get) => ({
         loading: false,
         error: error instanceof Error ? error.message : 'Unable to refresh friends',
       });
+    }
+  },
+
+  refreshRequests: async (userId) => {
+    const version = useAuthStore.getState().authStateVersion;
+    if (!verified(userId, version)) return;
+    if (get().ownerId !== userId) {
+      set({ ownerId: userId, friends: [], incoming: [], outgoing: [], error: null });
+    }
+    try {
+      const requests = await getFriendRequests(userId);
+      if (!verified(userId, version)) return;
+      set({
+        ownerId: userId,
+        incoming: requests.incoming,
+        outgoing: requests.outgoing,
+      });
+    } catch {
+      // Keep the last known request state visible until a later refresh succeeds.
     }
   },
 

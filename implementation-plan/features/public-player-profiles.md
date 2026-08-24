@@ -23,5 +23,8 @@ also clear pending requests.
 
 The account-scoped social store rejects late work after logout or account
 change. The Friends manager presents incoming, sent, and existing sections;
-incoming counts appear there and on League Tables. Friendship changes clear
-both Daily and Weekly Friends caches.
+unresolved incoming requests appear as a plain red dot on the League Tables
+navigation destination and Add Friends action. The web hamburger and Friends
+sheet title remain unbadged. Request state refreshes after verified login,
+foreground resume, League Tables focus, and social mutations, while friendship
+changes clear both Daily and Weekly Friends caches.

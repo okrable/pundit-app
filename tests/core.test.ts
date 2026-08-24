@@ -43,9 +43,11 @@ import {
   decideFriendLinkAcceptance,
   decideFriendInvitePreview,
   getFriendRelationshipState,
+  hasPendingIncomingFriendRequests,
   normalizeSocialCode,
   orderFriendshipPair,
 } from '../shared/socialPolicy';
+
 import {
   getCompatibilityPlayerName,
   LEGACY_GUEST_LABEL,
@@ -173,6 +175,21 @@ function dailyAchievementEvent(
     ...overrides,
   };
 }
+
+test('shows friend-request notifications only for the active account with incoming requests', () => {
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 1,
+  }), true);
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: 'auth0|one', currentUserId: 'auth0|two', incomingCount: 3,
+  }), false);
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 0,
+  }), false);
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: null, currentUserId: null, incomingCount: 2,
+  }), false);
+});
 
 test('accepts only declared pseudonymous analytics envelope values', () => {
   assert.equal(isAnalyticsEventName('app_shell_ready'), true);

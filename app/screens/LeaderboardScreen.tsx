@@ -38,6 +38,8 @@ import { getLeaderboardDatasetKey } from '../../shared/leaderboard';
 import { trackAnalyticsEvent } from '../services/analytics';
 import { openPlayerProfile } from '../navigation/rootNavigation';
 import { useSocialStore } from '../state/useSocialStore';
+import useIncomingFriendRequestNotification from '../hooks/useIncomingFriendRequestNotification';
+import NotificationDot from '../components/NotificationDot';
 
 type Row = LeaderboardEntry | FriendsLeaderboardEntry;
 
@@ -80,9 +82,7 @@ export default function LeaderboardScreen() {
     intent: 'signup',
     forceInteractive: forceInteractiveAuth,
   });
-  const incomingRequestCount = useSocialStore((state) =>
-    state.ownerId === user?.sub ? state.incoming.length : 0
-  );
+  const hasIncomingRequests = useIncomingFriendRequestNotification();
   const refreshSocial = useSocialStore((state) => state.refresh);
 
   const scope: LeaderboardScope = friendsOnly && isAuthenticated ? 'friends' : 'global';
@@ -287,15 +287,11 @@ export default function LeaderboardScreen() {
               style={styles.manageFriendsButton}
               onPress={() => setShowManageFriends(true)}
               accessibilityRole="button"
-              accessibilityLabel="Add friends"
+              accessibilityLabel={hasIncomingRequests ? 'Add friends, friend requests pending' : 'Add friends'}
             >
               <Ionicons name="person-add" size={18} color={theme.colors.white} />
               <Text style={styles.manageFriendsButtonText}>Add Friends</Text>
-              {incomingRequestCount > 0 ? (
-                <View style={styles.requestBadge}>
-                  <Text style={styles.requestBadgeText}>{Math.min(incomingRequestCount, 99)}</Text>
-                </View>
-              ) : null}
+              {hasIncomingRequests ? <NotificationDot style={styles.requestDot} /> : null}
             </TouchableOpacity>
           ) : null}
         </View>
@@ -374,8 +370,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.primary,
   },
   manageFriendsButtonText: { fontSize: 13, fontFamily: theme.fonts.gothamBold, color: theme.colors.white },
-  requestBadge: { minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, backgroundColor: theme.colors.white, alignItems: 'center', justifyContent: 'center' },
-  requestBadgeText: { color: theme.colors.primary, fontFamily: theme.fonts.gothamBold, fontSize: 10 },
+  requestDot: { borderWidth: 2, borderColor: theme.colors.white, width: 12, height: 12, borderRadius: 6 },
   filtersRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.sm },
   periodControl: {
     flex: 1, flexDirection: 'row', backgroundColor: theme.colors.white,

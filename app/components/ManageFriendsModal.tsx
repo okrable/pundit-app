@@ -316,14 +316,7 @@ export default function ManageFriendsModal({
       <SafeAreaView style={styles.container} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerTitleRow}>
-            <Text style={styles.headerTitle}>Friends</Text>
-            {incoming.length > 0 ? (
-              <View style={styles.headerRequestBadge}>
-                <Text style={styles.headerRequestBadgeText}>{Math.min(incoming.length, 99)}</Text>
-              </View>
-            ) : null}
-          </View>
+          <Text style={styles.headerTitle}>Friends</Text>
           <TouchableOpacity style={styles.doneButton} onPress={onClose}>
             <Text style={styles.doneButtonText}>Done</Text>
           </TouchableOpacity>
@@ -433,25 +426,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: theme.fonts.gothamBold,
     color: theme.colors.textDark,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  headerRequestBadge: {
-    minWidth: 22,
-    height: 22,
-    paddingHorizontal: 6,
-    borderRadius: 11,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerRequestBadgeText: {
-    fontSize: 11,
-    fontFamily: theme.fonts.gothamBold,
-    color: theme.colors.white,
   },
   doneButton: {
     paddingVertical: theme.spacing.xs,

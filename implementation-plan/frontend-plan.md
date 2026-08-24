@@ -66,6 +66,12 @@ Every leaderboard row opens the root-level public player profile above the
 platform-specific tab or drawer shell. The same route is used from existing
 friend and pending-request rows on web, iOS, and Android.
 
+An unresolved incoming friend request adds a plain red notification dot to the
+League Tables navigation destination and its Add Friends action. The web menu
+button itself stays unbadged. The account-scoped request state refreshes after
+verified authentication, foreground resume, League Tables focus, and social
+mutations; failed refreshes retain the last known state.
+
 The native runtime uses Expo SDK 55, React Native 0.83, Reanimated 4.2.1,
 Gesture Handler 2.30, and Worklets 0.7.4. Native tabs deliberately use
 `react-native-screens` 4.25.x, which supplies the experimental `Tabs.Host`

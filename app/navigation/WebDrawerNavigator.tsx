@@ -26,6 +26,8 @@ import type { MainSectionParamList } from './MainNavigator';
 import { useAuthRequest } from '../services/auth0';
 import { loginWithAuth0, logoutWithAuth0 } from '../services/authFlow';
 import { useAuthStore } from '../state/useAuthStore';
+import useIncomingFriendRequestNotification from '../hooks/useIncomingFriendRequestNotification';
+import NotificationDot from '../components/NotificationDot';
 
 const Drawer = createDrawerNavigator<MainSectionParamList>();
 const whiteLogo = require('../../assets/logo/white/pundit-white.png');
@@ -259,6 +261,7 @@ function WebDrawerContent(props: DrawerContentComponentProps) {
 
 export default function WebDrawerNavigator() {
   const { width } = useWindowDimensions();
+  const hasIncomingRequests = useIncomingFriendRequestNotification();
   const drawerWidth = Math.min(360, Math.round(width * 0.88));
 
   return (
@@ -320,6 +323,17 @@ export default function WebDrawerNavigator() {
         component={LeaderboardScreen}
         options={{
           title: 'League Tables',
+          drawerLabel: ({ color }) => (
+            <View
+              style={styles.leagueTablesLabel}
+              accessibilityLabel={hasIncomingRequests
+                ? 'League Tables, friend requests pending'
+                : 'League Tables'}
+            >
+              <Text style={[styles.drawerLabelText, { color }]}>League Tables</Text>
+              {hasIncomingRequests ? <NotificationDot /> : null}
+            </View>
+          ),
           drawerIcon: ({ color, size }) => (
             <Ionicons name="trophy-outline" color={color} size={size} />
           ),
@@ -340,6 +354,15 @@ export default function WebDrawerNavigator() {
 }
 
 const styles = StyleSheet.create({
+  leagueTablesLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  drawerLabelText: {
+    fontFamily: theme.fonts.gothamBold,
+    fontSize: 15,
+  },
   header: {
     width: '100%',
     backgroundColor: theme.colors.accent,

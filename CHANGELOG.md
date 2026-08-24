@@ -13,7 +13,9 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
 - Added public player profiles from leaderboard, friend, and request rows with
   Daily Quiz stats and earned-only achievement showcases.
 - Added approval-based friend requests with incoming/sent management, reciprocal
-  acceptance, request badges, profile actions, and additive migration 020.
+  acceptance, profile actions, and additive migration 020.
+- Added account-aware red notification dots to League Tables navigation and its
+  Add Friends action while incoming requests remain unresolved.
 
 ## v2.12.0 - Refresh-safe Daily Quiz attempts
 
