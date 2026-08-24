@@ -54,8 +54,15 @@
   provisioning and username-onboarding state.
 - Friendships use one ordered `(user_a, user_b)` row that is visible to both
   players.
+- Public player profiles expose Daily Quiz accomplishments and earned
+  achievements only; public cache data is target-scoped while relationship
+  state remains account-scoped and uncached.
+- `friend_requests` holds one pending sender per ordered pair. Duplicate sends
+  are idempotent, reciprocal sends atomically become friendships, and
+  accept/decline/cancel delete the pending row.
 - New friend invites are reusable for seven days; legacy invite rows retain
-  single-use semantics.
+  single-use semantics. Invite acceptance remains immediate and clears any
+  pending approval request for that pair.
 - Daily result dates are authoritative for streaks. The user-row streak fields
   are recomputed projections, while profile responses expose date-aware status.
 

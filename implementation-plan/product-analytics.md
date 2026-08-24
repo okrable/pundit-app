@@ -26,6 +26,9 @@ gate Release 1.
   installed-client compatibility.
 - `leaderboard_viewed` and `leaderboard_filter_changed` measure Daily/Weekly and
   Global/Friends-only use through fixed enum columns added by migration 019.
+- `player_profile_viewed`, `friend_request_sent`, and
+  `friend_request_accepted` measure the social funnel without player IDs or new
+  properties.
 
 Properties are fixed typed columns. No event accepts arbitrary metadata,
 question text, selected answers, usernames, email addresses, Auth0 subjects, or
@@ -55,6 +58,9 @@ content, account identifier, or new free-form property is collected.
 For v2.13 leaderboard evaluation, apply migration 019 before exercising the
 preview. The baseline query groups view and filter events by scope, period,
 platform, and app version; tracking remains version 1.
+
+The v2.13 social events remain tracking-version 1 and use no properties, so
+they cannot identify the viewed or requested player.
 
 ## Privacy and Retention
 

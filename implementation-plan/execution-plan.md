@@ -79,6 +79,10 @@
   locked-answer recovery, Continue entry points, and durable completion handoff.
 - [x] Global-first Daily/Weekly leaderboards with account-partitioned Friends-only
   rankings, stale-first caches, and typed filter analytics.
+- [x] Public player profiles with earned achievement showcases and root-level
+  navigation from leaderboard, friend, and request rows.
+- [x] Approval-based friend requests with reciprocal acceptance, account-scoped
+  request state, badges, and migration 020.
 
 ## Active Hardening
 
@@ -88,6 +92,7 @@
 
 ## Next Feature Wave
 
-1. Evaluate v2.13 leaderboard filter usage after the controlled Production smoke.
+1. Evaluate v2.13 leaderboard, public-profile, and friend-request usage after
+   the controlled Production smoke.
 2. Push notifications.
 3. Quiz archives and historical access.

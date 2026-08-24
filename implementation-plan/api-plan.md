@@ -37,6 +37,7 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 ## Profile APIs
 
 - `GET /getUserStats`
+- `GET /getPlayerProfile?playerId=...&viewerUserId=...`
 - `POST /updateProfile`
 - `GET /checkUsername`
 - `POST /setUsername`
@@ -45,6 +46,10 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `setUsername` atomically confirms the incomplete identity's username and
   selected avatar. Same-value retries are idempotent and later username changes
   return `USERNAME_IMMUTABLE`.
+- Player profiles are public for completed identities and expose only username,
+  avatar, current Daily streak, best score, quiz count, and earned achievement
+  IDs/unlock dates. An optional viewer ID requires its matching bearer token and
+  adds only the relationship enum.
 
 ## Leaderboard APIs
 
@@ -80,6 +85,10 @@ Functions and historical data remain preserved for a future redesign.
 - `POST /acceptFriendLink`
 - `GET /getFriends`
 - `POST /removeFriend`
+- `GET /getFriendRequests?userId=...`
+- `POST /sendFriendRequest`
+- `POST /respondFriendRequest` with `accept | decline`
+- `POST /cancelFriendRequest`
 - New invite codes are reusable for seven days and are returned again while active.
 - Previously issued codes retain single-use behavior.
 - Acceptance transactionally inserts one ordered mutual friendship row and is idempotent when the relationship already exists.
@@ -87,6 +96,11 @@ Functions and historical data remain preserved for a future redesign.
   earlier slow request already completed, and uses the longer social-mutation
   client timeout.
 - Friend responses use `PublicPlayer { userId, username, avatarId?, avatarUrl? }`; deprecated name/id aliases remain during the compatibility window.
+- Friend requests are protected by completed verified identity ownership and
+  store one pending row per ordered pair. Duplicate sends are idempotent,
+  reciprocal sends create the friendship, and decline/cancel permit a later retry.
+- Sender and pair rate limits restrict repeated unsolicited sends. Existing
+  invite links retain immediate friendship acceptance and clear pending requests.
 
 ## Operational Instrumentation
 
@@ -98,4 +112,6 @@ Functions and historical data remain preserved for a future redesign.
   and fixed typed properties for quiz date, source, duration, question count,
   score, exit reason, leaderboard scope, and leaderboard period. Auth0 IDs,
   usernames, answers, codes, and free-form metadata are rejected.
+- Profile views and friend-request send/accept events add event names only; they
+  contain no target player ID or new free-form property.
 - Scheduled `purgeAnalyticsEvents` removes raw analytics rows older than 90 days.

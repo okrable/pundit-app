@@ -36,6 +36,8 @@ import { formatStreakLabel } from '../../shared/streak';
 import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
 import { getLeaderboardDatasetKey } from '../../shared/leaderboard';
 import { trackAnalyticsEvent } from '../services/analytics';
+import { openPlayerProfile } from '../navigation/rootNavigation';
+import { useSocialStore } from '../state/useSocialStore';
 
 type Row = LeaderboardEntry | FriendsLeaderboardEntry;
 
@@ -78,6 +80,10 @@ export default function LeaderboardScreen() {
     intent: 'signup',
     forceInteractive: forceInteractiveAuth,
   });
+  const incomingRequestCount = useSocialStore((state) =>
+    state.ownerId === user?.sub ? state.incoming.length : 0
+  );
+  const refreshSocial = useSocialStore((state) => state.refresh);
 
   const scope: LeaderboardScope = friendsOnly && isAuthenticated ? 'friends' : 'global';
   const datasetKey = getLeaderboardDatasetKey(scope, period);
@@ -114,11 +120,12 @@ export default function LeaderboardScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadCurrent();
+      if (isAuthenticated && user?.sub) void refreshSocial(user.sub);
       trackAnalyticsEvent('leaderboard_viewed', actorType, {
         leaderboardScope: scope,
         leaderboardPeriod: period,
       });
-    }, [actorType, loadCurrent, period, scope])
+    }, [actorType, isAuthenticated, loadCurrent, period, refreshSocial, scope, user?.sub])
   );
 
   const handleCreateAccount = async () => {
@@ -167,7 +174,16 @@ export default function LeaderboardScreen() {
     const notPlayed = period === 'weekly' ? 'No score this week' : 'Not played today';
 
     return (
-      <View style={[styles.leaderboardItem, isCurrentUser && styles.currentUserItem]}>
+      <TouchableOpacity
+        style={[styles.leaderboardItem, isCurrentUser && styles.currentUserItem]}
+        onPress={() => openPlayerProfile({
+          playerId: item.userId,
+          username: item.username,
+          avatarId: item.avatarId,
+        })}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${formatPublicPlayerName(item.username)} profile`}
+      >
         {hasPlayed && item.rank ? (
           <View style={styles.rankContainer}>
             <Text style={styles.rank}>#{item.rank || index + 1}</Text>
@@ -189,7 +205,7 @@ export default function LeaderboardScreen() {
             {hasPlayed ? stats : notPlayed}
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -275,6 +291,11 @@ export default function LeaderboardScreen() {
             >
               <Ionicons name="person-add" size={18} color={theme.colors.white} />
               <Text style={styles.manageFriendsButtonText}>Add Friends</Text>
+              {incomingRequestCount > 0 ? (
+                <View style={styles.requestBadge}>
+                  <Text style={styles.requestBadgeText}>{Math.min(incomingRequestCount, 99)}</Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
           ) : null}
         </View>
@@ -353,6 +374,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.primary,
   },
   manageFriendsButtonText: { fontSize: 13, fontFamily: theme.fonts.gothamBold, color: theme.colors.white },
+  requestBadge: { minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, backgroundColor: theme.colors.white, alignItems: 'center', justifyContent: 'center' },
+  requestBadgeText: { color: theme.colors.primary, fontFamily: theme.fonts.gothamBold, fontSize: 10 },
   filtersRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.sm },
   periodControl: {
     flex: 1, flexDirection: 'row', backgroundColor: theme.colors.white,

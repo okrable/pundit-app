@@ -20,5 +20,9 @@ progress while locked easter eggs retain mystery copy. Guests can earn the five
 single-play quiz achievements locally; only the current adopted guest result is
 validated at login, while cumulative progress starts after authentication.
 
+Public player profiles show earned achievement definitions and unlock dates
+only. They never expose locked entries, secret hints, milestone progress, or
+the source event that produced an unlock.
+
 Achievement tracking starts at v2.9.0. Migration 017 is additive and intentionally
 does not backfill older results, streaks, or avatar changes.

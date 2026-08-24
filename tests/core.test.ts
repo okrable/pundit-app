@@ -37,8 +37,12 @@ import {
 } from '../shared/clientIdentityPolicy';
 import {
   canReuseFriendLink,
+  decideCancelFriendRequest,
+  decideFriendRequestResponse,
+  decideSendFriendRequest,
   decideFriendLinkAcceptance,
   decideFriendInvitePreview,
+  getFriendRelationshipState,
   normalizeSocialCode,
   orderFriendshipPair,
 } from '../shared/socialPolicy';
@@ -129,6 +133,7 @@ import {
   ACHIEVEMENTS,
   applyAchievementEvent,
   createEmptyAchievementSnapshot,
+  projectPublicAchievementUnlocks,
   type AchievementSnapshot,
   type DailyQuizAchievementEvent,
 } from '../shared/achievements';
@@ -175,6 +180,9 @@ test('accepts only declared pseudonymous analytics envelope values', () => {
   assert.equal(isAnalyticsEventName('quiz_attempt_resumed'), true);
   assert.equal(isAnalyticsEventName('leaderboard_viewed'), true);
   assert.equal(isAnalyticsEventName('leaderboard_filter_changed'), true);
+  assert.equal(isAnalyticsEventName('player_profile_viewed'), true);
+  assert.equal(isAnalyticsEventName('friend_request_sent'), true);
+  assert.equal(isAnalyticsEventName('friend_request_accepted'), true);
   assert.equal(isAnalyticsEventName('arbitrary_event'), false);
   assert.equal(isAnalyticsActorType('guest'), true);
   assert.equal(isAnalyticsActorType('user-123'), false);
@@ -1733,6 +1741,102 @@ test('orders mutual friendships and reuses only active reusable links', () => {
     }),
     'inviter_unavailable'
   );
+});
+
+test('resolves every public profile relationship without exposing request internals', () => {
+  assert.equal(getFriendRelationshipState({
+    viewerId: null,
+    playerId: 'player-b',
+    alreadyFriends: false,
+    pendingSenderId: null,
+  }), 'guest');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-a',
+    alreadyFriends: false,
+    pendingSenderId: null,
+  }), 'self');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-b',
+    alreadyFriends: false,
+    pendingSenderId: null,
+  }), 'none');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-b',
+    alreadyFriends: false,
+    pendingSenderId: 'player-a',
+  }), 'outgoing_pending');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-b',
+    alreadyFriends: false,
+    pendingSenderId: 'player-b',
+  }), 'incoming_pending');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-b',
+    alreadyFriends: true,
+    pendingSenderId: 'player-b',
+  }), 'friends');
+});
+
+test('friend request sends are idempotent and reciprocal sends become friendships', () => {
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-a', alreadyFriends: false, pendingSenderId: null,
+  }), 'self');
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-b', alreadyFriends: true, pendingSenderId: null,
+  }), 'already_friends');
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-b', alreadyFriends: false, pendingSenderId: null,
+  }), 'create_request');
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-b', alreadyFriends: false, pendingSenderId: 'player-a',
+  }), 'already_requested');
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-b', alreadyFriends: false, pendingSenderId: 'player-b',
+  }), 'accept_reciprocal');
+});
+
+test('friend request responses and cancellations enforce sender ownership idempotently', () => {
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-b', pendingSenderId: 'player-a', alreadyFriends: false, action: 'accept',
+  }), 'accept');
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-b', pendingSenderId: 'player-a', alreadyFriends: false, action: 'decline',
+  }), 'decline');
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-a', pendingSenderId: 'player-a', alreadyFriends: false, action: 'accept',
+  }), 'forbidden');
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-b', pendingSenderId: null, alreadyFriends: false, action: 'accept',
+  }), 'already_handled');
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-b', pendingSenderId: 'player-a', alreadyFriends: true, action: 'accept',
+  }), 'already_friends');
+  assert.equal(decideCancelFriendRequest({ senderId: 'player-a', pendingSenderId: 'player-a' }), 'cancel');
+  assert.equal(decideCancelFriendRequest({ senderId: 'player-b', pendingSenderId: 'player-a' }), 'forbidden');
+  assert.equal(decideCancelFriendRequest({ senderId: 'player-a', pendingSenderId: null }), 'already_handled');
+});
+
+test('public achievement projection keeps earned IDs and dates only', () => {
+  const projected = projectPublicAchievementUnlocks([
+    {
+      achievementId: 'debut',
+      unlockedAt: '2026-08-24T12:00:00.000Z',
+      sourceEventId: 'private-event',
+      progress: 30,
+    },
+    { achievementId: 'not-real', unlockedAt: '2026-08-24T13:00:00.000Z' },
+  ]);
+  assert.deepEqual(projected, [{
+    id: 'debut',
+    unlockedAt: '2026-08-24T12:00:00.000Z',
+  }]);
+  assert.equal('sourceEventId' in projected[0], false);
+  assert.equal('progress' in projected[0], false);
 });
 
 test('uses current challenge usernames and labels legacy guest history', () => {

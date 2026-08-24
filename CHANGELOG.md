@@ -10,6 +10,10 @@ This project uses SemVer for app and documentation checkpoints. Dates are intent
   unranked friends who have not played, and current-player highlighting.
 - Partitioned stale-first caches by scope, period, week anchor, and account, and
   added privacy-bounded filter analytics through migration 019.
+- Added public player profiles from leaderboard, friend, and request rows with
+  Daily Quiz stats and earned-only achievement showcases.
+- Added approval-based friend requests with incoming/sent management, reciprocal
+  acceptance, request badges, profile actions, and additive migration 020.
 
 ## v2.12.0 - Refresh-safe Daily Quiz attempts
 

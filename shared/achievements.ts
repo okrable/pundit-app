@@ -41,6 +41,21 @@ export interface AchievementUnlock {
   sourceEventId: string;
 }
 
+export interface PublicAchievementUnlock {
+  id: AchievementId;
+  unlockedAt: string;
+}
+
+export function projectPublicAchievementUnlocks(
+  unlocks: readonly ({ achievementId: unknown; unlockedAt: string } & Record<string, unknown>)[]
+): PublicAchievementUnlock[] {
+  return unlocks
+    .filter((unlock): unlock is { achievementId: AchievementId; unlockedAt: string } =>
+      isAchievementId(unlock.achievementId)
+    )
+    .map((unlock) => ({ id: unlock.achievementId, unlockedAt: unlock.unlockedAt }));
+}
+
 export interface AchievementProgress {
   dailyCompletions: number;
   dailyStreak: number;

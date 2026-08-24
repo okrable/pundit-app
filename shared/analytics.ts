@@ -23,6 +23,9 @@ export const ANALYTICS_EVENT_NAMES = [
   'challenge_submitted',
   'leaderboard_viewed',
   'leaderboard_filter_changed',
+  'player_profile_viewed',
+  'friend_request_sent',
+  'friend_request_accepted',
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];

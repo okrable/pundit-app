@@ -1,5 +1,6 @@
 import type { StreakStatus } from '../../shared/streak';
 import type { AvatarId } from '../../shared/avatarCatalog';
+import type { FriendRelationshipState } from '../../shared/socialPolicy';
 import type {
   AchievementId,
   AchievementSnapshot,
@@ -121,6 +122,42 @@ export interface PublicPlayer {
   username: string;
   avatarUrl?: string | null;
   avatarId?: AvatarId | null;
+}
+
+export interface PublicAchievementUnlock {
+  id: AchievementId;
+  unlockedAt: string;
+}
+
+export interface PublicPlayerProfile extends PublicPlayer {
+  currentStreak: number;
+  bestScore: number;
+  totalQuizzes: number;
+  achievements: PublicAchievementUnlock[];
+}
+
+export interface PlayerProfileResponse {
+  profile: PublicPlayerProfile;
+  relationship: FriendRelationshipState;
+}
+
+export interface FriendRequestSummary {
+  requestId: string;
+  createdAt: string;
+  player: PublicPlayer;
+}
+
+export interface GetFriendRequestsResponse {
+  incoming: FriendRequestSummary[];
+  outgoing: FriendRequestSummary[];
+}
+
+export interface FriendRelationshipResponse {
+  relationship: Extract<FriendRelationshipState, 'none' | 'outgoing_pending' | 'friends'>;
+  alreadyRequested?: boolean;
+  alreadyFriends?: boolean;
+  reciprocalAccepted?: boolean;
+  alreadyHandled?: boolean;
 }
 
 export interface LeaderboardEntry {
