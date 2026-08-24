@@ -24,7 +24,9 @@ db/
 │   ├── 015_career_game_results.sql
 │   ├── 016_profile_avatars.sql
 │   ├── 017_achievements.sql
-│   └── 018_pseudonymous_product_analytics.sql
+│   ├── 018_pseudonymous_product_analytics.sql
+│   ├── 019_leaderboard_analytics.sql
+│   └── 020_friend_requests.sql
 ├── audits/
 │   ├── identity_onboarding_pre.sql
 │   ├── identity_onboarding.sql
@@ -40,7 +42,8 @@ db/
 ## Migrations
 
 Production status: migrations 012 and 013 were applied and aggregate-audited on
-25 July 2026. For another environment, apply every migration in numeric order.
+25 July 2026. Migrations 019 and 020 were applied for the v2.13.0 preview on
+24 August 2026. For another environment, apply every migration in numeric order.
 
 Run migrations in order against CockroachDB:
 
@@ -63,6 +66,8 @@ cockroach sql --url "$DATABASE_URL" < db/migrations/015_career_game_results.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/016_profile_avatars.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/017_achievements.sql
 cockroach sql --url "$DATABASE_URL" < db/migrations/018_pseudonymous_product_analytics.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/019_leaderboard_analytics.sql
+cockroach sql --url "$DATABASE_URL" < db/migrations/020_friend_requests.sql
 ```
 
 Immediately after migration 016, run `npm run audit:profile-avatars`. The audit
@@ -82,6 +87,7 @@ updated client is released, its letter-avatar count should also be zero.
 | `online_game_players` | Legacy online game participants |
 | `challenges` | Async 1v1 challenge lifecycle and answer payloads |
 | `friendships` | Symmetric friend relationships |
+| `friend_requests` | One pending approval request per ordered player pair |
 | `api_rate_limits` | Shared fixed-window API throttling across serverless instances |
 | `analytics_events` | Privacy-bounded product funnel, performance, and return events |
 | `user_achievements` | Durable authenticated achievement unlocks and reveal acknowledgements |
@@ -111,6 +117,9 @@ for results, challenges, users, and other transactional state.
 - New friend links are reusable by multiple players for seven days; links issued before migration 013 remain single-use.
 - `friendships` stores one ordered row per mutual relationship.
 - Friendship acceptance and removal are idempotent around that ordered row.
+- Approval-based requests exist only while pending. Reciprocal sends accept the
+  request atomically; accept creates the friendship, while decline/cancel remove
+  the request. Invite-link acceptance remains immediate and clears a pending pair.
 - Analytics events contain a resettable random installation UUID for return
   measurement but no Auth0 IDs, email addresses, usernames, codes, answers, or
   free-form metadata. Raw rows are purged after 90 days.
@@ -123,6 +132,7 @@ for results, challenges, users, and other transactional state.
 users
   ├── results
   ├── career_game_results
+  ├── friend_requests
   ├── leagues
   ├── league_members
   ├── online_games

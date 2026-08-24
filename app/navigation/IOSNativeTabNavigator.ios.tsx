@@ -7,10 +7,13 @@ import ChallengeComingSoonScreen from '../screens/ChallengeComingSoonScreen';
 import { theme } from '../theme/theme';
 import type { MainSectionParamList } from './MainNavigator';
 import { MainTabSafeAreaProvider } from './MainTabSafeArea';
+import useIncomingFriendRequestNotification from '../hooks/useIncomingFriendRequestNotification';
 
 const Tab = createNativeBottomTabNavigator<MainSectionParamList>();
 
 export default function IOSNativeTabNavigator() {
+  const hasIncomingRequests = useIncomingFriendRequestNotification();
+
   return (
     <MainTabSafeAreaProvider usesNativeTabBar>
       <Tab.Navigator
@@ -56,6 +59,11 @@ export default function IOSNativeTabNavigator() {
           component={LeaderboardScreen}
           options={{
             title: 'League Tables',
+            tabBarBadge: hasIncomingRequests ? '\u200B' : undefined,
+            tabBarBadgeStyle: {
+              backgroundColor: theme.colors.notification,
+              color: 'transparent',
+            },
             tabBarIcon: ({ focused }) => ({
               type: 'sfSymbol',
               name: focused ? 'trophy.fill' : 'trophy',

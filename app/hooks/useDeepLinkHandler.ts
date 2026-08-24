@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { useAuthStore } from '../state/useAuthStore';
 import { acceptFriendLink, getFriendInvite } from '../services/api';
 import { useLeaderboardStore } from '../state/useLeaderboardStore';
+import { useSocialStore } from '../state/useSocialStore';
 import {
   getSharedCodeActionFromUrl,
   getWebSharedCodeUrlReplacement,
@@ -307,6 +308,7 @@ export default function useDeepLinkHandler(options: DeepLinkHandlerOptions = {})
         )
       ) return;
       await useLeaderboardStore.getState().invalidateFriends(user.sub);
+      await useSocialStore.getState().refresh(user.sub);
       setMessage(
         response.alreadyFriends
           ? `You and ${response.friendUsername || 'this player'} are already friends.`

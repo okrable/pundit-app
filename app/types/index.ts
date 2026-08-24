@@ -1,5 +1,6 @@
 import type { StreakStatus } from '../../shared/streak';
 import type { AvatarId } from '../../shared/avatarCatalog';
+import type { FriendRelationshipState } from '../../shared/socialPolicy';
 import type {
   AchievementId,
   AchievementSnapshot,
@@ -113,13 +114,50 @@ export interface QuizResult {
   rejectedAchievementIds?: AchievementId[];
 }
 
-export type LeaderboardPeriod = 'daily';
+export type LeaderboardPeriod = 'daily' | 'weekly';
+export type LeaderboardScope = 'global' | 'friends';
 
 export interface PublicPlayer {
   userId: string;
   username: string;
   avatarUrl?: string | null;
   avatarId?: AvatarId | null;
+}
+
+export interface PublicAchievementUnlock {
+  id: AchievementId;
+  unlockedAt: string;
+}
+
+export interface PublicPlayerProfile extends PublicPlayer {
+  currentStreak: number;
+  bestScore: number;
+  totalQuizzes: number;
+  achievements: PublicAchievementUnlock[];
+}
+
+export interface PlayerProfileResponse {
+  profile: PublicPlayerProfile;
+  relationship: FriendRelationshipState;
+}
+
+export interface FriendRequestSummary {
+  requestId: string;
+  createdAt: string;
+  player: PublicPlayer;
+}
+
+export interface GetFriendRequestsResponse {
+  incoming: FriendRequestSummary[];
+  outgoing: FriendRequestSummary[];
+}
+
+export interface FriendRelationshipResponse {
+  relationship: Extract<FriendRelationshipState, 'none' | 'outgoing_pending' | 'friends'>;
+  alreadyRequested?: boolean;
+  alreadyFriends?: boolean;
+  reciprocalAccepted?: boolean;
+  alreadyHandled?: boolean;
 }
 
 export interface LeaderboardEntry {
@@ -131,12 +169,15 @@ export interface LeaderboardEntry {
   gamesPlayed: number;
   streak: number;
   rank: number;
+  hasPlayedPeriod: boolean;
   avatarId?: AvatarId | null;
 }
 
 export interface GlobalLeaderboardResponse {
   period: LeaderboardPeriod;
   quizDate: string;
+  periodStart: string;
+  periodEnd: string;
   leaderboard: LeaderboardEntry[];
 }
 
@@ -333,15 +374,19 @@ export interface FriendsLeaderboardEntry {
   streak: number;
   rank: number | null;
   hasPlayedToday: boolean;
+  hasPlayedPeriod: boolean;
   avatarId?: AvatarId | null;
 }
 
 export interface FriendsLeaderboardResponse {
   period: LeaderboardPeriod;
   quizDate: string;
+  periodStart: string;
+  periodEnd: string;
   leaderboard: FriendsLeaderboardEntry[];
   totalFriends: number;
   friendsPlayedToday: number;
+  friendsPlayedPeriod: number;
 }
 
 export interface CreateFriendLinkResponse {

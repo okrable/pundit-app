@@ -18,6 +18,9 @@ import {
   GetFriendsResponse,
   RemoveFriendResponse,
   FriendsLeaderboardResponse,
+  PlayerProfileResponse,
+  GetFriendRequestsResponse,
+  FriendRelationshipResponse,
 } from '../types';
 import type { AvatarId } from '../../shared/avatarCatalog';
 import type {
@@ -31,6 +34,7 @@ import { useAuthStore } from '../state/useAuthStore';
 import { logError, logInfo, logWarn } from './debugLog';
 import { getQuizDate } from '../utils/quizDate';
 import { buildDailyQuizPath } from '../../shared/dailyQuiz';
+import { getLeaderboardDateWindow } from '../../shared/leaderboard';
 
 function resolveApiBaseUrl(): string {
   if (
@@ -280,6 +284,7 @@ function normalizeLeaderboardEntry(entry: LeaderboardEntry): LeaderboardEntry {
     gamesPlayed: Number(entry.gamesPlayed ?? 1),
     streak: Number(entry.streak ?? 0),
     rank: Number(entry.rank ?? 0),
+    hasPlayedPeriod: entry.hasPlayedPeriod ?? true,
   };
 }
 
@@ -289,9 +294,12 @@ function normalizeGlobalLeaderboardResponse(
 ): GlobalLeaderboardResponse {
   if (Array.isArray(data)) {
     const quizDate = getQuizDate();
+    const dates = getLeaderboardDateWindow(quizDate, period);
     return {
       period,
       quizDate,
+      periodStart: dates.periodStart,
+      periodEnd: dates.periodEnd,
       leaderboard: data.map((entry) => normalizeLeaderboardEntry(entry)),
     };
   }
@@ -299,6 +307,8 @@ function normalizeGlobalLeaderboardResponse(
   return {
     ...data,
     period: data.period ?? period,
+    periodStart: data.periodStart ?? getLeaderboardDateWindow(data.quizDate, period).periodStart,
+    periodEnd: data.periodEnd ?? getLeaderboardDateWindow(data.quizDate, period).periodEnd,
     leaderboard: data.leaderboard.map((entry) => normalizeLeaderboardEntry(entry)),
   };
 }
@@ -308,17 +318,22 @@ function normalizeFriendsLeaderboardResponse(
   period: LeaderboardPeriod
 ): FriendsLeaderboardResponse {
   const quizDate = data.quizDate ?? getQuizDate();
+  const dates = getLeaderboardDateWindow(quizDate, period);
 
   return {
     ...data,
     period: data.period ?? period,
     quizDate,
+    periodStart: data.periodStart ?? dates.periodStart,
+    periodEnd: data.periodEnd ?? dates.periodEnd,
+    friendsPlayedPeriod: data.friendsPlayedPeriod ?? data.friendsPlayedToday ?? 0,
     leaderboard: data.leaderboard.map((entry) => ({
       ...entry,
       score: Number(entry.score ?? 0),
       gamesPlayed: Number(entry.gamesPlayed ?? (entry.hasPlayedToday ? 1 : 0)),
       streak: Number(entry.streak ?? 0),
       rank: entry.rank === null ? null : Number(entry.rank ?? 0),
+      hasPlayedPeriod: entry.hasPlayedPeriod ?? entry.hasPlayedToday,
     })),
   };
 }
@@ -361,10 +376,10 @@ export async function finalizeQuizStats(
 }
 
 export async function getLeaderboard(
+  period: LeaderboardPeriod = 'daily',
   limit = 100
 ): Promise<GlobalLeaderboardResponse> {
-  const period: LeaderboardPeriod = 'daily';
-  const data = await fetchApi<GlobalLeaderboardResponse | LeaderboardEntry[]>(`/getLeaderboard?period=daily&limit=${limit}`, undefined, {
+  const data = await fetchApi<GlobalLeaderboardResponse | LeaderboardEntry[]>(`/getLeaderboard?period=${period}&limit=${limit}`, undefined, {
     timeoutMs: LEADERBOARD_TIMEOUT_MS,
   });
   return normalizeGlobalLeaderboardResponse(data, period);
@@ -527,6 +542,56 @@ export async function getFriends(userId: string): Promise<GetFriendsResponse> {
   return fetchApi<GetFriendsResponse>(`/getFriends?userId=${userId}`);
 }
 
+export async function getPlayerProfile(
+  playerId: string,
+  viewerUserId?: string
+): Promise<PlayerProfileResponse> {
+  const viewer = viewerUserId ? `&viewerUserId=${encodeURIComponent(viewerUserId)}` : '';
+  return fetchApi<PlayerProfileResponse>(
+    `/getPlayerProfile?playerId=${encodeURIComponent(playerId)}${viewer}`
+  );
+}
+
+export async function getFriendRequests(userId: string): Promise<GetFriendRequestsResponse> {
+  return fetchApi<GetFriendRequestsResponse>(
+    `/getFriendRequests?userId=${encodeURIComponent(userId)}`
+  );
+}
+
+export async function sendFriendRequest(
+  userId: string,
+  playerId: string
+): Promise<FriendRelationshipResponse> {
+  return fetchApi<FriendRelationshipResponse>(
+    '/sendFriendRequest',
+    { method: 'POST', body: JSON.stringify({ userId, playerId }) },
+    { timeoutMs: SOCIAL_MUTATION_TIMEOUT_MS }
+  );
+}
+
+export async function respondFriendRequest(
+  userId: string,
+  playerId: string,
+  action: 'accept' | 'decline'
+): Promise<FriendRelationshipResponse> {
+  return fetchApi<FriendRelationshipResponse>(
+    '/respondFriendRequest',
+    { method: 'POST', body: JSON.stringify({ userId, playerId, action }) },
+    { timeoutMs: SOCIAL_MUTATION_TIMEOUT_MS }
+  );
+}
+
+export async function cancelFriendRequest(
+  userId: string,
+  playerId: string
+): Promise<FriendRelationshipResponse> {
+  return fetchApi<FriendRelationshipResponse>(
+    '/cancelFriendRequest',
+    { method: 'POST', body: JSON.stringify({ userId, playerId }) },
+    { timeoutMs: SOCIAL_MUTATION_TIMEOUT_MS }
+  );
+}
+
 export async function removeFriend(
   userId: string,
   friendId: string
@@ -542,11 +607,11 @@ export async function removeFriend(
 }
 
 export async function getFriendsLeaderboard(
-  userId: string
+  userId: string,
+  period: LeaderboardPeriod = 'daily'
 ): Promise<FriendsLeaderboardResponse> {
-  const period: LeaderboardPeriod = 'daily';
   const data = await fetchApi<FriendsLeaderboardResponse>(
-    `/getFriendsLeaderboard?userId=${userId}&period=daily`,
+    `/getFriendsLeaderboard?userId=${encodeURIComponent(userId)}&period=${period}`,
     undefined,
     {
       timeoutMs: LEADERBOARD_TIMEOUT_MS,

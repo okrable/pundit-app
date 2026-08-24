@@ -1,6 +1,6 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.10.0 product analytics baseline
+> Last updated: v2.13.0 leaderboards, player profiles, and friend requests
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
 
@@ -86,6 +86,13 @@ In plain English, this work delivered four connected changes:
     refresh failures retain cached navigation with Retry, and Daily Quiz or
     Journey completions queue locally under the correct account.
 
+17. **v2.12.0 — refresh-safe attempts:** active Daily Quiz state persists by
+    identity/date/quiz and restores elapsed timers without replaying answered questions.
+
+18. **v2.13.0 — social competition:** one Global-first Daily/Weekly leaderboard
+    now opens public player profiles, while verified accounts can manage
+    approval-based friend requests alongside the existing invite-link route.
+
 ## Product Status Snapshot
 
 ### Delivered
@@ -109,15 +116,17 @@ In plain English, this work delivered four connected changes:
   and public friends/leaderboard rendering.
 - Verified identity synchronization and canonical server-side usernames.
 - Mutual ordered friendships with reusable seven-day invite links and retry-safe removal.
+- Public accomplishment profiles and earned achievement showcases from social rows.
+- Incoming/outgoing friend requests, reciprocal acceptance, and request badges.
 - Server-resolved username identities across friends, persisted leaderboards, and challenges.
 - Centralized auth flow with post-login quiz reconciliation and first data prefetch behind `AuthSyncScreen`.
 - Guest-to-auth daily result migration/adoption where applicable.
-- Daily global leaderboard, friends leaderboard, and friend links. Challenge
+- Global Daily/Weekly leaderboard, authenticated Friends-only filtering, and friend links. Challenge
   implementation and history are preserved but retired from active use.
 - Branded bootstrap, stale-first cache hydration, and debug-log export.
 - Mobile-first web shell aligned with the native bottom-tab layout.
-- Date-aware daily leaderboard caches with forced refresh after authenticated submissions.
-- Friends-leaderboard refresh after friendship mutations and League Tables focus.
+- Scope-, period-, date-, and account-partitioned leaderboard caches with stale-first refresh.
+- Friends-leaderboard invalidation after friendship mutations.
 - Pull-request CI, uniform Netlify previews, and same-commit web/iOS validation gates.
 - Persistent retry for daily and Journey submissions.
 - Immediate local quiz completion and projected post-play streak before server
@@ -133,8 +142,6 @@ In plain English, this work delivered four connected changes:
 - Operational alert configuration and error-budget reporting.
 - Broader automated integration and UI coverage.
 - Test-account data governance while previews share production services.
-- Refresh-safe local Daily Quiz attempts that restore question, answer, score,
-  phase, and elapsed timer state without allowing answered questions to be retried.
 
 ## Canonical Docs in This Folder
 

@@ -158,6 +158,11 @@ const handler: LambdaHandler = async (event) => {
         return { kind: 'self' };
       }
       if (decision === 'already_friends') {
+        await queryWithClient(
+          client,
+          'DELETE FROM friend_requests WHERE user_a = $1 AND user_b = $2',
+          [userA, userB]
+        );
         if (!link.is_reusable && !link.used_by) {
           await queryWithClient(
             client,
@@ -203,6 +208,11 @@ const handler: LambdaHandler = async (event) => {
          VALUES ($1, $2)
          ON CONFLICT (user_a, user_b) DO NOTHING
          RETURNING id`,
+        [userA, userB]
+      );
+      await queryWithClient(
+        client,
+        'DELETE FROM friend_requests WHERE user_a = $1 AND user_b = $2',
         [userA, userB]
       );
 

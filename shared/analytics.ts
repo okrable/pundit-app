@@ -21,12 +21,19 @@ export const ANALYTICS_EVENT_NAMES = [
   'challenge_created',
   'challenge_joined',
   'challenge_submitted',
+  'leaderboard_viewed',
+  'leaderboard_filter_changed',
+  'player_profile_viewed',
+  'friend_request_sent',
+  'friend_request_accepted',
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];
 export type AnalyticsActorType = 'guest' | 'authenticated';
 export type AnalyticsContentSource = 'cache' | 'network' | 'unknown';
 export type AnalyticsExitReason = 'screen_exit' | 'app_backgrounded' | 'unknown';
+export type AnalyticsLeaderboardScope = 'global' | 'friends';
+export type AnalyticsLeaderboardPeriod = 'daily' | 'weekly';
 
 export interface AnalyticsProperties {
   quizDate?: string;
@@ -36,6 +43,8 @@ export interface AnalyticsProperties {
   totalQuestions?: number;
   score?: number;
   exitReason?: AnalyticsExitReason;
+  leaderboardScope?: AnalyticsLeaderboardScope;
+  leaderboardPeriod?: AnalyticsLeaderboardPeriod;
 }
 
 export const ANALYTICS_ID_PATTERN =
@@ -81,6 +90,8 @@ export function normalizeAnalyticsProperties(
     'totalQuestions',
     'score',
     'exitReason',
+    'leaderboardScope',
+    'leaderboardPeriod',
   ]);
   if (Object.keys(input).some((key) => !allowedKeys.has(key))) return null;
 
@@ -98,6 +109,14 @@ export function normalizeAnalyticsProperties(
   if (input.exitReason !== undefined) {
     if (!EXIT_REASONS.has(input.exitReason as AnalyticsExitReason)) return null;
     output.exitReason = input.exitReason as AnalyticsExitReason;
+  }
+  if (input.leaderboardScope !== undefined) {
+    if (input.leaderboardScope !== 'global' && input.leaderboardScope !== 'friends') return null;
+    output.leaderboardScope = input.leaderboardScope;
+  }
+  if (input.leaderboardPeriod !== undefined) {
+    if (input.leaderboardPeriod !== 'daily' && input.leaderboardPeriod !== 'weekly') return null;
+    output.leaderboardPeriod = input.leaderboardPeriod;
   }
 
   for (const key of ['durationMs', 'questionNumber', 'totalQuestions', 'score'] as const) {

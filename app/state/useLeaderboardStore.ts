@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 import { ApiError, getFriendsLeaderboard, getLeaderboard } from '../services/api';
-import {
+import type {
   CacheEnvelope,
-  FriendsLeaderboardEntry,
   FriendsLeaderboardResponse,
   GlobalLeaderboardResponse,
-  LeaderboardEntry,
+  LeaderboardPeriod,
 } from '../types';
 import {
+  clearCachedFriendsLeaderboards,
   getCachedFriendsLeaderboard,
   getCachedGlobalLeaderboard,
   setCachedFriendsLeaderboard,
@@ -19,6 +19,9 @@ import { logError, logInfo, logWarn } from '../services/debugLog';
 import { getQuizDate } from '../utils/quizDate';
 import type { AvatarId } from '../../shared/avatarCatalog';
 import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
+import { getLeaderboardDatasetKey, getLeaderboardDateWindow } from '../../shared/leaderboard';
+
+type DatasetKey = 'global:daily' | 'global:weekly' | 'friends:daily' | 'friends:weekly';
 
 interface RevalidateOptions {
   force?: boolean;
@@ -31,31 +34,33 @@ interface PrefetchOptions {
 }
 
 interface LeaderboardState {
-  friendsLeaderboard: FriendsLeaderboardEntry[];
-  totalFriends: number;
-  friendsPlayedToday: number;
-  globalLeaderboard: LeaderboardEntry[];
-  friendsCache: CacheEnvelope<FriendsLeaderboardResponse> | null;
-  globalCache: CacheEnvelope<GlobalLeaderboardResponse> | null;
-  loadingFriends: boolean;
-  loadingGlobal: boolean;
-  error: string | null;
+  friendsOwnerId: string | null;
+  globalData: Partial<Record<LeaderboardPeriod, GlobalLeaderboardResponse>>;
+  friendsData: Partial<Record<LeaderboardPeriod, FriendsLeaderboardResponse>>;
+  globalCaches: Partial<Record<LeaderboardPeriod, CacheEnvelope<GlobalLeaderboardResponse>>>;
+  friendsCaches: Partial<Record<LeaderboardPeriod, CacheEnvelope<FriendsLeaderboardResponse>>>;
+  loading: Partial<Record<DatasetKey, boolean>>;
+  errors: Partial<Record<DatasetKey, string>>;
   hydrateFromCache: (userId: string) => Promise<void>;
-  revalidateFriends: (userId: string, options?: RevalidateOptions) => Promise<void>;
-  revalidateGlobal: (options?: RevalidateOptions) => Promise<void>;
+  hydratePeriodFromCache: (userId: string, period: LeaderboardPeriod) => Promise<void>;
+  revalidateFriends: (
+    userId: string,
+    period?: LeaderboardPeriod,
+    options?: RevalidateOptions
+  ) => Promise<void>;
+  revalidateGlobal: (period?: LeaderboardPeriod, options?: RevalidateOptions) => Promise<void>;
   prefetchDailyLoop: (
     userId: string,
     isAuthenticated: boolean,
     options?: PrefetchOptions
   ) => Promise<void>;
-  invalidateFriends: (userId: string) => Promise<void>;
+  invalidateFriends: (userId: string, periodToRefresh?: LeaderboardPeriod) => Promise<void>;
   applyAvatar: (userId: string, avatarId: AvatarId) => Promise<void>;
   reset: () => void;
 }
 
-const friendsRequests = new Map<string, Promise<void>>();
-let globalRequest: Promise<void> | null = null;
-let latestLeaderboardHydrationRequest = 0;
+const requests = new Map<string, Promise<void>>();
+let latestHydrationRequest = 0;
 
 function isCurrentAuthUser(userId: string, authStateVersion?: number): boolean {
   const authState = useAuthStore.getState();
@@ -72,315 +77,289 @@ function isCurrentAuthUser(userId: string, authStateVersion?: number): boolean {
   );
 }
 
-function isCurrentDailyCache<T extends { quizDate: string }>(
-  cache: CacheEnvelope<T> | null,
-  quizDate = getQuizDate()
+function isCurrentCache<T extends { period: LeaderboardPeriod; periodStart: string }>(
+  cache: CacheEnvelope<T> | null | undefined,
+  period: LeaderboardPeriod
 ): cache is CacheEnvelope<T> {
-  return Boolean(cache && cache.data.quizDate === quizDate);
-}
-
-function buildSelfOnlyFriendsResponse(userId: string): FriendsLeaderboardResponse {
-  const authUser = useAuthStore.getState().user;
-  const quizDate = getQuizDate();
-
-  return {
-    period: 'daily',
-    quizDate,
-    leaderboard: [
-      {
-        userId,
-        displayName: authUser?.username ?? null,
-        username: authUser?.username ?? null,
-        score: 0,
-        gamesPlayed: 0,
-        streak: 0,
-        rank: null,
-        hasPlayedToday: false,
-        avatarId: authUser?.avatarId ?? null,
-      },
-    ],
-    totalFriends: 0,
-    friendsPlayedToday: 0,
-  };
-}
-
-function hasUsableFriendsData(state: Pick<LeaderboardState, 'friendsLeaderboard' | 'friendsCache'>): boolean {
-  return (
-    state.friendsLeaderboard.length > 0 ||
-    Boolean(isCurrentDailyCache(state.friendsCache) && state.friendsCache.data.leaderboard.length)
+  const expected = getLeaderboardDateWindow(getQuizDate(), period);
+  return Boolean(
+    cache && cache.data.period === period && cache.data.periodStart === expected.periodStart
   );
 }
 
-export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
-  friendsLeaderboard: [],
-  totalFriends: 0,
-  friendsPlayedToday: 0,
-  globalLeaderboard: [],
-  friendsCache: null,
-  globalCache: null,
-  loadingFriends: false,
-  loadingGlobal: false,
-  error: null,
+function isCurrentResponse(data: { period: LeaderboardPeriod; periodStart: string }): boolean {
+  return data.periodStart === getLeaderboardDateWindow(getQuizDate(), data.period).periodStart;
+}
 
-  hydrateFromCache: async (userId: string) => {
-    const requestId = ++latestLeaderboardHydrationRequest;
-    const quizDate = getQuizDate();
-    logInfo('leaderboard.cache.hydrate.start', { userId, quizDate });
-    const [friendsCache, globalCache] = await Promise.all([
-      userId.startsWith('guest_') ? Promise.resolve(null) : getCachedFriendsLeaderboard(userId),
-      getCachedGlobalLeaderboard(),
-    ]);
-
-    const currentFriendsCache = isCurrentDailyCache(friendsCache, quizDate) ? friendsCache : null;
-    const currentGlobalCache = isCurrentDailyCache(globalCache, quizDate) ? globalCache : null;
-
-    if (requestId !== latestLeaderboardHydrationRequest) {
-      logInfo('leaderboard.cache.hydrate.discarded_stale', { userId, requestId });
-      return;
-    }
-
-    set((state) => ({
-      friendsLeaderboard: currentFriendsCache?.data.leaderboard ?? [],
-      totalFriends: currentFriendsCache?.data.totalFriends ?? 0,
-      friendsPlayedToday: currentFriendsCache?.data.friendsPlayedToday ?? 0,
-      globalLeaderboard: currentGlobalCache?.data.leaderboard ?? state.globalLeaderboard,
-      friendsCache: currentFriendsCache,
-      globalCache: currentGlobalCache,
-      error: null,
-    }));
-    logInfo('leaderboard.cache.hydrate.success', {
+function buildSelfOnlyFriendsResponse(
+  userId: string,
+  period: LeaderboardPeriod
+): FriendsLeaderboardResponse {
+  const authUser = useAuthStore.getState().user;
+  const dates = getLeaderboardDateWindow(getQuizDate(), period);
+  return {
+    period,
+    quizDate: dates.quizDate,
+    periodStart: dates.periodStart,
+    periodEnd: dates.periodEnd,
+    leaderboard: [{
       userId,
-      quizDate,
-      friendsCount: currentFriendsCache?.data.leaderboard.length ?? 0,
-      globalCount: currentGlobalCache?.data.leaderboard.length ?? 0,
-    });
+      displayName: authUser?.username ?? null,
+      username: authUser?.username ?? null,
+      score: 0,
+      gamesPlayed: 0,
+      streak: 0,
+      rank: null,
+      hasPlayedToday: false,
+      hasPlayedPeriod: false,
+      avatarId: authUser?.avatarId ?? null,
+    }],
+    totalFriends: 0,
+    friendsPlayedToday: 0,
+    friendsPlayedPeriod: 0,
+  };
+}
+
+function setDatasetError(
+  set: (partial: Partial<LeaderboardState> | ((state: LeaderboardState) => Partial<LeaderboardState>)) => void,
+  key: DatasetKey,
+  message?: string
+): void {
+  set((state) => ({
+    loading: { ...state.loading, [key]: false },
+    errors: { ...state.errors, [key]: message },
+  }));
+}
+
+export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
+  globalData: {},
+  friendsOwnerId: null,
+  friendsData: {},
+  globalCaches: {},
+  friendsCaches: {},
+  loading: {},
+  errors: {},
+
+  hydrateFromCache: async (userId) => {
+    await get().hydratePeriodFromCache(userId, 'daily');
   },
 
-  revalidateFriends: async (userId: string, options: RevalidateOptions = {}) => {
+  hydratePeriodFromCache: async (userId, period) => {
+    const requestId = ++latestHydrationRequest;
+    set((state) => state.friendsOwnerId === userId ? {} : {
+      friendsOwnerId: userId,
+      friendsData: {},
+      friendsCaches: {},
+      errors: {
+        ...state.errors,
+        'friends:daily': undefined,
+        'friends:weekly': undefined,
+      },
+    });
+    const [friendsCache, globalCache] = await Promise.all([
+      userId.startsWith('guest_')
+        ? Promise.resolve(null)
+        : getCachedFriendsLeaderboard(userId, period),
+      getCachedGlobalLeaderboard(period),
+    ]);
+    if (requestId !== latestHydrationRequest) return;
+
+    set((state) => ({
+      friendsData: {
+        ...state.friendsData,
+        [period]: isCurrentCache(friendsCache, period) ? friendsCache.data : undefined,
+      },
+      friendsOwnerId: userId,
+      globalData: {
+        ...state.globalData,
+        [period]: isCurrentCache(globalCache, period) ? globalCache.data : undefined,
+      },
+      friendsCaches: {
+        ...state.friendsCaches,
+        [period]: isCurrentCache(friendsCache, period) ? friendsCache : undefined,
+      },
+      globalCaches: {
+        ...state.globalCaches,
+        [period]: isCurrentCache(globalCache, period) ? globalCache : undefined,
+      },
+    }));
+    logInfo('leaderboard.cache.hydrate.success', { userId, period });
+  },
+
+  revalidateFriends: async (userId, period = 'daily', options = {}) => {
     const authStateVersion = useAuthStore.getState().authStateVersion;
-    if (userId.startsWith('guest_') || !isCurrentAuthUser(userId, authStateVersion)) {
-      logInfo('leaderboard.friends.skip', {
-        userId,
-        isGuest: userId.startsWith('guest_'),
-        hasToken: Boolean(useAuthStore.getState().token),
-      });
-      return;
+    if (userId.startsWith('guest_') || !isCurrentAuthUser(userId, authStateVersion)) return;
+    if (get().friendsOwnerId !== userId) {
+      set({ friendsOwnerId: userId, friendsData: {}, friendsCaches: {} });
     }
+    const cache = get().friendsCaches[period];
+    if (!options.force && isCurrentCache(cache, period) && !isResourceStale(cache)) return;
 
-    const cache = get().friendsCache;
-    if (!options.force && isCurrentDailyCache(cache) && !isResourceStale(cache)) {
-      logInfo('leaderboard.friends.fresh_cache_skip', { userId, quizDate: cache.data.quizDate });
-      return;
-    }
-
-    const requestKey = `${userId}:${authStateVersion}`;
-    const inFlightRequest = friendsRequests.get(requestKey);
-    if (inFlightRequest) {
-      logInfo('leaderboard.friends.in_flight_reuse', { userId });
-      return inFlightRequest;
-    }
+    const key = getLeaderboardDatasetKey('friends', period);
+    const requestKey = `${key}:${userId}:${authStateVersion}`;
+    const existing = requests.get(requestKey);
+    if (existing) return existing;
 
     const request = (async () => {
-      logInfo('leaderboard.friends.start', { userId, force: Boolean(options.force) });
-      set({ loadingFriends: true, error: null });
-
+      set((state) => ({
+        loading: { ...state.loading, [key]: true },
+        errors: { ...state.errors, [key]: undefined },
+      }));
       try {
-        const data = await getFriendsLeaderboard(userId);
+        const data = await getFriendsLeaderboard(userId, period);
+        if (!isCurrentResponse(data)) return;
         await setCachedFriendsLeaderboard(userId, data);
-        const refreshedCache = await getCachedFriendsLeaderboard(userId);
-
-        if (!isCurrentAuthUser(userId, authStateVersion)) {
-          logInfo('leaderboard.friends.stale_response', { userId });
-          return;
-        }
-
-        set({
-          friendsLeaderboard: data.leaderboard,
-          totalFriends: data.totalFriends,
-          friendsPlayedToday: data.friendsPlayedToday,
-          friendsCache: refreshedCache,
-          loadingFriends: false,
-          error: null,
-        });
-        logInfo('leaderboard.friends.success', { userId, count: data.leaderboard.length });
+        const refreshedCache = await getCachedFriendsLeaderboard(userId, period);
+        if (!isCurrentAuthUser(userId, authStateVersion)) return;
+        set((state) => ({
+          friendsData: { ...state.friendsData, [period]: data },
+          friendsCaches: {
+            ...state.friendsCaches,
+            ...(refreshedCache ? { [period]: refreshedCache } : {}),
+          },
+        }));
+        setDatasetError(set, key);
       } catch (error) {
-        if (!isCurrentAuthUser(userId, authStateVersion)) {
-          return;
-        }
-
-        if (hasUsableFriendsData(get())) {
-          logWarn('leaderboard.friends.refresh_failed_using_stale', {
-            userId,
-            message: error instanceof Error ? error.message : 'Failed to load friends leaderboard',
-          });
-          set({ loadingFriends: false, error: null });
-          if (options.propagateError) throw error;
-          return;
-        }
-
-        if (
-          error instanceof ApiError &&
-          error.statusCode === 408 &&
-          get().totalFriends === 0 &&
-          get().friendsLeaderboard.length <= 1
-        ) {
-          const fallback = buildSelfOnlyFriendsResponse(userId);
+        if (!isCurrentAuthUser(userId, authStateVersion)) return;
+        const staleData = get().friendsData[period];
+        if (staleData?.leaderboard.length) {
+          logWarn('leaderboard.friends.refresh_failed_using_stale', { userId, period });
+          setDatasetError(set, key, error instanceof Error ? error.message : 'Refresh failed');
+        } else if (error instanceof ApiError && error.statusCode === 408) {
+          const fallback = buildSelfOnlyFriendsResponse(userId, period);
           await setCachedFriendsLeaderboard(userId, fallback);
-          const refreshedCache = await getCachedFriendsLeaderboard(userId);
-          logWarn('leaderboard.friends.timeout_self_only_fallback', { userId });
-          set({
-            friendsLeaderboard: fallback.leaderboard,
-            totalFriends: fallback.totalFriends,
-            friendsPlayedToday: fallback.friendsPlayedToday,
-            friendsCache: refreshedCache,
-            loadingFriends: false,
-            error: null,
-          });
-          return;
+          set((state) => ({ friendsData: { ...state.friendsData, [period]: fallback } }));
+          setDatasetError(set, key);
+        } else {
+          logError('leaderboard.friends.error', error);
+          setDatasetError(
+            set,
+            key,
+            error instanceof Error ? error.message : 'Failed to load friends leaderboard'
+          );
         }
-
-        logError('leaderboard.friends.error', error);
-        set({
-          loadingFriends: false,
-          error: error instanceof Error ? error.message : 'Failed to load friends leaderboard',
-        });
         if (options.propagateError) throw error;
       } finally {
-        friendsRequests.delete(requestKey);
-        if (isCurrentAuthUser(userId, authStateVersion)) set({ loadingFriends: false });
+        requests.delete(requestKey);
+        if (isCurrentAuthUser(userId, authStateVersion)) setDatasetError(set, key, get().errors[key]);
       }
     })();
-
-    friendsRequests.set(requestKey, request);
+    requests.set(requestKey, request);
     return request;
   },
 
-  revalidateGlobal: async (options: RevalidateOptions = {}) => {
-    const cache = get().globalCache;
-    if (!options.force && isCurrentDailyCache(cache) && !isResourceStale(cache)) {
-      logInfo('leaderboard.global.fresh_cache_skip', { quizDate: cache.data.quizDate });
-      return;
-    }
+  revalidateGlobal: async (period = 'daily', options = {}) => {
+    const cache = get().globalCaches[period];
+    if (!options.force && isCurrentCache(cache, period) && !isResourceStale(cache)) return;
+    const key = getLeaderboardDatasetKey('global', period);
+    const requestKey = key;
+    const existing = requests.get(requestKey);
+    if (existing) return existing;
 
-    if (globalRequest) {
-      logInfo('leaderboard.global.in_flight_reuse');
-      return globalRequest;
-    }
-
-    globalRequest = (async () => {
-      logInfo('leaderboard.global.start', { force: Boolean(options.force) });
-      set({ loadingGlobal: true, error: null });
-
+    const request = (async () => {
+      set((state) => ({
+        loading: { ...state.loading, [key]: true },
+        errors: { ...state.errors, [key]: undefined },
+      }));
       try {
-        const data = await getLeaderboard();
+        const data = await getLeaderboard(period);
+        if (!isCurrentResponse(data)) return;
         await setCachedGlobalLeaderboard(data);
-        const refreshedCache = await getCachedGlobalLeaderboard();
-
-        set({
-          globalLeaderboard: data.leaderboard,
-          globalCache: refreshedCache,
-          loadingGlobal: false,
-          error: null,
-        });
-        logInfo('leaderboard.global.success', { count: data.leaderboard.length });
+        const refreshedCache = await getCachedGlobalLeaderboard(period);
+        set((state) => ({
+          globalData: { ...state.globalData, [period]: data },
+          globalCaches: {
+            ...state.globalCaches,
+            ...(refreshedCache ? { [period]: refreshedCache } : {}),
+          },
+        }));
+        setDatasetError(set, key);
       } catch (error) {
         logError('leaderboard.global.error', error);
-        set({
-          loadingGlobal: false,
-          error: error instanceof Error ? error.message : 'Failed to load leaderboard',
-        });
+        setDatasetError(
+          set,
+          key,
+          error instanceof Error ? error.message : 'Failed to load leaderboard'
+        );
+        if (options.propagateError) throw error;
       } finally {
-        globalRequest = null;
-        set({ loadingGlobal: false });
+        requests.delete(requestKey);
+        setDatasetError(set, key, get().errors[key]);
       }
     })();
-
-    return globalRequest;
+    requests.set(requestKey, request);
+    return request;
   },
 
-  prefetchDailyLoop: async (
-    userId: string,
-    isAuthenticated: boolean,
-    options: PrefetchOptions = {}
-  ) => {
-    logInfo('leaderboard.prefetch.start', {
-      userId,
-      isAuthenticated,
-      force: Boolean(options.force),
-    });
+  prefetchDailyLoop: async (userId, isAuthenticated, options = {}) => {
     await Promise.all([
-      get().revalidateGlobal({ force: options.force }),
+      get().revalidateGlobal('daily', { force: options.force }),
       isAuthenticated
-        ? get().revalidateFriends(userId, {
+        ? get().revalidateFriends(userId, 'daily', {
             force: options.force,
             propagateError: options.propagateProtectedError,
           })
         : Promise.resolve(),
     ]);
-    logInfo('leaderboard.prefetch.success', { userId, isAuthenticated });
   },
 
-  invalidateFriends: async (userId: string) => {
-    if (userId.startsWith('guest_')) {
-      set({
-        friendsLeaderboard: [],
-        totalFriends: 0,
-        friendsPlayedToday: 0,
-        friendsCache: null,
-      });
-      return;
+  invalidateFriends: async (userId, periodToRefresh = 'daily') => {
+    await clearCachedFriendsLeaderboards(userId);
+    set({ friendsOwnerId: userId, friendsData: {}, friendsCaches: {} });
+    if (!userId.startsWith('guest_')) {
+      await get().revalidateFriends(userId, periodToRefresh, { force: true });
     }
-
-    await get().revalidateFriends(userId, { force: true });
   },
 
   applyAvatar: async (userId, avatarId) => {
     const state = get();
-    const friendsLeaderboard = state.friendsLeaderboard.map((entry) =>
-      entry.userId === userId ? { ...entry, avatarId } : entry
-    );
-    const globalLeaderboard = state.globalLeaderboard.map((entry) =>
-      entry.userId === userId ? { ...entry, avatarId } : entry
-    );
-    const friendsCache = state.friendsCache
-      ? {
-          ...state.friendsCache,
-          data: {
-            ...state.friendsCache.data,
-            leaderboard: state.friendsCache.data.leaderboard.map((entry) =>
-              entry.userId === userId ? { ...entry, avatarId } : entry
-            ),
-          },
-        }
-      : null;
-    const globalCache = state.globalCache
-      ? {
-          ...state.globalCache,
-          data: {
-            ...state.globalCache.data,
-            leaderboard: state.globalCache.data.leaderboard.map((entry) =>
-              entry.userId === userId ? { ...entry, avatarId } : entry
-            ),
-          },
-        }
-      : null;
+    const globalData = Object.fromEntries(
+      Object.entries(state.globalData).map(([period, data]) => [
+        period,
+        data && { ...data, leaderboard: data.leaderboard.map((entry) =>
+          entry.userId === userId ? { ...entry, avatarId } : entry
+        ) },
+      ])
+    ) as LeaderboardState['globalData'];
+    const friendsData = Object.fromEntries(
+      Object.entries(state.friendsData).map(([period, data]) => [
+        period,
+        data && { ...data, leaderboard: data.leaderboard.map((entry) =>
+          entry.userId === userId ? { ...entry, avatarId } : entry
+        ) },
+      ])
+    ) as LeaderboardState['friendsData'];
+    set({ globalData, friendsData });
 
-    set({ friendsLeaderboard, globalLeaderboard, friendsCache, globalCache });
-    await Promise.all([
-      friendsCache ? setCachedFriendsLeaderboard(userId, friendsCache.data) : Promise.resolve(),
-      globalCache ? setCachedGlobalLeaderboard(globalCache.data) : Promise.resolve(),
-    ]);
+    const ownerId = useAuthStore.getState().user?.sub;
+    const periods: LeaderboardPeriod[] = ['daily', 'weekly'];
+    const cached = await Promise.all(periods.flatMap((period) => [
+      getCachedGlobalLeaderboard(period),
+      ownerId ? getCachedFriendsLeaderboard(ownerId, period) : Promise.resolve(null),
+    ]));
+    await Promise.all(cached.flatMap((envelope, index) => {
+      if (!envelope) return [];
+      const data = {
+        ...envelope.data,
+        leaderboard: envelope.data.leaderboard.map((entry) =>
+          entry.userId === userId ? { ...entry, avatarId } : entry
+        ),
+      };
+      return index % 2 === 0
+        ? [setCachedGlobalLeaderboard(data as GlobalLeaderboardResponse)]
+        : ownerId
+          ? [setCachedFriendsLeaderboard(ownerId, data as FriendsLeaderboardResponse)]
+          : [];
+    }));
   },
 
   reset: () => set({
-    friendsLeaderboard: [],
-    totalFriends: 0,
-    friendsPlayedToday: 0,
-    globalLeaderboard: [],
-    friendsCache: null,
-    globalCache: null,
-    loadingFriends: false,
-    loadingGlobal: false,
-    error: null,
+    friendsOwnerId: null,
+    globalData: {},
+    friendsData: {},
+    globalCaches: {},
+    friendsCaches: {},
+    loading: {},
+    errors: {},
   }),
 }));

@@ -5,7 +5,8 @@ Canonical TypeScript interfaces live in `app/types/index.ts`.
 ## Primary Client Types
 
 - Daily quiz: `Quiz`, `Question`, `AnswerWithTiming`, `QuizResultImmediate`, `QuizResult`.
-- Profile/social: `UserProfile`, `UserStats`, `LeaderboardEntry`, friends types.
+- Profile/social: `UserProfile`, `UserStats`, `PublicPlayerProfile`,
+  `FriendRequestSummary`, `LeaderboardEntry`, and friendship types.
 - Retired Challenge: compatibility types remain for dormant code and older clients.
 
 ## Daily Quiz Payload
@@ -91,6 +92,9 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - `career_game_results` stores independent career-game completion and does not
   contribute to quiz scores, streaks, profile aggregates, or leaderboards.
 - Daily leaderboards rank a single `quiz_date` by score, then earliest submission time, then user id.
+- Weekly leaderboards sum scores across the current London Monday-to-Sunday
+  window and rank by total, games played, earliest final contributing
+  submission, then user id. Future days have no rows.
 - `challenges` stores async head-to-head lifecycle and answer payloads.
 - Challenge tables and user aggregate columns are retained without mutation
   while all challenge endpoints are retired with HTTP `410`.
@@ -99,10 +103,19 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
   accounts receive a football-symbol default before players may choose any
   symbol or letter avatar.
 - `friendships` stores one ordered `(user_a, user_b)` row that is visible to both players.
+- `friend_requests` stores at most one pending request for that same ordered
+  pair plus its sender. Requests are removed when accepted, declined, cancelled,
+  or resolved through an invite link.
 - New `friend_links` rows are reusable for seven days; legacy rows remain single-use.
 - Challenge username columns are compatibility snapshots. API reads prefer the current `users.username`.
 - Deprecated display-name response fields contain usernames during the installed-client transition.
 - New client contracts use `PublicPlayer { userId, username, avatarId?, avatarUrl? }`.
+- Public player profiles add date-aware Daily Quiz aggregates and
+  `achievements: { id, unlockedAt }[]`; locked achievements, progress, hints,
+  source events, Auth0 claims, and contact data are never returned.
+- Relationship state is `guest | self | none | outgoing_pending |
+  incoming_pending | friends`; account-scoped request lists contain incoming
+  and outgoing public player summaries only.
 - Auth storage persists `username`, `usernameRequired`, `onboardingStatus`, and `avatarId`;
   missing legacy metadata is resynchronized before navigation.
 - `user_achievements`, `user_achievement_progress`, and
@@ -116,7 +129,8 @@ Answer payloads can include timing metadata. The client clamps timer behavior so
 - Legacy clients may omit the new envelope; current clients send
   `trackingVersion: 1` and an allowlisted `properties` object.
 - Allowed properties are quiz date, cache/network source, bounded duration,
-  question number, total questions, score, and a fixed exit reason.
+  question number, total questions, score, a fixed exit reason, leaderboard
+  scope, and leaderboard period.
 - Free-form keys and identity/content values such as usernames, emails,
   question text, answers, and invitation codes are rejected by the Function.
 

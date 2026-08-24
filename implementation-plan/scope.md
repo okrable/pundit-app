@@ -14,8 +14,8 @@
 - Auth0 sign-in, blocking username onboarding, permanent canonical usernames,
   username-only profile UI, and settings.
 - Guest-to-auth result migration/adoption after login.
-- Global leaderboard plus a mutual friends leaderboard backed by one ordered
-  relationship row and reusable seven-day invite links.
+- Global Daily/Weekly leaderboard with Friends-only filtering, public player
+  profiles, approval-based friend requests, and reusable immediate invite links.
 - A Challenge navigation entry that presents a dedicated Coming Soon screen;
   old links route there without authentication or API calls.
 - Stale-first cache hydration and background refresh.

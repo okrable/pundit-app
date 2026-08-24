@@ -1,5 +1,6 @@
 import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
-import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
+import { getQuizDate } from './lib/quizDate';
+import { getLeaderboardDateWindow } from '../../shared/leaderboard';
 import {
   getGlobalLeaderboardRows,
   parseLeaderboardLimit,
@@ -29,8 +30,8 @@ const handler: LambdaHandler = async (event) => {
   try {
     const now = new Date();
     const today = getQuizDate(now);
-    const previousQuizDate = getPreviousQuizDate(today);
     const period = parseLeaderboardPeriod(event.queryStringParameters?.period);
+    const dates = getLeaderboardDateWindow(today, period);
     const limit = parseLeaderboardLimit(event.queryStringParameters?.limit);
 
     console.log('getLeaderboard.start', { today, period, limit });
@@ -38,13 +39,15 @@ const handler: LambdaHandler = async (event) => {
     // Auth0 users only in persisted rankings; guests can view but do not persist rows.
     const leaderboard = await getGlobalLeaderboardRows(
       period,
-      { quizDate: today, previousQuizDate },
+      dates,
       limit
     );
 
     const response = {
       period,
       quizDate: today,
+      periodStart: dates.periodStart,
+      periodEnd: dates.periodEnd,
       leaderboard,
     };
 

@@ -7,12 +7,14 @@ import LeaderboardScreen from '../screens/LeaderboardScreen';
 import MeScreen from '../screens/MeScreen';
 import ChallengeComingSoonScreen from '../screens/ChallengeComingSoonScreen';
 import { theme } from '../theme/theme';
+import useIncomingFriendRequestNotification from '../hooks/useIncomingFriendRequestNotification';
 
 const Tab = createBottomTabNavigator();
 const NATIVE_TAB_BAR_CONTENT_HEIGHT = 50;
 
 export default function BottomTabNavigator() {
   const insets = useSafeAreaInsets();
+  const hasIncomingRequests = useIncomingFriendRequestNotification();
 
   return (
     <Tab.Navigator
@@ -69,6 +71,11 @@ export default function BottomTabNavigator() {
         component={LeaderboardScreen}
         options={{
           title: 'League Tables',
+          tabBarAccessibilityLabel: hasIncomingRequests
+            ? 'League Tables, friend requests pending'
+            : 'League Tables',
+          tabBarBadge: hasIncomingRequests ? '\u200B' : undefined,
+          tabBarBadgeStyle: styles.notificationBadge,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="trophy-outline" color={color} size={size} />
           ),
@@ -87,3 +94,17 @@ export default function BottomTabNavigator() {
     </Tab.Navigator>
   );
 }
+
+const styles = {
+  notificationBadge: {
+    minWidth: 10,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    paddingHorizontal: 0,
+    fontSize: 0,
+    lineHeight: 0,
+    backgroundColor: theme.colors.notification,
+    color: 'transparent',
+  },
+};

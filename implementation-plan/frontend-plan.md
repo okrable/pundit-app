@@ -56,6 +56,23 @@ The Challenge entry uses one centred Coming Soon card on desktop and mobile.
 Leaderboards remain a centred 960px list, while Me and the daily game surfaces retain a
 comfortable 760px reading width. Mobile browsers remain single-column.
 
+League Tables is one Global-first list. It resets to Daily + Global on mount,
+switches in place between Daily and the current London week, and exposes an
+authenticated Friends-only filter. Weekly data loads lazily; Daily Global and
+Friends data continue to hydrate during startup. Cached rows remain visible if
+a refresh fails, and all cache partitions include scope, period, anchor, and account.
+
+Every leaderboard row opens the root-level public player profile above the
+platform-specific tab or drawer shell. The same route is used from existing
+friend and pending-request rows on web, iOS, and Android.
+
+An unresolved incoming friend request adds a plain red notification dot to the
+League Tables navigation destination and its Add Friends action. The web menu
+button itself stays unbadged. The account-scoped request state refreshes after
+verified authentication, foreground resume, League Tables focus, and social
+mutations. A refresh marks notification state unverified until it succeeds, so
+failed or uncertain state never shows a dot even if cached request rows remain.
+
 The native runtime uses Expo SDK 55, React Native 0.83, Reanimated 4.2.1,
 Gesture Handler 2.30, and Worklets 0.7.4. Native tabs deliberately use
 `react-native-screens` 4.25.x, which supplies the experimental `Tabs.Host`
@@ -196,14 +213,21 @@ code-native icons and shared Coming Soon message.
 ### Profile and Leaderboards
 
 `useProfileStore` and `useLeaderboardStore` render cached data first and
-revalidate in the background. Daily leaderboard caches are keyed by quiz date
-and friend scope. Profile revalidation discards stale responses if auth state
-changes mid-flight. Friends data is forcibly revalidated after accept/remove
-mutations and whenever League Tables gains navigation focus, so remote
-acceptances do not wait for cache expiry.
+revalidate in the background. Leaderboard caches are partitioned by scope,
+period, London period anchor, and account. Profile and protected leaderboard
+revalidation discard stale responses if auth state changes mid-flight. Friends
+data is invalidated and refreshed after accept/remove mutations.
 
-Profile resources use cache schema 4 and leaderboard resources use social
-cache schema 3. Old payloads are removed lazily while quiz and result storage
+`PlayerProfileScreen` hydrates public-only profile data from a target-scoped
+24-hour cache and revalidates relationship state separately for the current
+verified account. Guests can view profiles; Sign in to add persists the public
+target through authentication and returns without automatically sending a request.
+`useSocialStore` owns the active account's friends and incoming/outgoing
+requests, rejects stale completions after account changes, and supplies badges
+and the three-section Friends manager.
+
+Profile resources use cache schema 4 and leaderboard resources use schema 4.
+Old daily-only payloads are ignored lazily while quiz and result storage
 remains separate. The daily quiz payload uses cache schema 3 and rejects
 cross-date payloads before hydration.
 Username onboarding previews the server-assigned football

@@ -5,6 +5,7 @@ import { logError, logInfo, logWarn } from './debugLog';
 import { useAuthStore } from '../state/useAuthStore';
 import { useAchievementStore } from '../state/useAchievementStore';
 import { useQuizStore } from '../state/useQuizStore';
+import { useSocialStore } from '../state/useSocialStore';
 import { trackAnalyticsEvent } from './analytics';
 import { setUsername as setUsernameApi, syncIdentity } from './api';
 import type { SetUsernameResponse } from '../types';
@@ -322,5 +323,6 @@ export async function logoutWithAuth0(): Promise<void> {
   }
   await useAuthStore.getState().logout();
   useAchievementStore.getState().reset();
+  useSocialStore.getState().reset();
   logInfo('auth.flow.logout.end');
 }

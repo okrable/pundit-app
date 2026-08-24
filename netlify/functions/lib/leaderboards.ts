@@ -1,11 +1,6 @@
 import { query } from './db';
-
-export type LeaderboardPeriod = 'daily' | 'weekly';
-
-export interface LeaderboardDateWindow {
-  quizDate: string;
-  previousQuizDate: string;
-}
+import type { LeaderboardDateWindow, LeaderboardPeriod } from '../../../shared/leaderboard';
+export { parseLeaderboardPeriod } from '../../../shared/leaderboard';
 
 export interface LeaderboardEntry {
   userId: string;
@@ -17,6 +12,7 @@ export interface LeaderboardEntry {
   streak: number;
   rank: number | null;
   hasPlayedToday?: boolean;
+  hasPlayedPeriod: boolean;
   avatarId: string | null;
 }
 
@@ -28,14 +24,8 @@ interface LeaderboardRow {
   streak: number;
   rank: number | string | null;
   has_played_today?: boolean;
+  has_played_period?: boolean;
   avatar_id: string | null;
-}
-
-export function parseLeaderboardPeriod(value: string | undefined): LeaderboardPeriod {
-  // Weekly leaderboards are temporarily removed from the product surface. Treat
-  // legacy weekly requests as daily so older clients degrade safely.
-  if (!value || value === 'daily' || value === 'weekly') return 'daily';
-  return 'daily';
 }
 
 export function parseLeaderboardLimit(value: string | undefined): number {
@@ -55,6 +45,7 @@ function mapLeaderboardRow(row: LeaderboardRow): LeaderboardEntry {
     streak: row.streak,
     rank: row.rank === null ? null : Number(row.rank),
     hasPlayedToday: Boolean(row.has_played_today),
+    hasPlayedPeriod: Boolean(row.has_played_period ?? row.has_played_today),
     avatarId: row.avatar_id,
   };
 }
@@ -64,6 +55,53 @@ export async function getGlobalLeaderboardRows(
   dates: LeaderboardDateWindow,
   limit: number
 ): Promise<LeaderboardEntry[]> {
+  if (period === 'weekly') {
+    const rows = await query<LeaderboardRow>(
+      `WITH aggregated AS (
+        SELECT
+          r.user_id,
+          u.username,
+          u.avatar_id,
+          SUM(r.score)::INT as score,
+          COUNT(r.id)::INT as games_played,
+          MAX(r.created_at) as final_submitted_at,
+          SUM(CASE WHEN r.quiz_date = $3::DATE THEN 1 ELSE 0 END) > 0 as has_played_today,
+          CASE
+            WHEN u.last_played IN ($3::DATE, $4::DATE) THEN u.streak
+            ELSE 0
+          END as streak
+        FROM results r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.quiz_date BETWEEN $1::DATE AND LEAST($2::DATE, $3::DATE)
+          AND u.onboarding_status = 'complete'
+          AND u.username IS NOT NULL
+        GROUP BY r.user_id, u.username, u.avatar_id, u.last_played, u.streak
+      ), ranked AS (
+        SELECT
+          *,
+          ROW_NUMBER() OVER (
+            ORDER BY score DESC, games_played DESC, final_submitted_at ASC, user_id ASC
+          ) as rank
+        FROM aggregated
+      )
+      SELECT
+        user_id,
+        username,
+        avatar_id,
+        score,
+        games_played,
+        streak,
+        rank,
+        true as has_played_period,
+        has_played_today
+      FROM ranked
+      ORDER BY rank ASC
+      LIMIT $5`,
+      [dates.periodStart, dates.periodEnd, dates.quizDate, dates.previousQuizDate, limit]
+    );
+    return rows.map(mapLeaderboardRow);
+  }
+
   const rows = await query<LeaderboardRow>(
     `WITH ranked AS (
       SELECT
@@ -92,7 +130,8 @@ export async function getGlobalLeaderboardRows(
       games_played,
       streak,
       rank,
-      true as has_played_today
+      true as has_played_today,
+      true as has_played_period
     FROM ranked
     ORDER BY rank ASC
     LIMIT $3`,
@@ -107,6 +146,62 @@ export async function getFriendsLeaderboardRows(
   period: LeaderboardPeriod,
   dates: LeaderboardDateWindow
 ): Promise<LeaderboardEntry[]> {
+  if (period === 'weekly') {
+    const rows = await query<LeaderboardRow>(
+      `WITH friend_ids AS (
+        SELECT CASE WHEN f.user_a = $1 THEN f.user_b ELSE f.user_a END as friend_id
+        FROM friendships f
+        WHERE f.user_a = $1 OR f.user_b = $1
+        UNION ALL
+        SELECT $1 as friend_id
+      ), aggregated AS (
+        SELECT
+          r.user_id,
+          SUM(r.score)::INT as score,
+          COUNT(r.id)::INT as games_played,
+          MAX(r.created_at) as final_submitted_at,
+          SUM(CASE WHEN r.quiz_date = $3::DATE THEN 1 ELSE 0 END) > 0 as has_played_today
+        FROM results r
+        WHERE r.quiz_date BETWEEN $2::DATE AND $3::DATE
+          AND r.user_id IN (SELECT friend_id FROM friend_ids)
+        GROUP BY r.user_id
+      ), ranked AS (
+        SELECT
+          user_id,
+          ROW_NUMBER() OVER (
+            ORDER BY score DESC, games_played DESC, final_submitted_at ASC, user_id ASC
+          ) as rank
+        FROM aggregated
+      )
+      SELECT
+        u.id as user_id,
+        u.username,
+        u.avatar_id,
+        COALESCE(a.score, 0)::INT as score,
+        COALESCE(a.games_played, 0)::INT as games_played,
+        CASE
+          WHEN u.last_played IN ($3::DATE, $4::DATE) THEN u.streak
+          ELSE 0
+        END as streak,
+        ranked.rank,
+        COALESCE(a.has_played_today, false) as has_played_today,
+        a.user_id IS NOT NULL as has_played_period
+      FROM friend_ids fi
+      JOIN users u ON u.id = fi.friend_id
+      LEFT JOIN aggregated a ON a.user_id = u.id
+      LEFT JOIN ranked ON ranked.user_id = u.id
+      WHERE u.onboarding_status = 'complete'
+        AND u.username IS NOT NULL
+      ORDER BY
+        CASE WHEN a.user_id IS NULL THEN 1 ELSE 0 END,
+        ranked.rank ASC NULLS LAST,
+        u.username ASC,
+        u.id ASC`,
+      [userId, dates.periodStart, dates.quizDate, dates.previousQuizDate]
+    );
+    return rows.map(mapLeaderboardRow);
+  }
+
   const rows = await query<LeaderboardRow>(
     `WITH friend_ids AS (
       SELECT CASE WHEN f.user_a = $1 THEN f.user_b ELSE f.user_a END as friend_id
@@ -137,7 +232,8 @@ export async function getFriendsLeaderboardRows(
         ELSE 0
       END as streak,
       ranked.rank,
-      r.score IS NOT NULL as has_played_today
+      r.score IS NOT NULL as has_played_today,
+      r.score IS NOT NULL as has_played_period
     FROM friend_ids fi
     JOIN users u ON u.id = fi.friend_id
     LEFT JOIN results r ON r.user_id = u.id AND r.quiz_date = $2

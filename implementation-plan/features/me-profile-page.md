@@ -1,7 +1,7 @@
 # Feature: Me Profile Page
 
 > Status: Implemented
-> Last updated: v2.9.0 achievements
+> Last updated: v2.13.0 public player profiles
 
 ## Delivered
 
@@ -32,6 +32,9 @@
 - Login uses the centralized auth flow and shows `AuthSyncScreen` while reconciliation/prefetch runs.
 - Completing a quiz publishes the projected post-play streak immediately; the
   authoritative submission result reconciles it in the background.
+- Other players see a separate public preview containing Daily Quiz aggregates
+  and earned achievements only; Me-only settings, progress, locked achievements,
+  identity claims, and contact fields are not part of that response.
 
 ## Follow-Up
 

@@ -13,6 +13,7 @@ export const theme = {
     correctBg: '#E8F5E9',
     incorrect: '#F44336',
     incorrectBg: '#FFEBEE',
+    notification: '#C62828',
     // Avatar colors - deterministic by userId hash
     avatarColors: [
       '#E57373', // Red

@@ -1,6 +1,7 @@
 import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { requireCompletedIdentity } from './lib/identity';
-import { getPreviousQuizDate, getQuizDate } from './lib/quizDate';
+import { getQuizDate } from './lib/quizDate';
+import { getLeaderboardDateWindow } from '../../shared/leaderboard';
 import {
   getFriendsLeaderboardRows,
   parseLeaderboardPeriod,
@@ -39,7 +40,7 @@ const handler: LambdaHandler = async (event) => {
 
     const now = new Date();
     const today = getQuizDate(now);
-    const previousQuizDate = getPreviousQuizDate(today);
+    const dates = getLeaderboardDateWindow(today, period);
 
     // Guest users don't have friends
     if (userId.startsWith('guest_')) {
@@ -49,9 +50,12 @@ const handler: LambdaHandler = async (event) => {
         body: JSON.stringify({
           period,
           quizDate: today,
+          periodStart: dates.periodStart,
+          periodEnd: dates.periodEnd,
           leaderboard: [],
           totalFriends: 0,
           friendsPlayedToday: 0,
+          friendsPlayedPeriod: 0,
         }),
       };
     }
@@ -64,12 +68,15 @@ const handler: LambdaHandler = async (event) => {
     const leaderboard = await getFriendsLeaderboardRows(
       userId,
       period,
-      { quizDate: today, previousQuizDate }
+      dates
     );
 
     const totalFriends = leaderboard.length - 1; // Exclude self
     const friendsPlayedToday = leaderboard.filter(
       (entry) => entry.hasPlayedToday && entry.userId !== userId
+    ).length;
+    const friendsPlayedPeriod = leaderboard.filter(
+      (entry) => entry.hasPlayedPeriod && entry.userId !== userId
     ).length;
     return {
       statusCode: 200,
@@ -77,9 +84,12 @@ const handler: LambdaHandler = async (event) => {
       body: JSON.stringify({
         period,
         quizDate: today,
+        periodStart: dates.periodStart,
+        periodEnd: dates.periodEnd,
         leaderboard,
         totalFriends,
         friendsPlayedToday,
+        friendsPlayedPeriod,
       }),
     };
   } catch (error) {

@@ -37,6 +37,7 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 ## Profile APIs
 
 - `GET /getUserStats`
+- `GET /getPlayerProfile?playerId=...&viewerUserId=...`
 - `POST /updateProfile`
 - `GET /checkUsername`
 - `POST /setUsername`
@@ -45,16 +46,23 @@ Guest daily plays do not call `submitQuiz` immediately; they are local-only unti
 - `setUsername` atomically confirms the incomplete identity's username and
   selected avatar. Same-value retries are idempotent and later username changes
   return `USERNAME_IMMUTABLE`.
+- Player profiles are public for completed identities and expose only username,
+  avatar, current Daily streak, best score, quiz count, and earned achievement
+  IDs/unlock dates. An optional viewer ID requires its matching bearer token and
+  adds only the relationship enum.
 
 ## Leaderboard APIs
 
-- `GET /getLeaderboard?period=daily&limit=100`
-- `GET /getFriendsLeaderboard?userId=...&period=daily`
-- Legacy `period=weekly` requests are tolerated and return daily leaderboard data.
-- Leaderboard responses include `period`, `quizDate`, ranked entries, and each
-  player's current `avatarId`.
+- `GET /getLeaderboard?period=daily|weekly&limit=100`
+- `GET /getFriendsLeaderboard?userId=...&period=daily|weekly`
+- Missing or invalid periods default to Daily for installed-client compatibility.
+- Responses include `period`, `quizDate`, `periodStart`, `periodEnd`, ranked
+  entries, and each player's current `avatarId`. Older today-specific fields
+  remain alongside the new period-specific played counts.
 - Global leaderboards are public to guests and authenticated users; persisted rankings include completed authenticated username identities only.
-- Friends leaderboards require a completed username identity and include the current user plus friends, with unplayed users shown unranked.
+- Weekly scores sum the current London Monday-to-Sunday window and rank by total
+  score, games played, earliest final contributing submission, then user ID.
+- Friends leaderboards require a completed username identity and include the current user plus every friend, with unplayed users shown unranked.
 - `username` is the canonical name. Deprecated `displayName` fields temporarily contain the username for installed-client compatibility.
 
 ## Challenge APIs
@@ -77,6 +85,10 @@ Functions and historical data remain preserved for a future redesign.
 - `POST /acceptFriendLink`
 - `GET /getFriends`
 - `POST /removeFriend`
+- `GET /getFriendRequests?userId=...`
+- `POST /sendFriendRequest`
+- `POST /respondFriendRequest` with `accept | decline`
+- `POST /cancelFriendRequest`
 - New invite codes are reusable for seven days and are returned again while active.
 - Previously issued codes retain single-use behavior.
 - Acceptance transactionally inserts one ordered mutual friendship row and is idempotent when the relationship already exists.
@@ -84,6 +96,11 @@ Functions and historical data remain preserved for a future redesign.
   earlier slow request already completed, and uses the longer social-mutation
   client timeout.
 - Friend responses use `PublicPlayer { userId, username, avatarId?, avatarUrl? }`; deprecated name/id aliases remain during the compatibility window.
+- Friend requests are protected by completed verified identity ownership and
+  store one pending row per ordered pair. Duplicate sends are idempotent,
+  reciprocal sends create the friendship, and decline/cancel permit a later retry.
+- Sender and pair rate limits restrict repeated unsolicited sends. Existing
+  invite links retain immediate friendship acceptance and clear pending requests.
 
 ## Operational Instrumentation
 
@@ -93,6 +110,8 @@ Functions and historical data remain preserved for a future redesign.
 - `POST /trackEvent` remains backward-compatible with legacy aggregate events.
   Current clients add a random UUID installation identifier, tracking version,
   and fixed typed properties for quiz date, source, duration, question count,
-  score, and exit reason. Auth0 IDs, usernames, answers, codes, and free-form
-  metadata are rejected.
+  score, exit reason, leaderboard scope, and leaderboard period. Auth0 IDs,
+  usernames, answers, codes, and free-form metadata are rejected.
+- Profile views and friend-request send/accept events add event names only; they
+  contain no target player ID or new free-form property.
 - Scheduled `purgeAnalyticsEvents` removes raw analytics rows older than 90 days.

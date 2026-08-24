@@ -6,6 +6,93 @@ export function orderFriendshipPair(userId: string, friendId: string): [string, 
   return userId < friendId ? [userId, friendId] : [friendId, userId];
 }
 
+export type FriendRelationshipState =
+  | 'guest'
+  | 'self'
+  | 'none'
+  | 'outgoing_pending'
+  | 'incoming_pending'
+  | 'friends';
+
+export function hasPendingIncomingFriendRequests(input: {
+  ownerId: string | null;
+  currentUserId?: string | null;
+  incomingCount: number;
+  requestsVerified: boolean;
+}): boolean {
+  return Boolean(
+    input.requestsVerified
+      && input.currentUserId
+      && input.ownerId === input.currentUserId
+      && input.incomingCount > 0
+  );
+}
+
+export type SendFriendRequestDecision =
+  | 'self'
+  | 'already_friends'
+  | 'create_request'
+  | 'already_requested'
+  | 'accept_reciprocal';
+
+export function decideSendFriendRequest(input: {
+  senderId: string;
+  recipientId: string;
+  alreadyFriends: boolean;
+  pendingSenderId: string | null;
+}): SendFriendRequestDecision {
+  if (input.senderId === input.recipientId) return 'self';
+  if (input.alreadyFriends) return 'already_friends';
+  if (!input.pendingSenderId) return 'create_request';
+  return input.pendingSenderId === input.senderId
+    ? 'already_requested'
+    : 'accept_reciprocal';
+}
+
+export function getFriendRelationshipState(input: {
+  viewerId?: string | null;
+  playerId: string;
+  alreadyFriends: boolean;
+  pendingSenderId: string | null;
+}): FriendRelationshipState {
+  if (!input.viewerId) return 'guest';
+  if (input.viewerId === input.playerId) return 'self';
+  if (input.alreadyFriends) return 'friends';
+  if (!input.pendingSenderId) return 'none';
+  return input.pendingSenderId === input.viewerId
+    ? 'outgoing_pending'
+    : 'incoming_pending';
+}
+
+export type FriendRequestResponseDecision =
+  | 'already_friends'
+  | 'already_handled'
+  | 'forbidden'
+  | 'accept'
+  | 'decline';
+
+export function decideFriendRequestResponse(input: {
+  responderId: string;
+  pendingSenderId: string | null;
+  alreadyFriends: boolean;
+  action: 'accept' | 'decline';
+}): FriendRequestResponseDecision {
+  if (input.alreadyFriends) return 'already_friends';
+  if (!input.pendingSenderId) return 'already_handled';
+  if (input.pendingSenderId === input.responderId) return 'forbidden';
+  return input.action;
+}
+
+export type CancelFriendRequestDecision = 'already_handled' | 'forbidden' | 'cancel';
+
+export function decideCancelFriendRequest(input: {
+  senderId: string;
+  pendingSenderId: string | null;
+}): CancelFriendRequestDecision {
+  if (!input.pendingSenderId) return 'already_handled';
+  return input.pendingSenderId === input.senderId ? 'cancel' : 'forbidden';
+}
+
 export function canReuseFriendLink(input: {
   isReusable: boolean;
   expiresAt: string | Date;

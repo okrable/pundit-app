@@ -29,10 +29,18 @@ Friendship removal deletes the single ordered mutual row and is idempotent. A
 retry reports success when an earlier slow request already completed, preventing
 stale clients from becoming stuck after a timeout.
 
+From v2.13.0, public leaderboard and Friends rows open a public accomplishment
+profile. New in-app additions use a pending approval row per ordered player
+pair; duplicate sends are idempotent and reciprocal sends accept atomically.
+Invite links remain an explicit immediate-accept route and clear any pending
+request between the pair.
+
 ## Runtime migration status
 
 Migrations 012 and 013 were applied to production CockroachDB on 25 July 2026.
 Their aggregate pre/post audit queries completed successfully.
+Migration 020 was applied on 24 August 2026 before the expanded v2.13.0
+authenticated preview; it adds only the pending-request table and indexes.
 
 For a new environment, run migrations in order and use:
 

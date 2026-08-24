@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -22,14 +22,21 @@ import AccountSyncBanner from './app/components/AccountSyncBanner';
 import AchievementRevealHost from './app/components/AchievementRevealHost';
 import { useAuthStore } from './app/state/useAuthStore';
 import {
+  canProcessProtectedAction,
   shouldShowIdentityFailure,
   shouldShowIdentitySync,
   shouldShowUsernameOnboarding,
 } from './shared/clientIdentityPolicy';
 import { getAppLaunchDuration, trackAnalyticsEvent } from './app/services/analytics';
+import PlayerProfileScreen from './app/screens/PlayerProfileScreen';
+import {
+  rootNavigationRef,
+  type RootStackParamList,
+} from './app/navigation/rootNavigation';
+import { consumePendingPlayerProfile } from './app/storage/playerProfileContinuation';
+import { useSocialStore } from './app/state/useSocialStore';
 
-const Stack = createNativeStackNavigator();
-const navigationRef = createNavigationContainerRef<any>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 interface AppErrorBoundaryState {
   error: Error | null;
@@ -79,14 +86,68 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, AppError
 
 // Separate component to use hooks that need navigation context
 function AppContent() {
+  const auth = useAuthStore();
   const sharedLink = useDeepLinkHandler({
     onChallengeUnavailable: React.useCallback(() => {
-      if (navigationRef.isReady()) {
-        navigationRef.navigate('Main', { screen: 'Challenge' });
+      if (rootNavigationRef.isReady()) {
+        rootNavigationRef.navigate('Main', { screen: 'Challenge' });
       }
     }, []),
   });
   const hasSeenActiveState = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!auth.user?.sub || !canProcessProtectedAction(
+      {
+        isAuthenticated: auth.isAuthenticated,
+        authStatus: auth.authStatus,
+        identityStatus: auth.identityStatus,
+        token: auth.token,
+        userId: auth.user.sub,
+        authStateVersion: auth.authStateVersion,
+      },
+      { userId: auth.user.sub, authStateVersion: auth.authStateVersion }
+    )) return;
+
+    void useSocialStore.getState().refreshRequests(auth.user.sub);
+  }, [
+    auth.authStateVersion,
+    auth.authStatus,
+    auth.identityStatus,
+    auth.isAuthenticated,
+    auth.token,
+    auth.user?.sub,
+  ]);
+
+  React.useEffect(() => {
+    if (!auth.user?.sub || !canProcessProtectedAction(
+      {
+        isAuthenticated: auth.isAuthenticated,
+        authStatus: auth.authStatus,
+        identityStatus: auth.identityStatus,
+        token: auth.token,
+        userId: auth.user.sub,
+        authStateVersion: auth.authStateVersion,
+      },
+      { userId: auth.user.sub, authStateVersion: auth.authStateVersion }
+    )) return;
+
+    void consumePendingPlayerProfile().then((pending) => {
+      if (!pending || !rootNavigationRef.isReady()) return;
+      rootNavigationRef.navigate('PlayerProfile', {
+        playerId: pending.playerId,
+        username: pending.username,
+        avatarId: pending.avatarId,
+      });
+    });
+  }, [
+    auth.authStateVersion,
+    auth.authStatus,
+    auth.identityStatus,
+    auth.isAuthenticated,
+    auth.token,
+    auth.user?.sub,
+  ]);
 
   React.useEffect(() => {
     logInfo('app.navigation.mounted');
@@ -94,6 +155,21 @@ function AppContent() {
       logInfo('app.state.change', { nextState, hasSeenActiveState: hasSeenActiveState.current });
       if (nextState === 'active' && hasSeenActiveState.current) {
         void prefetchDailyLoop({ mode: 'public-warm' });
+        const currentAuth = useAuthStore.getState();
+        const userId = currentAuth.user?.sub;
+        if (userId && canProcessProtectedAction(
+          {
+            isAuthenticated: currentAuth.isAuthenticated,
+            authStatus: currentAuth.authStatus,
+            identityStatus: currentAuth.identityStatus,
+            token: currentAuth.token,
+            userId,
+            authStateVersion: currentAuth.authStateVersion,
+          },
+          { userId, authStateVersion: currentAuth.authStateVersion }
+        )) {
+          void useSocialStore.getState().refreshRequests(userId);
+        }
       }
 
       if (nextState === 'active') {
@@ -107,8 +183,8 @@ function AppContent() {
   }, []);
 
   const navigateToMainSection = React.useCallback((screen: 'Me' | 'League Tables'): boolean => {
-    if (navigationRef.isReady()) {
-      navigationRef.navigate('Main', { screen });
+    if (rootNavigationRef.isReady()) {
+      rootNavigationRef.navigate('Main', { screen });
       return true;
     }
     return false;
@@ -132,6 +208,11 @@ function AppContent() {
         name="Main"
         component={MainNavigator}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="PlayerProfile"
+        component={PlayerProfileScreen}
+        options={{ title: 'Player Profile' }}
       />
       </Stack.Navigator>
       <SharedLinkAcceptanceModal
@@ -205,7 +286,7 @@ function ReadyApp() {
   return (
     <View style={styles.readyAppContainer}>
       {showBackgroundSyncFailure ? <AccountSyncBanner /> : null}
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer ref={rootNavigationRef}>
         <AppContent />
       </NavigationContainer>
     </View>

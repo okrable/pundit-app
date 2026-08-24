@@ -15,8 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme/theme';
-import { Friend } from '../types';
-import { getFriends, removeFriend, createFriendLink } from '../services/api';
+import type { Friend, FriendRequestSummary, PublicPlayer } from '../types';
+import { createFriendLink } from '../services/api';
 import { useAuthStore } from '../state/useAuthStore';
 import Avatar from './Avatar';
 import ShareFriendLinkModal from './ShareFriendLinkModal';
@@ -25,6 +25,8 @@ import { formatStreakLabel } from '../../shared/streak';
 import { normalizeSharedCode, resolveSharedCode } from '../services/sharedCode';
 import { useSharedLinkFlow } from '../context/SharedLinkContext';
 import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
+import { useSocialStore } from '../state/useSocialStore';
+import { openPlayerProfile } from '../navigation/rootNavigation';
 
 interface ManageFriendsModalProps {
   visible: boolean;
@@ -60,11 +62,23 @@ export default function ManageFriendsModal({
       )
   );
   const { openSharedAction } = useSharedLinkFlow();
-  const [friends, setFriends] = useState<Friend[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    ownerId,
+    friends: storedFriends,
+    incoming: storedIncoming,
+    outgoing: storedOutgoing,
+    loading,
+    refresh: refreshSocial,
+    respondRequest,
+    cancelRequest,
+    remove,
+  } = useSocialStore();
+  const friends = ownerId === user?.sub ? storedFriends : [];
+  const incoming = ownerId === user?.sub ? storedIncoming : [];
+  const outgoing = ownerId === user?.sub ? storedOutgoing : [];
   const [refreshing, setRefreshing] = useState(false);
   const [generatingLink, setGeneratingLink] = useState(false);
-  const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
+  const [processingPlayerId, setProcessingPlayerId] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState('');
   const [openingInvite, setOpeningInvite] = useState(false);
 
@@ -75,41 +89,16 @@ export default function ManageFriendsModal({
 
   const loadFriends = useCallback(async () => {
     if (!user?.sub || !hasVerifiedSession) {
-      setLoading(false);
       setRefreshing(false);
       return;
     }
-
-    const expectedAuthStateVersion = authStateVersion;
-    try {
-      const response = await getFriends(user.sub);
-      const latestAuthState = useAuthStore.getState();
-      if (
-        !canProcessProtectedAction(
-          {
-            isAuthenticated: latestAuthState.isAuthenticated,
-            authStatus: latestAuthState.authStatus,
-            identityStatus: latestAuthState.identityStatus,
-            token: latestAuthState.token,
-            userId: latestAuthState.user?.sub,
-            authStateVersion: latestAuthState.authStateVersion,
-          },
-          { userId: user.sub, authStateVersion: expectedAuthStateVersion }
-        )
-      ) return;
-      setFriends(response.friends);
-    } catch (error) {
-      console.error('Error loading friends:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [authStateVersion, hasVerifiedSession, user?.sub]);
+    await refreshSocial(user.sub);
+    setRefreshing(false);
+  }, [hasVerifiedSession, refreshSocial, user?.sub]);
 
   useEffect(() => {
     if (visible && user?.sub) {
-      setLoading(true);
-      loadFriends();
+      void loadFriends();
     }
   }, [visible, user?.sub, loadFriends]);
 
@@ -183,18 +172,46 @@ export default function ManageFriendsModal({
   const confirmRemoveFriend = async (friendId: string) => {
     if (!user?.sub || !hasVerifiedSession) return;
 
-    const expectedAuthStateVersion = authStateVersion;
-    setRemovingFriendId(friendId);
+    setProcessingPlayerId(friendId);
     try {
-      await removeFriend(user.sub, friendId);
-      if (useAuthStore.getState().authStateVersion !== expectedAuthStateVersion) return;
-      setFriends((prev) => prev.filter((f) => f.id !== friendId));
+      await remove(user.sub, friendId);
       onFriendsChanged?.();
     } catch (error) {
       console.error('Error removing friend:', error);
       Alert.alert('Error', 'Failed to remove friend. Please try again.');
     } finally {
-      setRemovingFriendId(null);
+      setProcessingPlayerId(null);
+    }
+  };
+
+  const openProfile = (player: PublicPlayer) => {
+    onClose();
+    requestAnimationFrame(() => {
+      openPlayerProfile({
+        playerId: player.userId,
+        username: player.username,
+        avatarId: player.avatarId,
+      });
+    });
+  };
+
+  const handleRequestResponse = async (
+    item: FriendRequestSummary,
+    action: 'accept' | 'decline' | 'cancel'
+  ) => {
+    if (!user?.sub || !hasVerifiedSession) return;
+    setProcessingPlayerId(item.player.userId);
+    try {
+      if (action === 'cancel') {
+        await cancelRequest(user.sub, item.player.userId);
+      } else {
+        await respondRequest(user.sub, item.player.userId, action);
+        if (action === 'accept') onFriendsChanged?.();
+      }
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Unable to update request.');
+    } finally {
+      setProcessingPlayerId(null);
     }
   };
 
@@ -207,24 +224,76 @@ export default function ManageFriendsModal({
         imageUrl={item.avatarUrl}
         size="md"
       />
-      <View style={styles.friendInfo}>
+      <TouchableOpacity style={styles.friendInfo} onPress={() => openProfile({
+        userId: item.id,
+        username: item.username,
+        avatarId: item.avatarId,
+        avatarUrl: item.avatarUrl,
+      })} accessibilityRole="button" accessibilityLabel={`View ${formatPublicPlayerName(item.username)} profile`}>
         <Text style={styles.friendName}>
           {formatPublicPlayerName(item.username)}
         </Text>
         <Text style={styles.friendStats}>{formatStreakLabel(item.streak)}</Text>
-      </View>
+      </TouchableOpacity>
       <TouchableOpacity
         style={[styles.removeButton, !hasVerifiedSession && styles.buttonDisabled]}
         onPress={() => handleRemoveFriend(item)}
-        disabled={!hasVerifiedSession || removingFriendId === item.id}
+        disabled={!hasVerifiedSession || processingPlayerId === item.id}
+        accessibilityRole="button"
+        accessibilityLabel={`Remove ${formatPublicPlayerName(item.username)}`}
       >
-        {removingFriendId === item.id ? (
+        {processingPlayerId === item.id ? (
           <ActivityIndicator size="small" color={theme.colors.incorrect} />
         ) : (
           <Ionicons name="close-circle" size={24} color={theme.colors.incorrect} />
         )}
       </TouchableOpacity>
     </View>
+  );
+
+  const renderRequest = (item: FriendRequestSummary, direction: 'incoming' | 'outgoing') => (
+    <View key={item.requestId} style={styles.friendItem}>
+      <Avatar userId={item.player.userId} username={item.player.username} avatarId={item.player.avatarId} size="md" />
+      <TouchableOpacity style={styles.friendInfo} onPress={() => openProfile(item.player)} accessibilityRole="button" accessibilityLabel={`View ${formatPublicPlayerName(item.player.username)} profile`}>
+        <Text style={styles.friendName}>{formatPublicPlayerName(item.player.username)}</Text>
+        <Text style={styles.friendStats}>{direction === 'incoming' ? 'Wants to add you' : 'Request sent'}</Text>
+      </TouchableOpacity>
+      {processingPlayerId === item.player.userId ? <ActivityIndicator color={theme.colors.primary} /> : direction === 'incoming' ? (
+        <View style={styles.requestActions}>
+          <TouchableOpacity style={styles.acceptRequestButton} onPress={() => void handleRequestResponse(item, 'accept')} accessibilityRole="button" accessibilityLabel={`Accept ${formatPublicPlayerName(item.player.username)}'s friend request`}>
+            <Ionicons name="checkmark" size={18} color={theme.colors.white} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.declineRequestButton} onPress={() => void handleRequestResponse(item, 'decline')} accessibilityRole="button" accessibilityLabel={`Decline ${formatPublicPlayerName(item.player.username)}'s friend request`}>
+            <Ionicons name="close" size={18} color={theme.colors.mediumGray} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.declineRequestButton} onPress={() => void handleRequestResponse(item, 'cancel')} accessibilityRole="button" accessibilityLabel={`Cancel request to ${formatPublicPlayerName(item.player.username)}`}>
+          <Ionicons name="close" size={18} color={theme.colors.mediumGray} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderRequestSections = () => (
+    <>
+      {incoming.length > 0 ? (
+        <View style={styles.requestSection}>
+          <Text style={styles.sectionTitle}>REQUESTS ({incoming.length})</Text>
+          {incoming.map((item) => renderRequest(item, 'incoming'))}
+        </View>
+      ) : null}
+      {outgoing.length > 0 ? (
+        <View style={styles.requestSection}>
+          <Text style={styles.sectionTitle}>SENT ({outgoing.length})</Text>
+          {outgoing.map((item) => renderRequest(item, 'outgoing'))}
+        </View>
+      ) : null}
+      <Text style={styles.sectionTitle}>YOUR FRIENDS ({friends.length})</Text>
+      {friends.length === 0 && (incoming.length > 0 || outgoing.length > 0) ? (
+        <Text style={styles.noExistingFriends}>No existing friends yet.</Text>
+      ) : null}
+    </>
   );
 
   const renderEmptyState = () => (
@@ -310,17 +379,13 @@ export default function ManageFriendsModal({
           </View>
         ) : (
           <>
-            {friends.length > 0 && (
-              <Text style={styles.sectionTitle}>
-                YOUR FRIENDS ({friends.length})
-              </Text>
-            )}
             <FlatList
               data={friends}
               renderItem={renderFriendItem}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.listContent}
-              ListEmptyComponent={renderEmptyState}
+              ListHeaderComponent={renderRequestSections}
+              ListEmptyComponent={incoming.length === 0 && outgoing.length === 0 ? renderEmptyState : null}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -438,7 +503,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.fonts.gothamMedium,
     color: theme.colors.mediumGray,
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: 0,
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.sm,
   },
@@ -472,6 +537,35 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     padding: theme.spacing.xs,
+  },
+  requestSection: {
+    marginBottom: theme.spacing.sm,
+  },
+  noExistingFriends: {
+    marginBottom: theme.spacing.md,
+    fontSize: 13,
+    fontFamily: theme.fonts.gothamBook,
+    color: theme.colors.mediumGray,
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+  },
+  acceptRequestButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  declineRequestButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingContainer: {
     flex: 1,

@@ -1,0 +1,190 @@
+import { create } from 'zustand';
+import type {
+  Friend,
+  FriendRelationshipResponse,
+  FriendRequestSummary,
+} from '../types';
+import {
+  cancelFriendRequest,
+  getFriendRequests,
+  getFriends,
+  removeFriend,
+  respondFriendRequest,
+  sendFriendRequest,
+} from '../services/api';
+import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
+import { useAuthStore } from './useAuthStore';
+import { useLeaderboardStore } from './useLeaderboardStore';
+import { trackAnalyticsEvent } from '../services/analytics';
+
+interface SocialState {
+  ownerId: string | null;
+  friends: Friend[];
+  incoming: FriendRequestSummary[];
+  outgoing: FriendRequestSummary[];
+  requestsVerified: boolean;
+  loading: boolean;
+  error: string | null;
+  refresh: (userId: string) => Promise<void>;
+  refreshRequests: (userId: string) => Promise<void>;
+  sendRequest: (userId: string, playerId: string) => Promise<FriendRelationshipResponse>;
+  respondRequest: (
+    userId: string,
+    playerId: string,
+    action: 'accept' | 'decline'
+  ) => Promise<FriendRelationshipResponse>;
+  cancelRequest: (userId: string, playerId: string) => Promise<FriendRelationshipResponse>;
+  remove: (userId: string, playerId: string) => Promise<void>;
+  reset: () => void;
+}
+
+function verified(userId: string, version: number): boolean {
+  const auth = useAuthStore.getState();
+  return canProcessProtectedAction(
+    {
+      isAuthenticated: auth.isAuthenticated,
+      authStatus: auth.authStatus,
+      identityStatus: auth.identityStatus,
+      token: auth.token,
+      userId: auth.user?.sub,
+      authStateVersion: auth.authStateVersion,
+    },
+    { userId, authStateVersion: version }
+  );
+}
+
+let requestRefreshSequence = 0;
+
+export const useSocialStore = create<SocialState>((set, get) => ({
+  ownerId: null,
+  friends: [],
+  incoming: [],
+  outgoing: [],
+  requestsVerified: false,
+  loading: false,
+  error: null,
+
+  refresh: async (userId) => {
+    const version = useAuthStore.getState().authStateVersion;
+    if (!verified(userId, version)) return;
+    const requestSequence = ++requestRefreshSequence;
+    if (get().ownerId !== userId) {
+      set({ ownerId: userId, friends: [], incoming: [], outgoing: [], requestsVerified: false });
+    }
+    set({ loading: true, error: null, requestsVerified: false });
+    try {
+      const [friends, requests] = await Promise.all([
+        getFriends(userId),
+        getFriendRequests(userId),
+      ]);
+      if (!verified(userId, version)) return;
+      const requestState = requestSequence === requestRefreshSequence
+        ? {
+            incoming: requests.incoming,
+            outgoing: requests.outgoing,
+            requestsVerified: true,
+          }
+        : {};
+      set({
+        ownerId: userId,
+        friends: friends.friends,
+        ...requestState,
+        loading: false,
+      });
+    } catch (error) {
+      if (!verified(userId, version)) return;
+      set({
+        loading: false,
+        ...(requestSequence === requestRefreshSequence ? { requestsVerified: false } : {}),
+        error: error instanceof Error ? error.message : 'Unable to refresh friends',
+      });
+    }
+  },
+
+  refreshRequests: async (userId) => {
+    const version = useAuthStore.getState().authStateVersion;
+    if (!verified(userId, version)) return;
+    const requestSequence = ++requestRefreshSequence;
+    if (get().ownerId !== userId) {
+      set({ ownerId: userId, friends: [], incoming: [], outgoing: [], requestsVerified: false, error: null });
+    }
+    set({ requestsVerified: false });
+    try {
+      const requests = await getFriendRequests(userId);
+      if (!verified(userId, version) || requestSequence !== requestRefreshSequence) return;
+      set({
+        ownerId: userId,
+        incoming: requests.incoming,
+        outgoing: requests.outgoing,
+        requestsVerified: true,
+      });
+    } catch {
+      // Cached rows may remain available, but notification dots require fresh proof.
+      if (verified(userId, version) && requestSequence === requestRefreshSequence) {
+        set({ requestsVerified: false });
+      }
+    }
+  },
+
+  sendRequest: async (userId, playerId) => {
+    const version = useAuthStore.getState().authStateVersion;
+    if (!verified(userId, version)) throw new Error('Your account is still syncing.');
+    const response = await sendFriendRequest(userId, playerId);
+    if (!verified(userId, version)) throw new Error('Account changed before the request completed.');
+    if (response.relationship === 'outgoing_pending' && !response.alreadyRequested) {
+      trackAnalyticsEvent('friend_request_sent', 'authenticated');
+    }
+    if (response.relationship === 'friends') {
+      if (response.reciprocalAccepted) {
+        trackAnalyticsEvent('friend_request_accepted', 'authenticated');
+      }
+      await useLeaderboardStore.getState().invalidateFriends(userId);
+    }
+    await get().refresh(userId);
+    return response;
+  },
+
+  respondRequest: async (userId, playerId, action) => {
+    const version = useAuthStore.getState().authStateVersion;
+    if (!verified(userId, version)) throw new Error('Your account is still syncing.');
+    const response = await respondFriendRequest(userId, playerId, action);
+    if (!verified(userId, version)) throw new Error('Account changed before the request completed.');
+    if (action === 'accept' && response.relationship === 'friends') {
+      trackAnalyticsEvent('friend_request_accepted', 'authenticated');
+      await useLeaderboardStore.getState().invalidateFriends(userId);
+    }
+    await get().refresh(userId);
+    return response;
+  },
+
+  cancelRequest: async (userId, playerId) => {
+    const version = useAuthStore.getState().authStateVersion;
+    if (!verified(userId, version)) throw new Error('Your account is still syncing.');
+    const response = await cancelFriendRequest(userId, playerId);
+    if (!verified(userId, version)) throw new Error('Account changed before the request completed.');
+    await get().refresh(userId);
+    return response;
+  },
+
+  remove: async (userId, playerId) => {
+    const version = useAuthStore.getState().authStateVersion;
+    if (!verified(userId, version)) throw new Error('Your account is still syncing.');
+    await removeFriend(userId, playerId);
+    if (!verified(userId, version)) throw new Error('Account changed before removal completed.');
+    await useLeaderboardStore.getState().invalidateFriends(userId);
+    await get().refresh(userId);
+  },
+
+  reset: () => {
+    requestRefreshSequence += 1;
+    set({
+      ownerId: null,
+      friends: [],
+      incoming: [],
+      outgoing: [],
+      requestsVerified: false,
+      loading: false,
+      error: null,
+    });
+  },
+}));

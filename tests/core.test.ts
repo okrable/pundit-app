@@ -37,11 +37,17 @@ import {
 } from '../shared/clientIdentityPolicy';
 import {
   canReuseFriendLink,
+  decideCancelFriendRequest,
+  decideFriendRequestResponse,
+  decideSendFriendRequest,
   decideFriendLinkAcceptance,
   decideFriendInvitePreview,
+  getFriendRelationshipState,
+  hasPendingIncomingFriendRequests,
   normalizeSocialCode,
   orderFriendshipPair,
 } from '../shared/socialPolicy';
+
 import {
   getCompatibilityPlayerName,
   LEGACY_GUEST_LABEL,
@@ -129,6 +135,7 @@ import {
   ACHIEVEMENTS,
   applyAchievementEvent,
   createEmptyAchievementSnapshot,
+  projectPublicAchievementUnlocks,
   type AchievementSnapshot,
   type DailyQuizAchievementEvent,
 } from '../shared/achievements';
@@ -145,6 +152,11 @@ import {
   isAnalyticsId,
   normalizeAnalyticsProperties,
 } from '../shared/analytics';
+import {
+  getLeaderboardCachePartitionKey,
+  getLeaderboardDateWindow,
+  parseLeaderboardPeriod,
+} from '../shared/leaderboard';
 
 function dailyAchievementEvent(
   date: string,
@@ -164,10 +176,33 @@ function dailyAchievementEvent(
   };
 }
 
+test('shows friend-request notifications only for the active account with incoming requests', () => {
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 1, requestsVerified: true,
+  }), true);
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: 'auth0|one', currentUserId: 'auth0|two', incomingCount: 3, requestsVerified: true,
+  }), false);
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 0, requestsVerified: true,
+  }), false);
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: null, currentUserId: null, incomingCount: 2, requestsVerified: true,
+  }), false);
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 2, requestsVerified: false,
+  }), false);
+});
+
 test('accepts only declared pseudonymous analytics envelope values', () => {
   assert.equal(isAnalyticsEventName('app_shell_ready'), true);
   assert.equal(isAnalyticsEventName('quiz_start_requested'), true);
   assert.equal(isAnalyticsEventName('quiz_attempt_resumed'), true);
+  assert.equal(isAnalyticsEventName('leaderboard_viewed'), true);
+  assert.equal(isAnalyticsEventName('leaderboard_filter_changed'), true);
+  assert.equal(isAnalyticsEventName('player_profile_viewed'), true);
+  assert.equal(isAnalyticsEventName('friend_request_sent'), true);
+  assert.equal(isAnalyticsEventName('friend_request_accepted'), true);
   assert.equal(isAnalyticsEventName('arbitrary_event'), false);
   assert.equal(isAnalyticsActorType('guest'), true);
   assert.equal(isAnalyticsActorType('user-123'), false);
@@ -185,6 +220,8 @@ test('normalizes fixed analytics properties without accepting free-form metadata
       totalQuestions: 5,
       score: 100,
       exitReason: 'screen_exit',
+      leaderboardScope: 'friends',
+      leaderboardPeriod: 'weekly',
     }),
     {
       quizDate: '2026-08-22',
@@ -194,12 +231,56 @@ test('normalizes fixed analytics properties without accepting free-form metadata
       totalQuestions: 5,
       score: 100,
       exitReason: 'screen_exit',
+      leaderboardScope: 'friends',
+      leaderboardPeriod: 'weekly',
     }
   );
   assert.equal(normalizeAnalyticsProperties({ username: 'liam' }), null);
   assert.equal(normalizeAnalyticsProperties({ answer: 'Player name' }), null);
   assert.equal(normalizeAnalyticsProperties({ durationMs: -1 }), null);
   assert.equal(normalizeAnalyticsProperties({ quizDate: '22-08-2026' }), null);
+  assert.equal(normalizeAnalyticsProperties({ leaderboardScope: 'private' }), null);
+  assert.equal(normalizeAnalyticsProperties({ leaderboardPeriod: 'monthly' }), null);
+});
+
+test('parses leaderboard periods with daily compatibility fallback', () => {
+  assert.equal(parseLeaderboardPeriod('weekly'), 'weekly');
+  assert.equal(parseLeaderboardPeriod('daily'), 'daily');
+  assert.equal(parseLeaderboardPeriod(undefined), 'daily');
+  assert.equal(parseLeaderboardPeriod('monthly'), 'daily');
+});
+
+test('calculates London quiz-date leaderboard windows across boundaries', () => {
+  assert.deepEqual(getLeaderboardDateWindow('2026-08-24', 'weekly'), {
+    quizDate: '2026-08-24',
+    previousQuizDate: '2026-08-23',
+    periodStart: '2026-08-24',
+    periodEnd: '2026-08-30',
+  });
+  assert.deepEqual(getLeaderboardDateWindow('2026-08-30', 'weekly'), {
+    quizDate: '2026-08-30',
+    previousQuizDate: '2026-08-29',
+    periodStart: '2026-08-24',
+    periodEnd: '2026-08-30',
+  });
+  assert.equal(getLeaderboardDateWindow('2027-01-01', 'weekly').periodStart, '2026-12-28');
+  assert.equal(getLeaderboardDateWindow('2027-01-01', 'weekly').periodEnd, '2027-01-03');
+  assert.equal(getLeaderboardDateWindow('2026-03-01', 'weekly').periodStart, '2026-02-23');
+});
+
+test('partitions leaderboard caches by scope, period, anchor, and account', () => {
+  assert.equal(
+    getLeaderboardCachePartitionKey('global', 'daily', '2026-08-24'),
+    'leaderboard_global_daily_2026-08-24_public'
+  );
+  assert.notEqual(
+    getLeaderboardCachePartitionKey('friends', 'weekly', '2026-08-24', 'user-a'),
+    getLeaderboardCachePartitionKey('friends', 'weekly', '2026-08-24', 'user-b')
+  );
+  assert.notEqual(
+    getLeaderboardCachePartitionKey('friends', 'weekly', '2026-08-24', 'user-a'),
+    getLeaderboardCachePartitionKey('friends', 'weekly', '2026-08-31', 'user-a')
+  );
 });
 
 test('defines the complete achievement catalogue', () => {
@@ -1680,6 +1761,102 @@ test('orders mutual friendships and reuses only active reusable links', () => {
     }),
     'inviter_unavailable'
   );
+});
+
+test('resolves every public profile relationship without exposing request internals', () => {
+  assert.equal(getFriendRelationshipState({
+    viewerId: null,
+    playerId: 'player-b',
+    alreadyFriends: false,
+    pendingSenderId: null,
+  }), 'guest');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-a',
+    alreadyFriends: false,
+    pendingSenderId: null,
+  }), 'self');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-b',
+    alreadyFriends: false,
+    pendingSenderId: null,
+  }), 'none');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-b',
+    alreadyFriends: false,
+    pendingSenderId: 'player-a',
+  }), 'outgoing_pending');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-b',
+    alreadyFriends: false,
+    pendingSenderId: 'player-b',
+  }), 'incoming_pending');
+  assert.equal(getFriendRelationshipState({
+    viewerId: 'player-a',
+    playerId: 'player-b',
+    alreadyFriends: true,
+    pendingSenderId: 'player-b',
+  }), 'friends');
+});
+
+test('friend request sends are idempotent and reciprocal sends become friendships', () => {
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-a', alreadyFriends: false, pendingSenderId: null,
+  }), 'self');
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-b', alreadyFriends: true, pendingSenderId: null,
+  }), 'already_friends');
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-b', alreadyFriends: false, pendingSenderId: null,
+  }), 'create_request');
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-b', alreadyFriends: false, pendingSenderId: 'player-a',
+  }), 'already_requested');
+  assert.equal(decideSendFriendRequest({
+    senderId: 'player-a', recipientId: 'player-b', alreadyFriends: false, pendingSenderId: 'player-b',
+  }), 'accept_reciprocal');
+});
+
+test('friend request responses and cancellations enforce sender ownership idempotently', () => {
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-b', pendingSenderId: 'player-a', alreadyFriends: false, action: 'accept',
+  }), 'accept');
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-b', pendingSenderId: 'player-a', alreadyFriends: false, action: 'decline',
+  }), 'decline');
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-a', pendingSenderId: 'player-a', alreadyFriends: false, action: 'accept',
+  }), 'forbidden');
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-b', pendingSenderId: null, alreadyFriends: false, action: 'accept',
+  }), 'already_handled');
+  assert.equal(decideFriendRequestResponse({
+    responderId: 'player-b', pendingSenderId: 'player-a', alreadyFriends: true, action: 'accept',
+  }), 'already_friends');
+  assert.equal(decideCancelFriendRequest({ senderId: 'player-a', pendingSenderId: 'player-a' }), 'cancel');
+  assert.equal(decideCancelFriendRequest({ senderId: 'player-b', pendingSenderId: 'player-a' }), 'forbidden');
+  assert.equal(decideCancelFriendRequest({ senderId: 'player-a', pendingSenderId: null }), 'already_handled');
+});
+
+test('public achievement projection keeps earned IDs and dates only', () => {
+  const projected = projectPublicAchievementUnlocks([
+    {
+      achievementId: 'debut',
+      unlockedAt: '2026-08-24T12:00:00.000Z',
+      sourceEventId: 'private-event',
+      progress: 30,
+    },
+    { achievementId: 'not-real', unlockedAt: '2026-08-24T13:00:00.000Z' },
+  ]);
+  assert.deepEqual(projected, [{
+    id: 'debut',
+    unlockedAt: '2026-08-24T12:00:00.000Z',
+  }]);
+  assert.equal('sourceEventId' in projected[0], false);
+  assert.equal('progress' in projected[0], false);
 });
 
 test('uses current challenge usernames and labels legacy guest history', () => {
