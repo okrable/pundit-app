@@ -22,6 +22,7 @@ interface SocialState {
   friends: Friend[];
   incoming: FriendRequestSummary[];
   outgoing: FriendRequestSummary[];
+  requestsVerified: boolean;
   loading: boolean;
   error: string | null;
   refresh: (userId: string) => Promise<void>;
@@ -52,38 +53,49 @@ function verified(userId: string, version: number): boolean {
   );
 }
 
+let requestRefreshSequence = 0;
+
 export const useSocialStore = create<SocialState>((set, get) => ({
   ownerId: null,
   friends: [],
   incoming: [],
   outgoing: [],
+  requestsVerified: false,
   loading: false,
   error: null,
 
   refresh: async (userId) => {
     const version = useAuthStore.getState().authStateVersion;
     if (!verified(userId, version)) return;
+    const requestSequence = ++requestRefreshSequence;
     if (get().ownerId !== userId) {
-      set({ ownerId: userId, friends: [], incoming: [], outgoing: [] });
+      set({ ownerId: userId, friends: [], incoming: [], outgoing: [], requestsVerified: false });
     }
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, requestsVerified: false });
     try {
       const [friends, requests] = await Promise.all([
         getFriends(userId),
         getFriendRequests(userId),
       ]);
       if (!verified(userId, version)) return;
+      const requestState = requestSequence === requestRefreshSequence
+        ? {
+            incoming: requests.incoming,
+            outgoing: requests.outgoing,
+            requestsVerified: true,
+          }
+        : {};
       set({
         ownerId: userId,
         friends: friends.friends,
-        incoming: requests.incoming,
-        outgoing: requests.outgoing,
+        ...requestState,
         loading: false,
       });
     } catch (error) {
       if (!verified(userId, version)) return;
       set({
         loading: false,
+        ...(requestSequence === requestRefreshSequence ? { requestsVerified: false } : {}),
         error: error instanceof Error ? error.message : 'Unable to refresh friends',
       });
     }
@@ -92,19 +104,25 @@ export const useSocialStore = create<SocialState>((set, get) => ({
   refreshRequests: async (userId) => {
     const version = useAuthStore.getState().authStateVersion;
     if (!verified(userId, version)) return;
+    const requestSequence = ++requestRefreshSequence;
     if (get().ownerId !== userId) {
-      set({ ownerId: userId, friends: [], incoming: [], outgoing: [], error: null });
+      set({ ownerId: userId, friends: [], incoming: [], outgoing: [], requestsVerified: false, error: null });
     }
+    set({ requestsVerified: false });
     try {
       const requests = await getFriendRequests(userId);
-      if (!verified(userId, version)) return;
+      if (!verified(userId, version) || requestSequence !== requestRefreshSequence) return;
       set({
         ownerId: userId,
         incoming: requests.incoming,
         outgoing: requests.outgoing,
+        requestsVerified: true,
       });
     } catch {
-      // Keep the last known request state visible until a later refresh succeeds.
+      // Cached rows may remain available, but notification dots require fresh proof.
+      if (verified(userId, version) && requestSequence === requestRefreshSequence) {
+        set({ requestsVerified: false });
+      }
     }
   },
 
@@ -157,12 +175,16 @@ export const useSocialStore = create<SocialState>((set, get) => ({
     await get().refresh(userId);
   },
 
-  reset: () => set({
-    ownerId: null,
-    friends: [],
-    incoming: [],
-    outgoing: [],
-    loading: false,
-    error: null,
-  }),
+  reset: () => {
+    requestRefreshSequence += 1;
+    set({
+      ownerId: null,
+      friends: [],
+      incoming: [],
+      outgoing: [],
+      requestsVerified: false,
+      loading: false,
+      error: null,
+    });
+  },
 }));

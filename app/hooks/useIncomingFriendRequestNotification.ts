@@ -9,5 +9,6 @@ export default function useIncomingFriendRequestNotification(): boolean {
     ownerId: state.ownerId,
     currentUserId,
     incomingCount: state.incoming.length,
+    requestsVerified: state.requestsVerified,
   }));
 }

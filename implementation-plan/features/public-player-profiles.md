@@ -27,4 +27,6 @@ unresolved incoming requests appear as a plain red dot on the League Tables
 navigation destination and Add Friends action. The web hamburger and Friends
 sheet title remain unbadged. Request state refreshes after verified login,
 foreground resume, League Tables focus, and social mutations, while friendship
-changes clear both Daily and Weekly Friends caches.
+changes clear both Daily and Weekly Friends caches. Notification dots require a
+successful current-account request refresh and disappear whenever that state is
+uncertain or a refresh fails.

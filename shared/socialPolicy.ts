@@ -18,9 +18,11 @@ export function hasPendingIncomingFriendRequests(input: {
   ownerId: string | null;
   currentUserId?: string | null;
   incomingCount: number;
+  requestsVerified: boolean;
 }): boolean {
   return Boolean(
-    input.currentUserId
+    input.requestsVerified
+      && input.currentUserId
       && input.ownerId === input.currentUserId
       && input.incomingCount > 0
   );

@@ -178,16 +178,19 @@ function dailyAchievementEvent(
 
 test('shows friend-request notifications only for the active account with incoming requests', () => {
   assert.equal(hasPendingIncomingFriendRequests({
-    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 1,
+    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 1, requestsVerified: true,
   }), true);
   assert.equal(hasPendingIncomingFriendRequests({
-    ownerId: 'auth0|one', currentUserId: 'auth0|two', incomingCount: 3,
+    ownerId: 'auth0|one', currentUserId: 'auth0|two', incomingCount: 3, requestsVerified: true,
   }), false);
   assert.equal(hasPendingIncomingFriendRequests({
-    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 0,
+    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 0, requestsVerified: true,
   }), false);
   assert.equal(hasPendingIncomingFriendRequests({
-    ownerId: null, currentUserId: null, incomingCount: 2,
+    ownerId: null, currentUserId: null, incomingCount: 2, requestsVerified: true,
+  }), false);
+  assert.equal(hasPendingIncomingFriendRequests({
+    ownerId: 'auth0|one', currentUserId: 'auth0|one', incomingCount: 2, requestsVerified: false,
   }), false);
 });
 
