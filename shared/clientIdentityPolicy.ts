@@ -59,10 +59,12 @@ export function shouldShowUsernameOnboarding(
 export function shouldShowIdentitySync(
   isAuthenticated: boolean,
   identityStatus: ClientIdentityStatus,
-  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed'
+  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed',
+  restoredShellEligible = false
 ): boolean {
   return (
     isAuthenticated &&
+    !restoredShellEligible &&
     authSyncStatus !== 'failed' &&
     (identityStatus === 'unknown' ||
       identityStatus === 'syncing' ||
@@ -73,17 +75,54 @@ export function shouldShowIdentitySync(
 export function shouldShowIdentityFailure(
   isAuthenticated: boolean,
   identityStatus: ClientIdentityStatus,
-  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed'
+  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed',
+  restoredShellEligible = false
 ): boolean {
   return (
     isAuthenticated &&
+    !restoredShellEligible &&
     (identityStatus === 'failed' || authSyncStatus === 'failed')
   );
 }
 
-export function canProcessProtectedAction(
-  isAuthenticated: boolean,
-  identityStatus: ClientIdentityStatus
+export function shouldResumeAuthenticatedReconciliation(
+  identityStatus: ClientIdentityStatus,
+  authSyncStatus: 'idle' | 'syncing' | 'ready' | 'failed'
 ): boolean {
-  return isAuthenticated && identityStatus === 'complete';
+  return identityStatus === 'complete' && authSyncStatus === 'failed';
+}
+
+export function shouldFailIdentityAfterActivationError(
+  verifiedIdentityReady: boolean
+): boolean {
+  return !verifiedIdentityReady;
+}
+
+export interface VerifiedSessionState {
+  isAuthenticated: boolean;
+  authStatus: 'anonymous' | 'restoring' | 'authenticated' | 'reauthRequired';
+  identityStatus: ClientIdentityStatus;
+  token?: string | null;
+  userId?: string | null;
+  authStateVersion: number;
+}
+
+export interface VerifiedSessionExpectation {
+  userId: string;
+  authStateVersion?: number;
+}
+
+export function canProcessProtectedAction(
+  current: VerifiedSessionState,
+  expected: VerifiedSessionExpectation
+): boolean {
+  return (
+    current.isAuthenticated &&
+    current.authStatus === 'authenticated' &&
+    current.identityStatus === 'complete' &&
+    Boolean(current.token) &&
+    current.userId === expected.userId &&
+    (expected.authStateVersion === undefined ||
+      current.authStateVersion === expected.authStateVersion)
+  );
 }

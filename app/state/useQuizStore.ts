@@ -47,6 +47,11 @@ import {
 import { isQuizForDate } from '../../shared/dailyQuiz';
 import type { DailyQuizAchievementEvent } from '../../shared/achievements';
 import { useAchievementStore } from './useAchievementStore';
+import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
+
+interface ReconcileIdentityOptions {
+  holdInteractiveHandoff?: boolean;
+}
 
 interface QuizState {
   quiz: Quiz | null;
@@ -64,7 +69,11 @@ interface QuizState {
   hydrateFromCache: (userId: string, date?: string) => Promise<void>;
   fetchQuiz: (date?: string, options?: { force?: boolean }) => Promise<Quiz | null>;
   setCachedResult: (result: CachedQuizResult | null) => void;
-  reconcileIdentity: (userId: string, userProfile?: UserProfile) => Promise<void>;
+  reconcileIdentity: (
+    userId: string,
+    userProfile?: UserProfile,
+    options?: ReconcileIdentityOptions
+  ) => Promise<void>;
   completeQuiz: (answers: AnswerWithTiming[]) => Promise<void>;
   createLocalResult: (answers: AnswerWithTiming[]) => Promise<QuizResultImmediate | null>;
   submitQuizAnswers: (
@@ -92,8 +101,23 @@ function buildUserProfile(): UserProfile | undefined {
   };
 }
 
-let inflightIdentityReconciliation: Promise<void> | null = null;
-let lastIdentityReconciliationKey: string | null = null;
+function hasVerifiedQuizSession(userId: string, authStateVersion?: number): boolean {
+  const authState = useAuthStore.getState();
+  return canProcessProtectedAction(
+    {
+      isAuthenticated: authState.isAuthenticated,
+      authStatus: authState.authStatus,
+      identityStatus: authState.identityStatus,
+      token: authState.token,
+      userId: authState.user?.sub,
+      authStateVersion: authState.authStateVersion,
+    },
+    { userId, authStateVersion }
+  );
+}
+
+const inflightIdentityReconciliations = new Map<string, Promise<void>>();
+const completedIdentityReconciliations = new Set<string>();
 let latestQuizFetchRequest = 0;
 const SUBMISSION_RETRY_DELAY_MS = 750;
 
@@ -149,6 +173,11 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         responseDate: quizCache?.data.date,
       });
       return get().hydrateFromCache(userId, currentDate);
+    }
+
+    if (get().userId !== userId) {
+      logWarn('quiz.cache.hydrate.discarded_identity_change', { userId, targetDate });
+      return;
     }
 
     set({
@@ -325,41 +354,64 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
   setCachedResult: (cachedResult: CachedQuizResult | null) => set({ cachedResult }),
 
-  reconcileIdentity: async (userId: string, userProfile?: UserProfile) => {
+  reconcileIdentity: async (
+    userId: string,
+    userProfile?: UserProfile,
+    options?: ReconcileIdentityOptions
+  ) => {
     if (!userId || userId.startsWith('guest_')) {
       return;
     }
 
-    const reconciliationKey = `${userId}:${getQuizDate()}:${useAuthStore.getState().authStateVersion}`;
-    if (lastIdentityReconciliationKey === reconciliationKey) {
+    const authStateVersion = useAuthStore.getState().authStateVersion;
+    const reconciliationKey = `${userId}:${getQuizDate()}:${authStateVersion}`;
+    if (completedIdentityReconciliations.has(reconciliationKey)) {
       logInfo('quiz.identity.reconcile.skip_already_done', { userId });
       return;
     }
 
-    if (inflightIdentityReconciliation) {
-      return inflightIdentityReconciliation;
-    }
+    const existingReconciliation = inflightIdentityReconciliations.get(reconciliationKey);
+    if (existingReconciliation) return existingReconciliation;
 
+    const assertCurrent = () => {
+      const currentAuthState = useAuthStore.getState();
+      if (
+        !canProcessProtectedAction(
+          {
+            isAuthenticated: currentAuthState.isAuthenticated,
+            authStatus: currentAuthState.authStatus,
+            identityStatus: currentAuthState.identityStatus,
+            token: currentAuthState.token,
+            userId: currentAuthState.user?.sub,
+            authStateVersion: currentAuthState.authStateVersion,
+          },
+          { userId, authStateVersion }
+        )
+      ) {
+        throw new Error('Authenticated session changed during quiz reconciliation');
+      }
+    };
+
+    assertCurrent();
     const startedAt = Date.now();
     logInfo('quiz.identity.reconcile.start', { userId });
-    lastIdentityReconciliationKey = reconciliationKey;
     set({
       userId,
       isReconcilingIdentity: true,
-      result: null,
       submitError: null,
       isSubmitting: false,
     });
 
-    inflightIdentityReconciliation = (async () => {
+    const reconciliation = (async () => {
       try {
         const localResult = await getTodayQuizResult(userId);
         if (localResult) {
+          assertCurrent();
           await clearGuestCache();
           await useProfileStore.getState().markPlayedToday(localResult, userId);
+          assertCurrent();
           set({
             cachedResult: localResult,
-            result: null,
             userId,
             quizError: null,
             submitError: null,
@@ -371,13 +423,14 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         try {
           const serverResult = await getTodayResult(userId);
           if (serverResult) {
+            assertCurrent();
             await saveDailyQuizResult(serverResult, userId, serverResult.syncState);
             const cachedServerResult = await getTodayQuizResult(userId);
             await clearGuestCache();
             await useProfileStore.getState().markPlayedToday(serverResult, userId);
+            assertCurrent();
             set({
               cachedResult: cachedServerResult,
-              result: null,
               userId,
               quizError: null,
               submitError: null,
@@ -387,9 +440,11 @@ export const useQuizStore = create<QuizState>((set, get) => ({
           }
         } catch (error) {
           logError('quiz.identity.reconcile.server_result.error', error);
+          throw error;
         }
 
         const guestResult = await getGuestTodayResult();
+        assertCurrent();
         const reconciliationSource = chooseReconciliationSource({
           hasLocalResult: false,
           hasServerResult: false,
@@ -398,7 +453,6 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         if (reconciliationSource === 'none' || !guestResult) {
           set({
             cachedResult: null,
-            result: null,
             userId,
             quizError: null,
             submitError: null,
@@ -427,6 +481,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
           guestAchievementEvent,
           guestAchievementSync
         );
+        assertCurrent();
 
         if (migrationResult.achievementSnapshot) {
           await useAchievementStore.getState().reconcileServer(
@@ -442,14 +497,15 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
         if (!migrationResult.migrated) {
           const existingResult = await getTodayResult(userId);
+          assertCurrent();
           if (existingResult) {
             await saveDailyQuizResult(existingResult, userId, existingResult.syncState);
             const cachedExistingResult = await getTodayQuizResult(userId);
             await clearGuestCache();
             await useProfileStore.getState().markPlayedToday(existingResult, userId);
+            assertCurrent();
             set({
               cachedResult: cachedExistingResult,
-              result: null,
               userId,
               quizError: null,
               submitError: null,
@@ -460,7 +516,6 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
           set({
             cachedResult: null,
-            result: null,
             userId,
             submitError: migrationResult.message ?? null,
           });
@@ -484,10 +539,10 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         const cachedMigratedResult = await getTodayQuizResult(userId);
         await clearGuestCache();
         await useProfileStore.getState().markPlayedToday(migratedResult, userId);
+        assertCurrent();
         void useLeaderboardStore.getState().prefetchDailyLoop(userId, true, { force: true });
         set({
           cachedResult: cachedMigratedResult ?? migratedResult,
-          result: null,
           userId,
           quizError: null,
           submitError: null,
@@ -498,21 +553,28 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         });
       } catch (error) {
         logError('quiz.identity.reconcile.error', error);
-        set({
-          cachedResult: null,
-          result: null,
-          userId,
-          submitError: error instanceof Error ? error.message : 'Failed to sync your play',
-        });
+        if (useAuthStore.getState().authStateVersion === authStateVersion) {
+          set({
+            submitError: error instanceof Error ? error.message : 'Failed to sync your play',
+          });
+        }
+        throw error;
       } finally {
-        await holdInterstitial(startedAt);
-        set({ isReconcilingIdentity: false });
-        inflightIdentityReconciliation = null;
+        if (options?.holdInteractiveHandoff) await holdInterstitial(startedAt);
+        if (useAuthStore.getState().authStateVersion === authStateVersion) {
+          set({ isReconcilingIdentity: false });
+        }
+        inflightIdentityReconciliations.delete(reconciliationKey);
         logInfo('quiz.identity.reconcile.end', { userId });
       }
     })();
 
-    return inflightIdentityReconciliation;
+    void reconciliation.then(
+      () => completedIdentityReconciliations.add(reconciliationKey),
+      () => undefined
+    );
+    inflightIdentityReconciliations.set(reconciliationKey, reconciliation);
+    return reconciliation;
   },
 
   createLocalResult: async (answers: AnswerWithTiming[]) => {
@@ -652,6 +714,15 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       return;
     }
 
+    if (!hasVerifiedQuizSession(originatingUserId)) {
+      logInfo('quiz.submit.deferred_until_verified', {
+        userId: originatingUserId,
+        quizId: localResult.quizId,
+      });
+      set({ isSubmitting: false, submitError: null });
+      return;
+    }
+
     await get().submitQuizAnswers(answers, undefined, {
       quizId: localResult.quizId,
       localResult,
@@ -689,6 +760,13 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       return;
     }
 
+    const submissionAuthStateVersion = useAuthStore.getState().authStateVersion;
+    if (!hasVerifiedQuizSession(userId, submissionAuthStateVersion)) {
+      logInfo('quiz.submit.deferred_until_verified', { userId, quizId: submittedQuizId });
+      set({ isSubmitting: false, submitError: null });
+      return;
+    }
+
     logInfo('quiz.submit.start', {
       userId,
       quizId: submittedQuizId,
@@ -698,15 +776,14 @@ export const useQuizStore = create<QuizState>((set, get) => ({
 
     const profile = userProfile ?? buildUserProfile();
     let finalError: unknown = null;
+    let sessionChanged = false;
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
-      const currentAuthState = useAuthStore.getState();
       if (
         get().userId !== userId ||
-        !currentAuthState.isAuthenticated ||
-        currentAuthState.user?.sub !== userId ||
-        !currentAuthState.token
+        !hasVerifiedQuizSession(userId, submissionAuthStateVersion)
       ) {
+        sessionChanged = true;
         finalError = new Error('Authenticated session changed during quiz submission');
         logWarn('quiz.submit.discarded_stale_before_attempt', {
           userId,
@@ -731,6 +808,13 @@ export const useQuizStore = create<QuizState>((set, get) => ({
           profile,
           achievementSync
         );
+        if (
+          get().userId !== userId ||
+          !hasVerifiedQuizSession(userId, submissionAuthStateVersion)
+        ) {
+          sessionChanged = true;
+          throw new Error('Authenticated session changed during quiz submission');
+        }
         const mergedResult: QuizResultImmediate = {
           ...serverResult,
           achievementEvent,
@@ -806,7 +890,9 @@ export const useQuizStore = create<QuizState>((set, get) => ({
             ? (error as { statusCode?: number }).statusCode
             : undefined;
         const shouldRetry =
-          attempt === 1 && isTransientQuizSubmissionFailure(statusCode);
+          !sessionChanged &&
+          attempt === 1 &&
+          isTransientQuizSubmissionFailure(statusCode);
 
         logError('quiz.submit.error', {
           name: error instanceof Error ? error.name : 'UnknownError',
@@ -830,6 +916,12 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         });
         await new Promise((resolve) => setTimeout(resolve, SUBMISSION_RETRY_DELAY_MS));
       }
+    }
+
+    if (sessionChanged) {
+      if (get().userId === userId) set({ isSubmitting: false, submitError: null });
+      logWarn('quiz.submit.deferred_after_session_change', { userId, quizId: submittedQuizId });
+      return;
     }
 
     const failedResult = submissionLocalResult
@@ -896,11 +988,16 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   },
 
   retryPendingSubmission: async () => {
-    const pending = await getPendingQuizSubmission();
     const { userId } = get();
+    const pending = userId ? await getPendingQuizSubmission(userId) : null;
 
     if (!pending || !userId || pending.userId !== userId) {
       logInfo('quiz.submit.retry.none', { userId, hasPending: Boolean(pending) });
+      return;
+    }
+
+    if (!hasVerifiedQuizSession(userId)) {
+      logInfo('quiz.submit.retry.waiting_for_verified_session', { userId });
       return;
     }
 

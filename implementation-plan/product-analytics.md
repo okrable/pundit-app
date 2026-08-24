@@ -10,8 +10,11 @@ gate Release 1.
 
 ## Event Contract
 
-- `app_ready`, `today_viewed`, `quiz_start_requested`, and
-  `quiz_first_question_ready` measure discovery and readiness.
+- `app_shell_ready` measures first usable cached presentation, while `app_ready`
+  remains the full restoration/reconciliation milestone used by the Release 0
+  comparison. Guests normally emit both together.
+- `today_viewed`, `quiz_start_requested`, and `quiz_first_question_ready`
+  measure discovery and gameplay readiness.
 - `quiz_started`, `quiz_question_answered`, `quiz_abandoned`, and
   `quiz_completed` measure the ranked funnel.
 - `quiz_recap_viewed` and `quiz_shared` measure the result loop.
@@ -35,6 +38,11 @@ invite codes.
 5. After the smoke test is stable, proceed to Release 1 without waiting for a
    fixed number of days. Keep `db/queries/analytics_baseline.sql` for future
    retention reporting once cohorts are large enough to be credible.
+
+For v2.11 startup evaluation, the baseline query reports `app_shell_ready` and
+`app_ready` p50/p75 by actor type, platform, and app version. The event is an
+additive tracking-version 1 event and carries only the existing typed duration
+and source fields.
 
 ## Privacy and Retention
 

@@ -24,6 +24,7 @@ import { formatPublicPlayerName } from '../utils/publicIdentity';
 import { formatStreakLabel } from '../../shared/streak';
 import { normalizeSharedCode, resolveSharedCode } from '../services/sharedCode';
 import { useSharedLinkFlow } from '../context/SharedLinkContext';
+import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
 
 interface ManageFriendsModalProps {
   visible: boolean;
@@ -36,7 +37,28 @@ export default function ManageFriendsModal({
   onClose,
   onFriendsChanged,
 }: ManageFriendsModalProps) {
-  const { user } = useAuthStore();
+  const {
+    user,
+    token,
+    isAuthenticated,
+    authStatus,
+    identityStatus,
+    authStateVersion,
+  } = useAuthStore();
+  const hasVerifiedSession = Boolean(
+    user?.sub &&
+      canProcessProtectedAction(
+        {
+          isAuthenticated,
+          authStatus,
+          identityStatus,
+          token,
+          userId: user.sub,
+          authStateVersion,
+        },
+        { userId: user.sub, authStateVersion }
+      )
+  );
   const { openSharedAction } = useSharedLinkFlow();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,10 +74,29 @@ export default function ManageFriendsModal({
   const [shareUrl, setShareUrl] = useState('');
 
   const loadFriends = useCallback(async () => {
-    if (!user?.sub) return;
+    if (!user?.sub || !hasVerifiedSession) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
+    const expectedAuthStateVersion = authStateVersion;
     try {
       const response = await getFriends(user.sub);
+      const latestAuthState = useAuthStore.getState();
+      if (
+        !canProcessProtectedAction(
+          {
+            isAuthenticated: latestAuthState.isAuthenticated,
+            authStatus: latestAuthState.authStatus,
+            identityStatus: latestAuthState.identityStatus,
+            token: latestAuthState.token,
+            userId: latestAuthState.user?.sub,
+            authStateVersion: latestAuthState.authStateVersion,
+          },
+          { userId: user.sub, authStateVersion: expectedAuthStateVersion }
+        )
+      ) return;
       setFriends(response.friends);
     } catch (error) {
       console.error('Error loading friends:', error);
@@ -63,7 +104,7 @@ export default function ManageFriendsModal({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.sub]);
+  }, [authStateVersion, hasVerifiedSession, user?.sub]);
 
   useEffect(() => {
     if (visible && user?.sub) {
@@ -78,11 +119,13 @@ export default function ManageFriendsModal({
   };
 
   const handleGenerateLink = async () => {
-    if (!user?.sub) return;
+    if (!user?.sub || !hasVerifiedSession) return;
 
+    const expectedAuthStateVersion = authStateVersion;
     setGeneratingLink(true);
     try {
       const response = await createFriendLink(user.sub);
+      if (useAuthStore.getState().authStateVersion !== expectedAuthStateVersion) return;
       setShareCode(response.code);
       setShareUrl(response.shareUrl);
       setShowShareModal(true);
@@ -138,11 +181,13 @@ export default function ManageFriendsModal({
   };
 
   const confirmRemoveFriend = async (friendId: string) => {
-    if (!user?.sub) return;
+    if (!user?.sub || !hasVerifiedSession) return;
 
+    const expectedAuthStateVersion = authStateVersion;
     setRemovingFriendId(friendId);
     try {
       await removeFriend(user.sub, friendId);
+      if (useAuthStore.getState().authStateVersion !== expectedAuthStateVersion) return;
       setFriends((prev) => prev.filter((f) => f.id !== friendId));
       onFriendsChanged?.();
     } catch (error) {
@@ -169,9 +214,9 @@ export default function ManageFriendsModal({
         <Text style={styles.friendStats}>{formatStreakLabel(item.streak)}</Text>
       </View>
       <TouchableOpacity
-        style={styles.removeButton}
+        style={[styles.removeButton, !hasVerifiedSession && styles.buttonDisabled]}
         onPress={() => handleRemoveFriend(item)}
-        disabled={removingFriendId === item.id}
+        disabled={!hasVerifiedSession || removingFriendId === item.id}
       >
         {removingFriendId === item.id ? (
           <ActivityIndicator size="small" color={theme.colors.incorrect} />
@@ -215,9 +260,9 @@ export default function ManageFriendsModal({
             Share your invite link or enter a code someone sent you.
           </Text>
           <TouchableOpacity
-            style={styles.inviteButton}
+            style={[styles.inviteButton, !hasVerifiedSession && styles.buttonDisabled]}
             onPress={handleGenerateLink}
-            disabled={generatingLink}
+            disabled={!hasVerifiedSession || generatingLink}
           >
             {generatingLink ? (
               <ActivityIndicator size="small" color={theme.colors.white} />

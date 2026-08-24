@@ -53,6 +53,22 @@ FROM retention;
 
 SELECT
   event_name,
+  actor_type,
+  platform,
+  app_version,
+  percentile_disc(0.50) WITHIN GROUP (ORDER BY duration_ms) AS p50_duration_ms,
+  percentile_disc(0.75) WITHIN GROUP (ORDER BY duration_ms) AS p75_duration_ms,
+  count(*) AS samples
+FROM analytics_events
+WHERE app_environment = 'production'
+  AND event_name IN ('app_shell_ready', 'app_ready')
+  AND duration_ms IS NOT NULL
+  AND occurred_at >= now() - INTERVAL '7 days'
+GROUP BY event_name, actor_type, platform, app_version
+ORDER BY app_version DESC, actor_type, platform, event_name;
+
+SELECT
+  event_name,
   platform,
   percentile_disc(0.75) WITHIN GROUP (ORDER BY duration_ms) AS p75_duration_ms,
   count(*) AS samples

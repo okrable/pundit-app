@@ -18,6 +18,7 @@ import { ResponsiveAppShell } from './app/components/ResponsiveLayout';
 import UsernameOnboardingScreen from './app/components/UsernameOnboardingScreen';
 import AuthSyncScreen from './app/components/AuthSyncScreen';
 import AuthSyncFailureScreen from './app/components/AuthSyncFailureScreen';
+import AccountSyncBanner from './app/components/AccountSyncBanner';
 import AchievementRevealHost from './app/components/AchievementRevealHost';
 import { useAuthStore } from './app/state/useAuthStore';
 import {
@@ -164,7 +165,12 @@ function AppContent() {
 }
 
 function ReadyApp() {
-  const { isAuthenticated, identityStatus, authSyncStatus } = useAuthStore();
+  const {
+    isAuthenticated,
+    identityStatus,
+    authSyncStatus,
+    restoredShellEligible,
+  } = useAuthStore();
 
   if (shouldShowUsernameOnboarding(isAuthenticated, identityStatus)) {
     return <UsernameOnboardingScreen />;
@@ -174,27 +180,51 @@ function ReadyApp() {
     shouldShowIdentityFailure(
       isAuthenticated,
       identityStatus,
-      authSyncStatus
+      authSyncStatus,
+      restoredShellEligible
     )
   ) {
     return <AuthSyncFailureScreen />;
   }
 
-  if (shouldShowIdentitySync(isAuthenticated, identityStatus, authSyncStatus)) {
+  if (
+    shouldShowIdentitySync(
+      isAuthenticated,
+      identityStatus,
+      authSyncStatus,
+      restoredShellEligible
+    )
+  ) {
     return <AuthSyncScreen />;
   }
 
+  const showBackgroundSyncFailure =
+    restoredShellEligible &&
+    (identityStatus === 'failed' || authSyncStatus === 'failed');
+
   return (
-    <NavigationContainer ref={navigationRef}>
-      <AppContent />
-    </NavigationContainer>
+    <View style={styles.readyAppContainer}>
+      {showBackgroundSyncFailure ? <AccountSyncBanner /> : null}
+      <NavigationContainer ref={navigationRef}>
+        <AppContent />
+      </NavigationContainer>
+    </View>
   );
 }
 
 export default function App() {
   const fontsLoaded = useFonts();
-  const authReady = useAuthInit();
-  const appReady = useAppBootstrap(authReady);
+  const { localAuthReady, restoreSettled } = useAuthInit();
+  const shellReady = useAppBootstrap(localAuthReady);
+  const { isAuthenticated, authStatus, identityStatus, authSyncStatus } = useAuthStore();
+  const fullAppReady =
+    restoreSettled &&
+    shellReady &&
+    (!isAuthenticated ||
+      (authStatus === 'authenticated' &&
+        identityStatus === 'complete' &&
+        authSyncStatus === 'ready'));
+  const shellReadyEventSent = React.useRef(false);
   const readyEventSent = React.useRef(false);
 
   React.useEffect(() => {
@@ -213,7 +243,7 @@ export default function App() {
       previousHandler?.(error, isFatal);
     });
 
-    logInfo('app.render.state', { fontsLoaded, authReady, appReady });
+    logInfo('app.render.state', { fontsLoaded, localAuthReady, restoreSettled, shellReady, fullAppReady });
 
     return () => {
       if (previousHandler && globalErrorUtils?.setGlobalHandler) {
@@ -223,11 +253,22 @@ export default function App() {
   }, []);
 
   React.useEffect(() => {
-    logInfo('app.render.state', { fontsLoaded, authReady, appReady });
-  }, [fontsLoaded, authReady, appReady]);
+    logInfo('app.render.state', { fontsLoaded, localAuthReady, restoreSettled, shellReady, fullAppReady });
+  }, [fontsLoaded, fullAppReady, localAuthReady, restoreSettled, shellReady]);
 
   React.useEffect(() => {
-    if (!fontsLoaded || !authReady || !appReady || readyEventSent.current) return;
+    if (!fontsLoaded || !localAuthReady || !shellReady || shellReadyEventSent.current) return;
+    shellReadyEventSent.current = true;
+    const authState = useAuthStore.getState();
+    trackAnalyticsEvent(
+      'app_shell_ready',
+      authState.isAuthenticated ? 'authenticated' : 'guest',
+      { durationMs: getAppLaunchDuration(), source: 'cache' }
+    );
+  }, [fontsLoaded, localAuthReady, shellReady]);
+
+  React.useEffect(() => {
+    if (!fontsLoaded || !fullAppReady || readyEventSent.current) return;
     readyEventSent.current = true;
     const authState = useAuthStore.getState();
     trackAnalyticsEvent(
@@ -235,9 +276,9 @@ export default function App() {
       authState.isAuthenticated ? 'authenticated' : 'guest',
       { durationMs: getAppLaunchDuration(), source: 'unknown' }
     );
-  }, [appReady, authReady, fontsLoaded]);
+  }, [fontsLoaded, fullAppReady]);
 
-  if (!fontsLoaded || !authReady || !appReady) {
+  if (!fontsLoaded || !localAuthReady || !shellReady) {
     return <BootstrapScreen />;
   }
 
@@ -253,6 +294,9 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  readyAppContainer: {
+    flex: 1,
+  },
   errorBoundaryContainer: {
     flex: 1,
     backgroundColor: theme.colors.background,

@@ -68,6 +68,8 @@ async function persist(state: AchievementState) {
   if (state.userId) await setStoredAchievementState(state.userId, stored(state));
 }
 
+let latestAchievementHydrationRequest = 0;
+
 export const useAchievementStore = create<AchievementState>((set, get) => ({
   ...createEmptyStoredAchievementState(),
   userId: null,
@@ -76,7 +78,12 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
   activeRevealIds: [],
 
   hydrate: async (userId) => {
+    const requestId = ++latestAchievementHydrationRequest;
     const saved = await getStoredAchievementState(userId);
+    if (requestId !== latestAchievementHydrationRequest) {
+      logWarn('achievements.cache.hydrate.discarded_stale', { userId, requestId });
+      return;
+    }
     const revealQueues = normalizeAchievementRevealQueues({
       activeRevealIds: [],
       immediateRevealIds: saved.immediateRevealIds,
@@ -195,12 +202,15 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
     await persist(get());
   },
 
-  reset: () => set({
-    ...createEmptyStoredAchievementState(),
-    userId: null,
-    hydrated: false,
-    dailyGameActive: false,
-    activeRevealIds: [],
-    snapshot: createEmptyAchievementSnapshot(),
-  }),
+  reset: () => {
+    latestAchievementHydrationRequest += 1;
+    set({
+      ...createEmptyStoredAchievementState(),
+      userId: null,
+      hydrated: false,
+      dailyGameActive: false,
+      activeRevealIds: [],
+      snapshot: createEmptyAchievementSnapshot(),
+    });
+  },
 }));

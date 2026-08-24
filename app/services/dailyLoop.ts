@@ -7,7 +7,10 @@ import { useCareerGameStore } from '../state/useCareerGameStore';
 import { useAchievementStore } from '../state/useAchievementStore';
 import { clearPendingChallengeSubmission } from '../storage/pendingChallengeSubmission';
 import { logError, logInfo, logWarn } from './debugLog';
-import { isIdentityActivationCurrent } from '../../shared/clientIdentityPolicy';
+import {
+  canProcessProtectedAction,
+  isIdentityActivationCurrent,
+} from '../../shared/clientIdentityPolicy';
 import { getQuizDate } from '../utils/quizDate';
 import { getTodayQuizResult } from '../storage/quizStorage';
 
@@ -42,8 +45,12 @@ export async function resolveEffectiveUserId(): Promise<string> {
   return guestUserId;
 }
 
-export async function hydrateDailyLoopFromCache(userId: string): Promise<void> {
-  logInfo('dailyLoop.cache.hydrate.start', { userId });
+export async function hydrateDailyLoopFromCache(
+  userId: string,
+  expectedAuthStateVersion = useAuthStore.getState().authStateVersion
+): Promise<void> {
+  if (useAuthStore.getState().authStateVersion !== expectedAuthStateVersion) return;
+  logInfo('dailyLoop.cache.hydrate.start', { userId, expectedAuthStateVersion });
   useQuizStore.getState().setUserId(userId);
   useCareerGameStore.getState().setUserId(userId);
   await Promise.all([
@@ -64,6 +71,10 @@ export async function hydrateDailyLoopFromCache(userId: string): Promise<void> {
       logInfo('dailyLoop.cache.challenge_pending_cleared');
     }),
   ]);
+  if (useAuthStore.getState().authStateVersion !== expectedAuthStateVersion) {
+    logWarn('dailyLoop.cache.hydrate.discarded_stale', { userId, expectedAuthStateVersion });
+    return;
+  }
   logInfo('dailyLoop.cache.hydrate.success', { userId });
 }
 
@@ -82,13 +93,20 @@ export async function prefetchDailyLoop(options?: string | PrefetchOptions): Pro
     return existingPrefetch;
   }
 
-  const isAuthenticated =
-    useAuthStore.getState().isAuthenticated &&
-    useAuthStore.getState().authStatus === 'authenticated' &&
-    Boolean(useAuthStore.getState().token) &&
-    !effectiveUserId.startsWith('guest_');
-  const hasToken = Boolean(useAuthStore.getState().token);
-  const shouldRunProtected = mode === 'bootstrap-auth' && isAuthenticated && hasToken;
+  const authState = useAuthStore.getState();
+  const hasToken = Boolean(authState.token);
+  const isAuthenticated = canProcessProtectedAction(
+    {
+      isAuthenticated: authState.isAuthenticated,
+      authStatus: authState.authStatus,
+      identityStatus: authState.identityStatus,
+      token: authState.token,
+      userId: authState.user?.sub,
+      authStateVersion: authState.authStateVersion,
+    },
+    { userId: effectiveUserId, authStateVersion: authState.authStateVersion }
+  );
+  const shouldRunProtected = mode === 'bootstrap-auth' && isAuthenticated;
 
   logInfo('dailyLoop.prefetch.start', {
     userId: effectiveUserId,
@@ -111,13 +129,22 @@ export async function prefetchDailyLoop(options?: string | PrefetchOptions): Pro
       }
       useQuizStore.getState().setCachedResult(cachedResult);
     }),
-    useLeaderboardStore.getState().prefetchDailyLoop(effectiveUserId, shouldRunProtected),
+    useLeaderboardStore.getState().prefetchDailyLoop(
+      effectiveUserId,
+      shouldRunProtected,
+      {
+        force: shouldRunProtected,
+        propagateProtectedError: shouldRunProtected,
+      }
+    ),
   ];
 
   if (shouldRunProtected) {
     tasks.push(useQuizStore.getState().retryPendingSubmission());
     tasks.push(useCareerGameStore.getState().retryPendingSubmission(effectiveUserId));
-    tasks.push(useProfileStore.getState().revalidate(effectiveUserId));
+    tasks.push(
+      useProfileStore.getState().revalidate(effectiveUserId, { propagateError: true })
+    );
   }
 
   const prefetch = Promise.all(tasks).then(() => undefined)
@@ -169,9 +196,13 @@ export async function syncAuthenticatedSession({
 
     try {
       await useAchievementStore.getState().hydrate(userId);
-      await useQuizStore.getState().reconcileIdentity(userId, userProfile);
       assertCurrentSession();
-      await useCareerGameStore.getState().reconcileIdentity(userId);
+      await Promise.all([
+        useQuizStore.getState().reconcileIdentity(userId, userProfile, {
+          holdInteractiveHandoff: source === 'login',
+        }),
+        useCareerGameStore.getState().reconcileIdentity(userId),
+      ]);
       assertCurrentSession();
       await prefetchDailyLoop({ userId, mode: 'bootstrap-auth' });
       assertCurrentSession();

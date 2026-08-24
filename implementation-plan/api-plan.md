@@ -7,6 +7,10 @@ All APIs are Netlify Functions under `/.netlify/functions/`.
 - Guest-compatible endpoints allow unauthenticated `guest_*` identities only where explicitly supported.
 - Protected flows require `Authorization: Bearer <access-token>`.
 - Server validates Auth0 tokens through `/userinfo` and enforces `token.sub === userId`.
+  A successful match is reusable for 60 seconds across the site's Functions via
+  a strongly consistent verification cache containing only token/subject
+  SHA-256 digests and an expiry timestamp. Raw credentials and identity claims
+  are never cached, and storage failure falls back to Auth0 verification.
   A genuine upstream 401 is returned as an invalid-token 401; rate limits,
   upstream failures, malformed responses, and network errors return a temporary
   `AUTH_VERIFICATION_UNAVAILABLE` 503 so background refreshes cannot incorrectly

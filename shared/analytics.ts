@@ -1,4 +1,5 @@
 export const ANALYTICS_EVENT_NAMES = [
+  'app_shell_ready',
   'app_ready',
   'today_viewed',
   'quiz_start_requested',

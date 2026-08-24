@@ -8,49 +8,36 @@ import { activateAuthenticatedSession } from '../services/authFlow';
 import { useAuthStore } from '../state/useAuthStore';
 import { logError, logInfo, logWarn } from '../services/debugLog';
 
-export default function useAppBootstrap(isAuthReady: boolean): boolean {
-  const [isReady, setIsReady] = useState(false);
-  const { user, isAuthenticated, token, identitySource } = useAuthStore();
+export default function useAppBootstrap(localAuthReady: boolean): boolean {
+  const [hydratedAuthStateVersion, setHydratedAuthStateVersion] = useState<number | null>(null);
+  const { user, isAuthenticated, token, identitySource, authStateVersion } = useAuthStore();
 
   useEffect(() => {
     let isMounted = true;
-    logInfo('bootstrap.app.start', { isAuthReady });
+    if (!localAuthReady) return undefined;
+
+    const expectedAuthStateVersion = authStateVersion;
+    logInfo('bootstrap.app.start', { localAuthReady, expectedAuthStateVersion });
     const bootstrapTimeout = setTimeout(() => {
-      logWarn('bootstrap.app.timeout');
+      logWarn('bootstrap.app.timeout', { expectedAuthStateVersion });
     }, 10000);
 
     async function bootstrap() {
-      if (!isAuthReady) {
-        clearTimeout(bootstrapTimeout);
-        return;
-      }
-
       try {
         const userId = await resolveEffectiveUserId();
-        logInfo('bootstrap.app.user_resolved', { userId });
-        await hydrateDailyLoopFromCache(userId);
-        logInfo('bootstrap.app.cache_hydrated', { userId });
+        logInfo('bootstrap.app.user_resolved', { userId, expectedAuthStateVersion });
+        await hydrateDailyLoopFromCache(userId, expectedAuthStateVersion);
 
         if (
-          isAuthenticated &&
-          user?.sub &&
-          token &&
-          identitySource === 'restore'
+          !isMounted ||
+          useAuthStore.getState().authStateVersion !== expectedAuthStateVersion
         ) {
-          await activateAuthenticatedSession({
-            userId: user.sub,
-            intent: 'restore',
-            source: 'restore',
-            userProfile: {
-              email: user.email,
-              avatarUrl: user.picture,
-            },
-          });
+          logWarn('bootstrap.app.cache_discarded_stale', { userId, expectedAuthStateVersion });
+          return;
         }
 
-        if (isMounted) {
-          setIsReady(true);
-        }
+        logInfo('bootstrap.app.cache_hydrated', { userId, expectedAuthStateVersion });
+        setHydratedAuthStateVersion(expectedAuthStateVersion);
 
         void prefetchDailyLoop({ userId, mode: 'public-warm' }).catch((error) => {
           logError('bootstrap.app.prefetch.error', error);
@@ -58,8 +45,11 @@ export default function useAppBootstrap(isAuthReady: boolean): boolean {
       } catch (error) {
         console.error('Error bootstrapping app state:', error);
         logError('bootstrap.app.error', error);
-        if (isMounted) {
-          setIsReady(true);
+        if (
+          isMounted &&
+          useAuthStore.getState().authStateVersion === expectedAuthStateVersion
+        ) {
+          setHydratedAuthStateVersion(expectedAuthStateVersion);
         }
       } finally {
         clearTimeout(bootstrapTimeout);
@@ -72,7 +62,31 @@ export default function useAppBootstrap(isAuthReady: boolean): boolean {
       isMounted = false;
       clearTimeout(bootstrapTimeout);
     };
-  }, [isAuthReady, isAuthenticated, token, user?.sub]);
+  }, [authStateVersion, localAuthReady]);
 
-  return isReady;
+  useEffect(() => {
+    if (
+      !localAuthReady ||
+      !isAuthenticated ||
+      !user?.sub ||
+      !token ||
+      identitySource !== 'restore'
+    ) {
+      return;
+    }
+
+    void activateAuthenticatedSession({
+      userId: user.sub,
+      intent: 'restore',
+      source: 'restore',
+      userProfile: {
+        email: user.email,
+        avatarUrl: user.picture,
+      },
+    }).catch((error) => {
+      logError('bootstrap.app.restore_activation.error', error);
+    });
+  }, [identitySource, isAuthenticated, localAuthReady, token, user?.sub]);
+
+  return localAuthReady && hydratedAuthStateVersion === authStateVersion;
 }

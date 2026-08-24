@@ -18,13 +18,16 @@ import { useAuthStore } from './useAuthStore';
 import { logError, logInfo, logWarn } from '../services/debugLog';
 import { getQuizDate } from '../utils/quizDate';
 import type { AvatarId } from '../../shared/avatarCatalog';
+import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
 
 interface RevalidateOptions {
   force?: boolean;
+  propagateError?: boolean;
 }
 
 interface PrefetchOptions {
   force?: boolean;
+  propagateProtectedError?: boolean;
 }
 
 interface LeaderboardState {
@@ -52,10 +55,21 @@ interface LeaderboardState {
 
 const friendsRequests = new Map<string, Promise<void>>();
 let globalRequest: Promise<void> | null = null;
+let latestLeaderboardHydrationRequest = 0;
 
-function isCurrentAuthUser(userId: string): boolean {
+function isCurrentAuthUser(userId: string, authStateVersion?: number): boolean {
   const authState = useAuthStore.getState();
-  return Boolean(authState.token && authState.user?.sub === userId);
+  return canProcessProtectedAction(
+    {
+      isAuthenticated: authState.isAuthenticated,
+      authStatus: authState.authStatus,
+      identityStatus: authState.identityStatus,
+      token: authState.token,
+      userId: authState.user?.sub,
+      authStateVersion: authState.authStateVersion,
+    },
+    { userId, authStateVersion }
+  );
 }
 
 function isCurrentDailyCache<T extends { quizDate: string }>(
@@ -109,6 +123,7 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   error: null,
 
   hydrateFromCache: async (userId: string) => {
+    const requestId = ++latestLeaderboardHydrationRequest;
     const quizDate = getQuizDate();
     logInfo('leaderboard.cache.hydrate.start', { userId, quizDate });
     const [friendsCache, globalCache] = await Promise.all([
@@ -119,10 +134,15 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
     const currentFriendsCache = isCurrentDailyCache(friendsCache, quizDate) ? friendsCache : null;
     const currentGlobalCache = isCurrentDailyCache(globalCache, quizDate) ? globalCache : null;
 
+    if (requestId !== latestLeaderboardHydrationRequest) {
+      logInfo('leaderboard.cache.hydrate.discarded_stale', { userId, requestId });
+      return;
+    }
+
     set((state) => ({
-      friendsLeaderboard: currentFriendsCache?.data.leaderboard ?? state.friendsLeaderboard,
-      totalFriends: currentFriendsCache?.data.totalFriends ?? state.totalFriends,
-      friendsPlayedToday: currentFriendsCache?.data.friendsPlayedToday ?? state.friendsPlayedToday,
+      friendsLeaderboard: currentFriendsCache?.data.leaderboard ?? [],
+      totalFriends: currentFriendsCache?.data.totalFriends ?? 0,
+      friendsPlayedToday: currentFriendsCache?.data.friendsPlayedToday ?? 0,
       globalLeaderboard: currentGlobalCache?.data.leaderboard ?? state.globalLeaderboard,
       friendsCache: currentFriendsCache,
       globalCache: currentGlobalCache,
@@ -137,7 +157,8 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   },
 
   revalidateFriends: async (userId: string, options: RevalidateOptions = {}) => {
-    if (userId.startsWith('guest_') || !useAuthStore.getState().token) {
+    const authStateVersion = useAuthStore.getState().authStateVersion;
+    if (userId.startsWith('guest_') || !isCurrentAuthUser(userId, authStateVersion)) {
       logInfo('leaderboard.friends.skip', {
         userId,
         isGuest: userId.startsWith('guest_'),
@@ -152,7 +173,8 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
       return;
     }
 
-    const inFlightRequest = friendsRequests.get(userId);
+    const requestKey = `${userId}:${authStateVersion}`;
+    const inFlightRequest = friendsRequests.get(requestKey);
     if (inFlightRequest) {
       logInfo('leaderboard.friends.in_flight_reuse', { userId });
       return inFlightRequest;
@@ -167,7 +189,7 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
         await setCachedFriendsLeaderboard(userId, data);
         const refreshedCache = await getCachedFriendsLeaderboard(userId);
 
-        if (!isCurrentAuthUser(userId)) {
+        if (!isCurrentAuthUser(userId, authStateVersion)) {
           logInfo('leaderboard.friends.stale_response', { userId });
           return;
         }
@@ -182,7 +204,7 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
         });
         logInfo('leaderboard.friends.success', { userId, count: data.leaderboard.length });
       } catch (error) {
-        if (!isCurrentAuthUser(userId)) {
+        if (!isCurrentAuthUser(userId, authStateVersion)) {
           return;
         }
 
@@ -192,6 +214,7 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
             message: error instanceof Error ? error.message : 'Failed to load friends leaderboard',
           });
           set({ loadingFriends: false, error: null });
+          if (options.propagateError) throw error;
           return;
         }
 
@@ -221,13 +244,14 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
           loadingFriends: false,
           error: error instanceof Error ? error.message : 'Failed to load friends leaderboard',
         });
+        if (options.propagateError) throw error;
       } finally {
-        friendsRequests.delete(userId);
-        set({ loadingFriends: false });
+        friendsRequests.delete(requestKey);
+        if (isCurrentAuthUser(userId, authStateVersion)) set({ loadingFriends: false });
       }
     })();
 
-    friendsRequests.set(userId, request);
+    friendsRequests.set(requestKey, request);
     return request;
   },
 
@@ -286,7 +310,12 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
     });
     await Promise.all([
       get().revalidateGlobal({ force: options.force }),
-      isAuthenticated ? get().revalidateFriends(userId, { force: options.force }) : Promise.resolve(),
+      isAuthenticated
+        ? get().revalidateFriends(userId, {
+            force: options.force,
+            propagateError: options.propagateProtectedError,
+          })
+        : Promise.resolve(),
     ]);
     logInfo('leaderboard.prefetch.success', { userId, isAuthenticated });
   },

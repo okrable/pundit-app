@@ -20,6 +20,8 @@ import {
 import { isTransientQuizSubmissionFailure } from '../../shared/quizSync';
 import { logError, logInfo, logWarn } from '../services/debugLog';
 import { getQuizDate } from '../utils/quizDate';
+import { useAuthStore } from './useAuthStore';
+import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
 
 interface CareerGameState {
   userId: string | null;
@@ -43,6 +45,21 @@ async function submitCompletion(
   submittedAnswer: string
 ): Promise<CareerGameResult> {
   return completeCareerGameApi(gameId, userId, submittedAnswer);
+}
+
+function hasVerifiedCareerSession(userId: string, authStateVersion?: number): boolean {
+  const authState = useAuthStore.getState();
+  return canProcessProtectedAction(
+    {
+      isAuthenticated: authState.isAuthenticated,
+      authStatus: authState.authStatus,
+      identityStatus: authState.identityStatus,
+      token: authState.token,
+      userId: authState.user?.sub,
+      authStateVersion: authState.authStateVersion,
+    },
+    { userId, authStateVersion }
+  );
 }
 
 export const useCareerGameStore = create<CareerGameState>((set, get) => ({
@@ -77,10 +94,16 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
       return;
     }
 
+    const authStateVersion = useAuthStore.getState().authStateVersion;
+    if (!hasVerifiedCareerSession(userId, authStateVersion)) {
+      throw new Error('A verified session is required to sync Journey');
+    }
+    const isCurrent = () =>
+      get().userId === userId && hasVerifiedCareerSession(userId, authStateVersion);
     set({ userId, isLoading: true, error: null });
     try {
       const localResult = await getTodayCareerGameResult(userId);
-      if (get().userId !== userId) {
+      if (!isCurrent()) {
         return;
       }
       if (localResult) {
@@ -89,7 +112,7 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
       }
 
       const serverResult = await getServerCareerGameResult(userId);
-      if (get().userId !== userId) {
+      if (!isCurrent()) {
         return;
       }
       if (serverResult) {
@@ -98,7 +121,7 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
           userId,
           'synced'
         );
-        if (get().userId !== userId) {
+        if (!isCurrent()) {
           return;
         }
         await clearGuestCareerGameResult();
@@ -107,11 +130,11 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
       }
 
       const guestResult = await getGuestCareerGameResult();
-      if (get().userId !== userId) {
+      if (!isCurrent()) {
         return;
       }
       if (!guestResult) {
-        set({ result: null, isLoading: false });
+        set({ isLoading: false });
         return;
       }
 
@@ -120,11 +143,11 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
         guestResult.gameId,
         guestResult.submittedAnswer
       );
-      if (get().userId !== userId) {
+      if (!isCurrent()) {
         return;
       }
       const cached = await saveCareerGameResult(migrated, userId, 'synced');
-      if (get().userId !== userId) {
+      if (!isCurrent()) {
         return;
       }
       await clearGuestCareerGameResult();
@@ -142,6 +165,7 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
             error instanceof Error ? error.message : 'Failed to sync career game',
         });
       }
+      throw error;
     }
   },
 
@@ -180,6 +204,13 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
       queuedAt: new Date().toISOString(),
     });
 
+    const authStateVersion = useAuthStore.getState().authStateVersion;
+    if (!hasVerifiedCareerSession(userId, authStateVersion)) {
+      logInfo('career.submit.deferred_until_verified', { userId, gameId: game.id });
+      set({ isSubmitting: false, error: null });
+      return localResult;
+    }
+
     set({ isSubmitting: true });
     try {
       const serverResult = await submitCompletion(
@@ -187,6 +218,10 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
         game.id,
         submittedAnswer
       );
+      if (!hasVerifiedCareerSession(userId, authStateVersion)) {
+        if (get().userId === userId) set({ isSubmitting: false, error: null });
+        return localResult;
+      }
       const current = get();
       if (
         current.userId !== userId ||
@@ -201,6 +236,10 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
       set({ result: synced, isSubmitting: false, error: null });
       return serverResult;
     } catch (error) {
+      if (!hasVerifiedCareerSession(userId, authStateVersion)) {
+        if (get().userId === userId) set({ isSubmitting: false, error: null });
+        return localResult;
+      }
       const statusCode = error instanceof ApiError ? error.statusCode : undefined;
       const retryable = isTransientQuizSubmissionFailure(statusCode);
       if (!retryable) {
@@ -229,8 +268,13 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
   },
 
   retryPendingSubmission: async (userId) => {
-    const pending = await getPendingCareerGameSubmission();
+    const pending = await getPendingCareerGameSubmission(userId);
     if (!pending || pending.userId !== userId) {
+      return;
+    }
+    const authStateVersion = useAuthStore.getState().authStateVersion;
+    if (!hasVerifiedCareerSession(userId, authStateVersion)) {
+      logInfo('career.submit.retry.waiting_for_verified_session', { userId });
       return;
     }
     if (pending.localResult.date !== getQuizDate()) {
@@ -247,6 +291,7 @@ export const useCareerGameStore = create<CareerGameState>((set, get) => ({
         pending.gameId,
         pending.submittedAnswer
       );
+      if (!hasVerifiedCareerSession(userId, authStateVersion)) return;
       const cached = await saveCareerGameResult(serverResult, userId, 'synced');
       await clearPendingCareerGameSubmission({
         userId,

@@ -45,6 +45,7 @@ interface AuthState {
   identityStatus: ClientIdentityStatus;
   identityError: string | null;
   identitySource: 'login' | 'restore' | null;
+  restoredShellEligible: boolean;
   forceInteractiveAuth: boolean;
   authStateVersion: number;
   isInitialized: boolean;
@@ -81,6 +82,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   identityStatus: 'unknown',
   identityError: null,
   identitySource: null,
+  restoredShellEligible: false,
   forceInteractiveAuth: false,
   authStateVersion: 0,
   isInitialized: false,
@@ -113,6 +115,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ]);
 
       if (storedRefreshToken && storedUserInfo) {
+        const storedIdentityStatus = resolveStoredIdentityStatus(storedUserInfo);
         logInfo('auth.store.bootstrap.cached_session_found', {
           userId: storedUserInfo.sub,
           forceInteractiveAuth,
@@ -134,9 +137,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           authSyncStatus: 'idle',
           authSyncSource: null,
           authSyncError: null,
-          identityStatus: resolveStoredIdentityStatus(storedUserInfo),
+          identityStatus: storedIdentityStatus,
           identityError: null,
           identitySource: 'restore',
+          restoredShellEligible: storedIdentityStatus === 'complete',
           forceInteractiveAuth,
           isInitialized: true,
           isRestoring: false,
@@ -158,6 +162,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         identityStatus: 'unknown',
         identityError: null,
         identitySource: null,
+        restoredShellEligible: false,
         forceInteractiveAuth,
         isInitialized: true,
         isRestoring: false,
@@ -179,6 +184,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         identityStatus: 'unknown',
         identityError: null,
         identitySource: null,
+        restoredShellEligible: false,
         forceInteractiveAuth: false,
         isInitialized: true,
         isRestoring: false,
@@ -202,6 +208,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       identityStatus: 'unknown',
       identityError: null,
       identitySource: null,
+      restoredShellEligible: false,
       forceInteractiveAuth: false,
       authStateVersion: nextAuthStateVersion,
       error: null,
@@ -247,6 +254,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: updatedUser,
       identityStatus: identity.usernameRequired ? 'username_required' : 'complete',
       identityError: null,
+      restoredShellEligible: identity.usernameRequired ? false : get().restoredShellEligible,
     });
     await storeUserInfo({
       sub: updatedUser.sub,
@@ -288,6 +296,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set((state) => ({
       identityStatus: 'username_required',
       identityError: null,
+      restoredShellEligible: false,
       user: state.user
         ? {
             ...state.user,
@@ -330,6 +339,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authSyncSource: null,
       authSyncError: message,
       error: message,
+      restoredShellEligible: false,
     });
   },
 
@@ -347,6 +357,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       identityStatus: 'unknown',
       identityError: null,
       identitySource: null,
+      restoredShellEligible: false,
       forceInteractiveAuth: true,
       authStateVersion: nextAuthStateVersion,
       error: null,
@@ -388,7 +399,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           identityStatus: 'unknown',
           identityError: null,
           identitySource: null,
+          restoredShellEligible: false,
           forceInteractiveAuth: false,
+          authStateVersion: get().authStateVersion + (get().isAuthenticated ? 1 : 0),
           isInitialized: true,
           isRestoring: false,
         });
@@ -418,7 +431,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           identityStatus: 'unknown',
           identityError: null,
           identitySource: null,
+          restoredShellEligible: false,
           forceInteractiveAuth: false,
+          authStateVersion: get().authStateVersion + (get().isAuthenticated ? 1 : 0),
           isInitialized: true,
           isRestoring: false,
         });
@@ -452,7 +467,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           identityStatus: 'unknown',
           identityError: null,
           identitySource: null,
+          restoredShellEligible: false,
           forceInteractiveAuth: false,
+          authStateVersion: get().authStateVersion + (get().isAuthenticated ? 1 : 0),
           isInitialized: true,
           isRestoring: false,
         });
@@ -463,6 +480,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       logInfo('auth.store.restore.read_cached_user_info.start');
       const storedUserInfo = await getUserInfo();
       logInfo('auth.store.restore.read_cached_user_info.success', { hasUserInfo: Boolean(storedUserInfo) });
+      if (storedUserInfo?.sub && storedUserInfo.sub !== userInfo.sub) {
+        logWarn('auth.store.restore.ownership_mismatch');
+        await clearAuthStorage();
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          authStatus: 'anonymous',
+          authSyncStatus: 'idle',
+          authSyncSource: null,
+          authSyncError: null,
+          identityStatus: 'unknown',
+          identityError: null,
+          identitySource: null,
+          restoredShellEligible: false,
+          forceInteractiveAuth: true,
+          authStateVersion: get().authStateVersion + 1,
+          isInitialized: true,
+          isRestoring: false,
+          error: 'Your saved account changed. Sign in again to continue.',
+        });
+        return false;
+      }
       await clearForceInteractiveAuth();
       logInfo('auth.store.restore.success', { userId: userInfo.sub });
 
@@ -486,6 +526,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         identityStatus: resolveStoredIdentityStatus(storedUserInfo || {}),
         identityError: null,
         identitySource: 'restore',
+        restoredShellEligible:
+          storedUserInfo !== null &&
+          resolveStoredIdentityStatus(storedUserInfo) === 'complete',
         forceInteractiveAuth: false,
         isInitialized: true,
         isRestoring: false,
@@ -496,22 +539,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Error restoring auth state:', error);
       logError('auth.store.restore.error', error);
-      await clearAuthStorage();
-      set({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        authStatus: 'anonymous',
-        authSyncStatus: 'idle',
-        authSyncSource: null,
-        authSyncError: null,
-        identityStatus: 'unknown',
-        identityError: null,
-        identitySource: null,
-        forceInteractiveAuth: false,
-        isInitialized: true,
-        isRestoring: false,
-      });
+      if (get().authStateVersion === authStateVersion) {
+        set({
+          token: null,
+          authStatus: 'restoring',
+          authSyncStatus: 'failed',
+          authSyncSource: null,
+          authSyncError: 'Account data could not refresh.',
+          isInitialized: true,
+          isRestoring: false,
+        });
+      }
       return false;
     }
   },
