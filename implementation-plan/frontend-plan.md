@@ -105,6 +105,12 @@ identifiers, callback schemes, and app resources.
 The native tab controller owns the bottom inset. Screens inside the main tab
 subtree omit their own bottom safe-area edge only while native tabs are active;
 Android, web, and Expo Go retain their existing safe-area handling.
+Headerless nested Games screens still declare their top safe-area intent. The
+playable Daily Quiz also sets its own iOS ScrollView inset adjustment to
+`automatic`, because native tabs cannot discover that ScrollView through the
+nested Games stack. UIKit therefore keeps the question header below the status
+area and scrollable answers clear of the translucent iOS tab bar without a
+hard-coded bar height.
 
 The web navigation drawer keeps dedicated authentication actions anchored in
 its footer. Guests see separate Create Account and Log In actions so new

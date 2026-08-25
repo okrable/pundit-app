@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -34,7 +34,7 @@ import {
 type Props = NativeStackScreenProps<GamesStackParamList, 'DailyQuiz'>;
 
 export default function DailyQuizScreen({ navigation, route }: Props) {
-  const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
+  const safeAreaEdges = useMainTabSafeAreaEdges(['top', 'bottom']);
   const centeredQuizStyle = useCenteredWebStyle(webContentWidth.quiz);
   const [startRequested, setStartRequested] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
@@ -329,6 +329,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
       <Pressable style={styles.pressable} onPressIn={() => setIsHolding(true)}
         onPressOut={() => setIsHolding(false)}>
         <ScrollView style={styles.scrollView}
+          contentInsetAdjustmentBehavior={Platform.OS === 'ios' ? 'automatic' : undefined}
           contentContainerStyle={[styles.contentContainer, centeredQuizStyle]}
           showsVerticalScrollIndicator={false}>
           {currentQuestion ? (

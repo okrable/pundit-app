@@ -2,6 +2,12 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.13.1 - iOS Daily Quiz safe areas
+
+- Kept active Daily Quiz content below the iOS status bar and Dynamic Island.
+- Applied UIKit's automatic scroll insets directly to the nested quiz surface so
+  answer options remain reachable above the translucent native tab bar.
+
 ## v2.13.0 - Global and weekly leaderboards
 
 - Replaced separate Friends and Global tabs with one Global-first leaderboard,
