@@ -2,11 +2,13 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
-## v2.13.1 - iOS Daily Quiz safe areas
+## v2.13.1 - Immersive responsive Daily Quiz
 
-- Kept active Daily Quiz content below the iOS status bar and Dynamic Island.
-- Applied UIKit's automatic scroll insets directly to the nested quiz surface so
-  answer options remain reachable above the translucent native tab bar.
+- Moved the Daily Quiz above global navigation with a standard back route, so
+  native tabs and the web drawer no longer consume or cover gameplay space.
+- Adapted quiz density from the usable viewport and system text scale, retained
+  readable wrapping, and aligned revealed answers before the timer begins.
+- Made quiz entry and recap states scroll safely on constrained displays.
 
 ## v2.13.0 - Global and weekly leaderboards
 

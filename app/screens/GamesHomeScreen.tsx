@@ -34,6 +34,7 @@ import { getQuizDate } from '../utils/quizDate';
 import { isQuizForDate } from '../../shared/dailyQuiz';
 import { getCareerResultForDate } from '../../shared/careerGame';
 import { markAnalyticsTiming, trackAnalyticsEvent } from '../services/analytics';
+import { openDailyQuiz } from '../navigation/rootNavigation';
 
 type Props = NativeStackScreenProps<GamesStackParamList, 'GamesHome'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -253,8 +254,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
         source: quizAvailable ? 'cache' : 'network',
       });
     }
-    navigation.navigate(
-      'DailyQuiz',
+    openDailyQuiz(
       currentCachedResult || hubState.quiz === 'in_progress'
         ? undefined
         : { autoStart: true }

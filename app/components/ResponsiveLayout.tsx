@@ -8,6 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { theme } from '../theme/theme';
+import { getQuizLayoutPolicy } from '../../shared/quizLayout';
 
 export const webBreakpoint = {
   compact: 600,
@@ -65,6 +66,22 @@ export function useMobileLayoutMetrics() {
     optionStageMinHeight: isShortHeight ? 144 : 164,
     optionPadding: isTight ? theme.spacing.sm : theme.spacing.md,
     useSingleColumnOptions: appWidth < 350,
+  };
+}
+
+export function useQuizLayoutMetrics(viewportHeight?: number) {
+  const { width, height, fontScale } = useWindowDimensions();
+  const mobileLayout = useMobileLayoutMetrics();
+  const policy = getQuizLayoutPolicy({
+    width,
+    viewportHeight: viewportHeight && viewportHeight > 0 ? viewportHeight : height,
+    fontScale,
+  });
+
+  return {
+    ...mobileLayout,
+    ...policy,
+    fontScale,
   };
 }
 

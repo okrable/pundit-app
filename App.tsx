@@ -29,6 +29,7 @@ import {
 } from './shared/clientIdentityPolicy';
 import { getAppLaunchDuration, trackAnalyticsEvent } from './app/services/analytics';
 import PlayerProfileScreen from './app/screens/PlayerProfileScreen';
+import DailyQuizScreen from './app/screens/DailyQuizScreen';
 import {
   rootNavigationRef,
   type RootStackParamList,
@@ -208,6 +209,11 @@ function AppContent() {
         name="Main"
         component={MainNavigator}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="DailyQuiz"
+        component={DailyQuizScreen}
+        options={{ title: 'Daily Quiz', headerBackTitle: 'Games' }}
       />
       <Stack.Screen
         name="PlayerProfile"

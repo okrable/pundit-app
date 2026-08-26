@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Image,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -57,8 +58,12 @@ export default function CompletedQuizScreen({
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
           <View style={styles.logoRow}>
             <Image
               source={require('../../assets/logo/white/pundit-white.png')}
@@ -90,7 +95,8 @@ export default function CompletedQuizScreen({
               <Text style={styles.gamesButtonText}>Back to Games</Text>
             </TouchableOpacity>
           ) : null}
-        </CenteredWebContent>
+          </CenteredWebContent>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -105,8 +111,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: theme.spacing.xl,
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   content: {
-    flex: 1,
+    flexGrow: 1,
+    paddingBottom: theme.spacing.xl,
   },
   logoRow: {
     alignItems: 'center',
