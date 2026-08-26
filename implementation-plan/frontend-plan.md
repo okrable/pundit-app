@@ -106,6 +106,14 @@ The native tab controller owns the bottom inset. Screens inside the main tab
 subtree omit their own bottom safe-area edge only while native tabs are active;
 Android, web, and Expo Go retain their existing safe-area handling.
 
+Daily Quiz is an immersive root-stack route above the tab and drawer
+navigators. Its standard branded header supplies back navigation and the route
+owns its bottom safe area, so no global navigation bar can cover gameplay.
+The playable ScrollView retains automatic iOS inset adjustment without a
+hard-coded bar height. Quiz density uses the measured content viewport and
+system font scale; prompts and answers wrap naturally, compact HUD text has a
+bounded scale, and accessibility-constrained layouts use single-column answers.
+
 The web navigation drawer keeps dedicated authentication actions anchored in
 its footer. Guests see separate Create Account and Log In actions so new
 players enter username/avatar onboarding while returning players retain the
@@ -114,11 +122,12 @@ Auth0 flow and expose pending and retryable error states.
 
 ## Games Hub
 
-The Games tab opens an internal stack with Daily Quiz and Whose Journey as
-playable modes. Journey is available whenever today's payload contains
-`careerGame`; it shows Play, Player found, Warming up, or Unavailable and reveals
-the player name on its tile only after completion. Games focus refreshes the
-quiz and hydrates the date-scoped Journey result for the current identity.
+The Games tab opens an internal stack for its hub and Whose Journey. Daily Quiz
+launches above that stack as an immersive root route. Journey is available
+whenever today's payload contains `careerGame`; it shows Play, Player found,
+Warming up, or Unavailable and reveals the player name on its tile only after
+completion. Games focus refreshes the quiz and hydrates the date-scoped Journey
+result for the current identity.
 
 ## Daily Quiz Flow
 

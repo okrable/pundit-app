@@ -21,13 +21,18 @@ import Animated, {
 import { Question } from '../types';
 import { theme } from '../theme/theme';
 import CountdownTimer from './CountdownTimer';
-import { useMobileLayoutMetrics } from './ResponsiveLayout';
+import { useQuizLayoutMetrics } from './ResponsiveLayout';
+import {
+  getQuizOptionRevealDuration,
+  QUIZ_OPTION_FADE_DURATION_MS,
+  QUIZ_OPTION_STAGGER_DELAY_MS,
+  shouldNotifyQuizOptionsReveal,
+} from '../../shared/quizLayout';
 
 const TYPING_SPEED = 30;
 const TYPING_SPEED_FAST = 8;
-const OPTION_FADE_DURATION = 300;
-const OPTION_STAGGER_DELAY = 220;
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
+const HUD_FONT_SCALE_LIMIT = 1.2;
 const logoImage = require('../../assets/logo/dark/pundit-black.png');
 
 const REVEAL_PHRASE_SETS = [
@@ -64,7 +69,9 @@ interface QuestionCardProps {
   correctOptionIndex?: number;
   isHolding?: boolean;
   onOptionsReady?: () => void;
+  onOptionsRevealStarted?: (optionsOffsetY: number) => void;
   revealImmediately?: boolean;
+  viewportHeight?: number;
   questionNumber: number;
   totalQuestions: number;
   score: number;
@@ -167,7 +174,8 @@ function OptionTile({
       <Animated.View
         entering={
           animateEntry
-            ? FadeIn.duration(OPTION_FADE_DURATION).delay(index * OPTION_STAGGER_DELAY)
+            ? FadeIn.duration(QUIZ_OPTION_FADE_DURATION_MS)
+                .delay(index * QUIZ_OPTION_STAGGER_DELAY_MS)
             : undefined
         }
       >
@@ -181,13 +189,12 @@ function OptionTile({
           disabled={isLocked}
         >
           <View style={styles.optionLabelBadge}>
-            <Text style={labelStyles}>{OPTION_LABELS[index]}</Text>
+            <Text style={labelStyles} maxFontSizeMultiplier={HUD_FONT_SCALE_LIMIT}>
+              {OPTION_LABELS[index]}
+            </Text>
           </View>
           <Text
             style={textStyles}
-            numberOfLines={3}
-            adjustsFontSizeToFit
-            minimumFontScale={0.78}
           >
             {option}
           </Text>
@@ -207,7 +214,9 @@ export default function QuestionCard({
   correctOptionIndex,
   isHolding = false,
   onOptionsReady,
+  onOptionsRevealStarted,
   revealImmediately = false,
+  viewportHeight,
   questionNumber,
   totalQuestions,
   score,
@@ -218,13 +227,16 @@ export default function QuestionCard({
   onTimeUp,
 }: QuestionCardProps) {
   const [displayedText, setDisplayedText] = useState('');
-  const layout = useMobileLayoutMetrics();
+  const layout = useQuizLayoutMetrics(viewportHeight);
   const [isTypingComplete, setIsTypingComplete] = useState(false);
+  const [questionContentOffsetY, setQuestionContentOffsetY] = useState<number | null>(null);
+  const [optionsOffsetY, setOptionsOffsetY] = useState<number | null>(null);
   const [revealPhraseSetIndex, setRevealPhraseSetIndex] = useState<number | null>(null);
   const typingTimer = useRef<NodeJS.Timeout | null>(null);
   const optionReadyTimer = useRef<NodeJS.Timeout | null>(null);
   const isHoldingRef = useRef(false);
   const onOptionsReadyRef = useRef(onOptionsReady);
+  const optionsRevealNotifiedQuestionRef = useRef<string | null>(null);
   const questionContentOpacity = useSharedValue(1);
   const questionContentScale = useSharedValue(1);
 
@@ -253,9 +265,27 @@ export default function QuestionCard({
   }, [onOptionsReady]);
 
   useEffect(() => {
+    if (questionContentOffsetY === null || !shouldNotifyQuizOptionsReveal(
+      question.id,
+      optionsRevealNotifiedQuestionRef.current,
+      isTypingComplete,
+      optionsOffsetY
+    )) return;
+    optionsRevealNotifiedQuestionRef.current = question.id;
+    onOptionsRevealStarted?.(questionContentOffsetY + (optionsOffsetY as number));
+  }, [
+    isTypingComplete,
+    onOptionsRevealStarted,
+    optionsOffsetY,
+    question.id,
+    questionContentOffsetY,
+  ]);
+
+  useEffect(() => {
     setDisplayedText('');
     setIsTypingComplete(false);
     setRevealPhraseSetIndex(null);
+    optionsRevealNotifiedQuestionRef.current = null;
 
     if (typingTimer.current) {
       clearTimeout(typingTimer.current);
@@ -282,8 +312,7 @@ export default function QuestionCard({
       }
 
       setIsTypingComplete(true);
-      const optionRevealMs =
-        OPTION_STAGGER_DELAY * Math.max(question.options.length - 1, 0) + OPTION_FADE_DURATION;
+      const optionRevealMs = getQuizOptionRevealDuration(question.options.length);
       optionReadyTimer.current = setTimeout(() => {
         onOptionsReadyRef.current?.();
       }, optionRevealMs);
@@ -344,15 +373,15 @@ export default function QuestionCard({
         },
       ]}
     >
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { minHeight: layout.hudMinHeight }]}>
         <Image
           source={logoImage}
-          style={styles.logo}
+          style={[styles.logo, { width: layout.logoWidth, height: layout.logoHeight }]}
           resizeMode="contain"
         />
 
         <View style={styles.progressBlock}>
-          <Text style={styles.questionNumber}>
+          <Text style={styles.questionNumber} maxFontSizeMultiplier={HUD_FONT_SCALE_LIMIT}>
             {questionNumber}/{totalQuestions}
           </Text>
           <View style={styles.progressDots}>
@@ -369,14 +398,22 @@ export default function QuestionCard({
         </View>
 
         <View style={styles.scorePill}>
-          <Text style={styles.scoreLabel}>Score</Text>
-          <Text style={styles.scoreText}>{score}</Text>
+          <Text style={styles.scoreLabel} maxFontSizeMultiplier={HUD_FONT_SCALE_LIMIT}>Score</Text>
+          <Text style={styles.scoreText} maxFontSizeMultiplier={HUD_FONT_SCALE_LIMIT}>{score}</Text>
         </View>
       </View>
 
       <Animated.View
         key={question.id}
         entering={FadeIn.duration(220)}
+        onLayout={(event) => {
+          const nextOffset = event.nativeEvent.layout.y;
+          setQuestionContentOffsetY((currentOffset) =>
+            currentOffset === null || Math.abs(currentOffset - nextOffset) > 0.5
+              ? nextOffset
+              : currentOffset
+          );
+        }}
         style={[
           styles.questionContent,
           { gap: layout.verticalGap },
@@ -387,7 +424,6 @@ export default function QuestionCard({
           style={[
             styles.playArea,
             {
-              minHeight: layout.playAreaMinHeight,
               padding: layout.cardPadding,
               gap: layout.verticalGap,
             },
@@ -402,10 +438,10 @@ export default function QuestionCard({
               setTimeRemaining={setTimeRemaining}
             />
             <View style={styles.timerCopy}>
-              <Text style={styles.timerTitle}>
+              <Text style={styles.timerTitle} maxFontSizeMultiplier={HUD_FONT_SCALE_LIMIT}>
                 {timerActive ? 'On the clock' : timeRemaining === 0 ? 'Minimum score' : 'Read first'}
               </Text>
-              <Text style={styles.timerHint}>
+              <Text style={styles.timerHint} maxFontSizeMultiplier={HUD_FONT_SCALE_LIMIT}>
                 {timeRemaining === 0
                   ? 'Answer when ready.'
                   : timerActive
@@ -438,12 +474,23 @@ export default function QuestionCard({
               revealTone === 'correct' ? styles.revealTextCorrect : null,
               revealTone === 'incorrect' ? styles.revealTextIncorrect : null,
             ]}
+            maxFontSizeMultiplier={HUD_FONT_SCALE_LIMIT}
           >
             {revealText}
           </Text>
         </View>
 
-        <View style={[styles.optionsStage, { minHeight: layout.optionStageMinHeight }]}>
+        <View
+          style={styles.optionsStage}
+          onLayout={(event) => {
+            const nextOffset = event.nativeEvent.layout.y;
+            setOptionsOffsetY((currentOffset) =>
+              currentOffset === null || Math.abs(currentOffset - nextOffset) > 0.5
+                ? nextOffset
+                : currentOffset
+            );
+          }}
+        >
           {isTypingComplete && (
             <View style={styles.optionsContainer}>
               {question.options.map((option, index) => {
@@ -488,7 +535,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   topBar: {
-    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -549,8 +595,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   playArea: {
-    flex: 1,
-    minHeight: 190,
     backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
@@ -580,7 +624,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   promptFrame: {
-    flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'stretch',
   },
@@ -614,7 +657,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   optionsStage: {
-    minHeight: 164,
+    width: '100%',
   },
   optionWrapper: {
     flexBasis: '48%',
