@@ -15,9 +15,15 @@ export function getPool() {
 }
 
 export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
-  const client = await getPool().connect();
+  return queryUsingPool<T>(getPool(), text, params);
+}
+
+export async function queryUsingPool<T>(
+  source: Pick<Pool, 'connect'>, text: string, params?: any[]
+): Promise<T[]> {
+  const client = await source.connect();
   try {
-    return queryWithClient<T>(client, text, params);
+    return await queryWithClient<T>(client, text, params);
   } finally {
     client.release();
   }
