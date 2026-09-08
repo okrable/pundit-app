@@ -72,9 +72,10 @@ export interface AnswerWithTiming {
 
 // Detailed answer info returned immediately after quiz submission
 export interface QuizAnswerDetail {
-  questionId: string;
-  selectedOptionIndex: number;
-  correctOptionIndex: number;
+  questionId?: string;
+  selectedOptionIndex?: number;
+  correctOptionIndex?: number;
+  timeRemainingMs?: number;
   isCorrect: boolean;
 }
 

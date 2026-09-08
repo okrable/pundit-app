@@ -43,8 +43,10 @@ export default function ResultsScreen({
     () =>
       result.answers.map((answer, index) => {
         const question = quiz.questions.find(q => q.id === answer.questionId);
-        const correctOptionIndex = answer.correctOptionIndex ?? question?.correctOptionIndex ?? 0;
-        const correctAnswer = question?.options[correctOptionIndex] ?? 'Unknown';
+        const correctOptionIndex = answer.correctOptionIndex;
+        const correctAnswer = question && correctOptionIndex !== undefined
+          ? question.options[correctOptionIndex] ?? 'Answer details unavailable'
+          : 'Answer details unavailable';
 
         return {
           questionNumber: index + 1,
