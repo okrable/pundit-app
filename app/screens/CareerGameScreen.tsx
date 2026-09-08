@@ -24,6 +24,7 @@ import { useQuizStore } from '../state/useQuizStore';
 import { useCareerGameStore } from '../state/useCareerGameStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
+import PlayerNameSuggestions from '../components/PlayerNameSuggestions';
 import JourneyGraphic from '../components/JourneyGraphic';
 import CenteredWebContent, { webContentWidth } from '../components/ResponsiveLayout';
 import { matchesCareerAnswer } from '../../shared/careerAnswer';
@@ -280,6 +281,7 @@ export default function CareerGameScreen({ navigation }: Props) {
                 style={styles.input}
                 accessibilityLabel="Player name"
               />
+              <PlayerNameSuggestions value={guess} onSelect={name => { setGuess(name); setFeedback(null); }} actorType={isAuthenticated ? 'authenticated' : 'guest'} identityKey={gameUserId} />
               {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
               <TouchableOpacity style={styles.submitButton} onPress={() => void handleSubmit()}>
                 <Text style={styles.submitButtonText}>Submit guess</Text>

@@ -86,7 +86,7 @@ export function getQuestionSource(
     : 'cockroach';
 }
 
-function getBigQueryConfig(): { projectId: string; dataset: string } {
+export function getBigQueryConfig(): { projectId: string; dataset: string } {
   const projectId = process.env.BIGQUERY_PROJECT_ID || 'pundit-498720';
   const dataset = process.env.BIGQUERY_DATASET || 'pundit';
 
@@ -109,7 +109,7 @@ function getBigQueryConfig(): { projectId: string; dataset: string } {
   return { projectId, dataset };
 }
 
-function getBigQueryClient(): BigQuery {
+export function getBigQueryClient(): BigQuery {
   if (bigQueryClient) {
     return bigQueryClient;
   }
@@ -144,7 +144,7 @@ const defaultClients: QuestionSourceClients = {
   },
 };
 
-function getBigQueryLocation(): string | undefined {
+export function getBigQueryLocation(): string | undefined {
   return process.env.BIGQUERY_LOCATION?.trim() || undefined;
 }
 
@@ -371,10 +371,10 @@ export async function getDailyQuestionRows(
 
   try {
     const rows = source === 'bigquery'
-      ? await getBigQueryQuestionRows(date, [1, 2, 3, 4, 5, 6], clients)
+      ? await getBigQueryQuestionRows(date, [1, 2, 3, 4, 5], clients)
       : await getCockroachQuestionRows(date, language, clients);
     const validated = source === 'bigquery'
-      ? validateQuestionRows(rows, [1, 2, 3, 4, 5, 6], source, true).slice(0, 5)
+      ? validateQuestionRows(rows, [1, 2, 3, 4, 5], source, true)
       : rows;
     logSourceRead('daily_questions', source, date, startedAt, validated.length);
     return validated;
@@ -400,8 +400,8 @@ export async function getAnswerKeyRows(
     let rows: SourceQuestionRow[];
     if (source === 'bigquery') {
       const bundle = validateQuestionRows(
-        await getBigQueryQuestionRows(date, [1, 2, 3, 4, 5, 6], clients),
-        [1, 2, 3, 4, 5, 6],
+        await getBigQueryQuestionRows(date, [1, 2, 3, 4, 5], clients),
+        [1, 2, 3, 4, 5],
         source,
         true
       );
@@ -511,6 +511,7 @@ export function validateCareerRows(rows: SourceCareerStatRow[]): SourceCareerSta
       !team ||
       !Number.isInteger(rank) ||
       rank < 1 ||
+      row.appearances === null || row.goals === null ||
       !Number.isInteger(appearances) ||
       appearances < 0 ||
       !Number.isInteger(goals) ||
