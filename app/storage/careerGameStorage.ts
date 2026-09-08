@@ -1,64 +1,34 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CareerGameResult, SyncState } from '../types';
 import { getQuizDate } from '../utils/quizDate';
-
-const GUEST_RESULT_KEY = '@pundit_daily_career_result_guest';
-const AUTH_RESULT_KEY_PREFIX = '@pundit_daily_career_result_auth_';
-
-export interface CachedCareerGameResult extends CareerGameResult {
-  cachedAt: string;
-  userId?: string;
+export interface CachedCareerGameResult extends CareerGameResult { cachedAt: string; userId?: string; pendingSync?: boolean; }
+const key = (id?: string | null) => `@pundit_journey_v2_${!id || id.startsWith('guest_') ? 'guest' : id}`;
+export async function saveCareerGameResult(result: CareerGameResult, userId?: string, syncState?: SyncState): Promise<CachedCareerGameResult> {
+  const value = { ...result, outcome: result.outcome ?? 'solved' as const, userId,
+    syncState: syncState ?? result.syncState, cachedAt: new Date().toISOString() };
+  await AsyncStorage.setItem(key(userId), JSON.stringify(value));
+  return value;
 }
-
-function getCacheKey(userId?: string | null): string {
-  if (!userId || userId.startsWith('guest_')) {
-    return GUEST_RESULT_KEY;
+export async function readCareerGameResult(userId?: string): Promise<CachedCareerGameResult | null> {
+  let raw = await AsyncStorage.getItem(key(userId));
+  if (!raw) {
+    const legacyKey = !userId || userId.startsWith('guest_') ? '@pundit_daily_career_result_guest' : `@pundit_daily_career_result_auth_${userId}`;
+    raw = await AsyncStorage.getItem(legacyKey);
   }
-  return `${AUTH_RESULT_KEY_PREFIX}${userId}`;
-}
-
-export async function saveCareerGameResult(
-  result: CareerGameResult,
-  userId?: string,
-  syncState?: SyncState
-): Promise<CachedCareerGameResult> {
-  const cachedResult: CachedCareerGameResult = {
-    ...result,
-    syncState: syncState ?? result.syncState,
-    userId,
-    cachedAt: new Date().toISOString(),
-  };
-  await AsyncStorage.setItem(getCacheKey(userId), JSON.stringify(cachedResult));
-  return cachedResult;
-}
-
-export async function getTodayCareerGameResult(
-  userId?: string
-): Promise<CachedCareerGameResult | null> {
+  if (!raw) return null;
   try {
-    const key = getCacheKey(userId);
-    const raw = await AsyncStorage.getItem(key);
-    if (!raw) {
-      return null;
-    }
-
-    const result = JSON.parse(raw) as CachedCareerGameResult;
-    if (result.date === getQuizDate()) {
-      return result;
-    }
-
-    await AsyncStorage.removeItem(key);
-    return null;
-  } catch (error) {
-    console.error('Error reading career game result:', error);
-    return null;
-  }
+    const value = JSON.parse(raw) as CachedCareerGameResult;
+    if (!value || typeof value.gameId !== 'string' || typeof value.date !== 'string' ||
+        typeof value.canonicalName !== 'string' || typeof value.submittedAnswer !== 'string' ||
+        (value.outcome !== undefined && value.outcome !== 'solved' && value.outcome !== 'given_up')) return null;
+    return { ...value, outcome: value.outcome ?? 'solved' };
+  } catch { return null; }
 }
-
-export async function getGuestCareerGameResult(): Promise<CachedCareerGameResult | null> {
-  return getTodayCareerGameResult();
+export async function getTodayCareerGameResult(userId?: string) {
+  const value = await readCareerGameResult(userId);
+  return value?.date === getQuizDate() ? value : null;
 }
-
+export const getGuestCareerGameResult = () => getTodayCareerGameResult();
 export async function clearGuestCareerGameResult(): Promise<void> {
-  await AsyncStorage.removeItem(GUEST_RESULT_KEY);
+  await AsyncStorage.multiRemove([key(), '@pundit_daily_career_result_guest']);
 }

@@ -54,6 +54,7 @@ export interface CareerGame {
 }
 
 export interface CareerGameResult {
+  outcome?: import("../../shared/journeyOutcome").JourneyOutcome;
   date: string;
   gameId: string;
   completed: true;

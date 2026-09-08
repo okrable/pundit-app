@@ -2,8 +2,10 @@ import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { query } from './lib/db';
 import { assertAuthorizedUser } from './lib/auth';
 import { getQuizDate } from './lib/quizDate';
+import { legacyJourneyVisibility } from '../../shared/journeyOutcome';
 
 interface CareerResultRow {
+  outcome: "solved" | "given_up";
   game_date: string;
   game_id: string;
   submitted_answer: string;
@@ -57,14 +59,15 @@ const handler: LambdaHandler = async (event) => {
          game_date::TEXT as game_date,
          game_id,
          submitted_answer,
-         canonical_name
+         canonical_name, outcome
        FROM career_game_results
        WHERE user_id = $1 AND game_date = $2
        ORDER BY completed_at DESC
        LIMIT 1`,
       [userId, getQuizDate()]
     );
-    const row = rows[0];
+    const candidate = rows[0];
+    const row = candidate && legacyJourneyVisibility(candidate.outcome, event.queryStringParameters?.contractVersion === '2' ? 2 : 1) ? candidate : null;
 
     return {
       statusCode: 200,
@@ -75,6 +78,7 @@ const handler: LambdaHandler = async (event) => {
               date: row.game_date,
               gameId: row.game_id,
               completed: true,
+              outcome: row.outcome,
               canonicalName: row.canonical_name,
               submittedAnswer: row.submitted_answer,
               syncState: 'synced',

@@ -1,328 +1,120 @@
 import { create } from 'zustand';
-import {
-  ApiError,
-  completeCareerGame as completeCareerGameApi,
-  getTodayCareerGameResult as getServerCareerGameResult,
-} from '../services/api';
+import { ApiError, completeCareerGame as submit, getTodayCareerGameResult as readServer } from '../services/api';
 import type { CareerGame, CareerGameResult } from '../types';
-import {
-  CachedCareerGameResult,
-  clearGuestCareerGameResult,
-  getGuestCareerGameResult,
-  getTodayCareerGameResult,
-  saveCareerGameResult,
-} from '../storage/careerGameStorage';
-import {
-  clearPendingCareerGameSubmission,
-  getPendingCareerGameSubmission,
-  setPendingCareerGameSubmission,
-} from '../storage/pendingCareerGameSubmission';
-import { isTransientQuizSubmissionFailure } from '../../shared/quizSync';
-import { logError, logInfo, logWarn } from '../services/debugLog';
-import { getQuizDate } from '../utils/quizDate';
+import { saveCareerGameResult, getTodayCareerGameResult, getGuestCareerGameResult, clearGuestCareerGameResult, type CachedCareerGameResult } from '../storage/careerGameStorage';
 import { useAuthStore } from './useAuthStore';
 import { canProcessProtectedAction } from '../../shared/clientIdentityPolicy';
+import { isTransientQuizSubmissionFailure } from '../../shared/quizSync';
+import type { JourneyOutcome } from '../../shared/journeyOutcome';
+import { getQuizDate } from '../utils/quizDate';
 
-interface CareerGameState {
-  userId: string | null;
-  result: CachedCareerGameResult | null;
-  error: string | null;
-  isLoading: boolean;
-  isSubmitting: boolean;
-  setUserId: (userId: string) => void;
-  hydrateFromCache: (userId: string) => Promise<void>;
-  reconcileIdentity: (userId: string) => Promise<void>;
-  completeGame: (
-    game: CareerGame,
-    submittedAnswer: string
-  ) => Promise<CareerGameResult>;
-  retryPendingSubmission: (userId: string) => Promise<void>;
+interface State {
+  userId: string | null; result: CachedCareerGameResult | null; error: string | null;
+  isLoading: boolean; isSubmitting: boolean;
+  setUserId(id: string): void;
+  hydrateFromCache(id: string): Promise<void>;
+  reconcileIdentity(id: string): Promise<void>;
+  completeGame(game: CareerGame, answer: string, outcome?: JourneyOutcome): Promise<CareerGameResult>;
+  retryPendingSubmission(id: string): Promise<void>;
 }
-
-async function submitCompletion(
-  userId: string,
-  gameId: string,
-  submittedAnswer: string
-): Promise<CareerGameResult> {
-  return completeCareerGameApi(gameId, userId, submittedAnswer);
+const inflight = new Map<string, Promise<CareerGameResult>>();
+const retrying = new Set<string>();
+function verified(id: string, version: number) {
+  const a = useAuthStore.getState();
+  return canProcessProtectedAction({ isAuthenticated:a.isAuthenticated, authStatus:a.authStatus, identityStatus:a.identityStatus,
+    token:a.token,userId:a.user?.sub,authStateVersion:a.authStateVersion }, {userId:id,authStateVersion:version});
 }
-
-function hasVerifiedCareerSession(userId: string, authStateVersion?: number): boolean {
-  const authState = useAuthStore.getState();
-  return canProcessProtectedAction(
-    {
-      isAuthenticated: authState.isAuthenticated,
-      authStatus: authState.authStatus,
-      identityStatus: authState.identityStatus,
-      token: authState.token,
-      userId: authState.user?.sub,
-      authStateVersion: authState.authStateVersion,
-    },
-    { userId, authStateVersion }
-  );
-}
-
-export const useCareerGameStore = create<CareerGameState>((set, get) => ({
-  userId: null,
-  result: null,
-  error: null,
-  isLoading: false,
-  isSubmitting: false,
-
-  setUserId: (userId) =>
-    set((state) =>
-      state.userId === userId
-        ? { userId }
-        : {
-            userId,
-            result: null,
-            error: null,
-            isLoading: false,
-            isSubmitting: false,
-          }
-    ),
-
-  hydrateFromCache: async (userId) => {
-    const result = await getTodayCareerGameResult(userId);
-    if (get().userId === userId) {
-      set({ result, error: null });
-    }
-  },
-
-  reconcileIdentity: async (userId) => {
-    if (!userId || userId.startsWith('guest_')) {
-      return;
-    }
-
-    const authStateVersion = useAuthStore.getState().authStateVersion;
-    if (!hasVerifiedCareerSession(userId, authStateVersion)) {
-      throw new Error('A verified session is required to sync Journey');
-    }
-    const isCurrent = () =>
-      get().userId === userId && hasVerifiedCareerSession(userId, authStateVersion);
-    set({ userId, isLoading: true, error: null });
+export const useCareerGameStore = create<State>((set,get) => ({
+  userId:null,result:null,error:null,isLoading:false,isSubmitting:false,
+  setUserId: id => { if(get().userId !== id) set({userId:id,result:null,error:null,isLoading:false,isSubmitting:false}); },
+  hydrateFromCache: async id => {
+    const version = useAuthStore.getState().authStateVersion;
     try {
-      const localResult = await getTodayCareerGameResult(userId);
-      if (!isCurrent()) {
-        return;
-      }
-      if (localResult) {
-        set({ result: localResult, isLoading: false });
-        return;
-      }
-
-      const serverResult = await getServerCareerGameResult(userId);
-      if (!isCurrent()) {
-        return;
-      }
-      if (serverResult) {
-        const cached = await saveCareerGameResult(
-          serverResult,
-          userId,
-          'synced'
-        );
-        if (!isCurrent()) {
-          return;
-        }
+      const result = await getTodayCareerGameResult(id);
+      if(get().userId === id && useAuthStore.getState().authStateVersion === version) set({result,error:null});
+    } catch { if(get().userId === id) set({error:'Unable to read saved Journey. Please retry.'}); }
+  },
+  reconcileIdentity: async id => {
+    if(id.startsWith('guest_')) return;
+    const version = useAuthStore.getState().authStateVersion;
+    if(!verified(id,version)) return;
+    const current = () => get().userId === id && verified(id,version);
+    set({isLoading:true});
+    try {
+      const server = await readServer(id);
+      if(!current()) return;
+      if(server) {
+        const result = await saveCareerGameResult(server,id,'synced');
+        if(!current()) return;
         await clearGuestCareerGameResult();
-        set({ result: cached, isLoading: false });
-        return;
+        if(current()) set({result,error:null});
+      } else {
+        const local = await getTodayCareerGameResult(id);
+        const guest = local ? null : await getGuestCareerGameResult();
+        if(!current()) return;
+        if(guest) {
+          // Bind adoption to this account durably before the guest record is removed.
+          const result = await saveCareerGameResult({...guest,syncState:'pending',isOptimistic:true},id,'pending');
+          if(!current()) return;
+          await clearGuestCareerGameResult();
+          if(current()) set({result});
+        } else if(local && current()) set({result:local});
+        if(current()) await get().retryPendingSubmission(id);
       }
-
-      const guestResult = await getGuestCareerGameResult();
-      if (!isCurrent()) {
-        return;
-      }
-      if (!guestResult) {
-        set({ isLoading: false });
-        return;
-      }
-
-      const migrated = await submitCompletion(
-        userId,
-        guestResult.gameId,
-        guestResult.submittedAnswer
-      );
-      if (!isCurrent()) {
-        return;
-      }
-      const cached = await saveCareerGameResult(migrated, userId, 'synced');
-      if (!isCurrent()) {
-        return;
-      }
-      await clearGuestCareerGameResult();
-      set({ result: cached, isLoading: false });
-      logInfo('career.identity.migrated_guest', {
-        userId,
-        gameId: migrated.gameId,
-      });
-    } catch (error) {
-      logError('career.identity.reconcile.error', error);
-      if (get().userId === userId) {
-        set({
-          isLoading: false,
-          error:
-            error instanceof Error ? error.message : 'Failed to sync career game',
-        });
-      }
-      throw error;
-    }
+    } catch { if(current()) set({error:'Saved on this device. Retry sync when connected.'}); }
+    finally { if(current()) set({isLoading:false}); }
   },
-
-  completeGame: async (game, submittedAnswer) => {
-    const userId = get().userId;
-    if (!userId) {
-      throw new Error('Career game user is not ready');
-    }
-
-    const isGuest = userId.startsWith('guest_');
-    const localResult: CareerGameResult = {
-      date: game.date,
-      gameId: game.id,
-      completed: true,
-      canonicalName: game.canonicalName,
-      submittedAnswer: submittedAnswer.trim(),
-      syncState: isGuest ? 'synced' : 'pending',
-      isOptimistic: !isGuest,
-    };
-    const cached = await saveCareerGameResult(
-      localResult,
-      userId,
-      localResult.syncState
-    );
-    set({ result: cached, error: null });
-
-    if (isGuest) {
-      return localResult;
-    }
-
-    await setPendingCareerGameSubmission({
-      userId,
-      gameId: game.id,
-      submittedAnswer: submittedAnswer.trim(),
-      localResult,
-      queuedAt: new Date().toISOString(),
-    });
-
-    const authStateVersion = useAuthStore.getState().authStateVersion;
-    if (!hasVerifiedCareerSession(userId, authStateVersion)) {
-      logInfo('career.submit.deferred_until_verified', { userId, gameId: game.id });
-      set({ isSubmitting: false, error: null });
-      return localResult;
-    }
-
-    set({ isSubmitting: true });
-    try {
-      const serverResult = await submitCompletion(
-        userId,
-        game.id,
-        submittedAnswer
-      );
-      if (!hasVerifiedCareerSession(userId, authStateVersion)) {
-        if (get().userId === userId) set({ isSubmitting: false, error: null });
-        return localResult;
-      }
-      const current = get();
-      if (
-        current.userId !== userId ||
-        current.result?.gameId !== game.id ||
-        serverResult.gameId !== game.id
-      ) {
-        return localResult;
-      }
-
-      const synced = await saveCareerGameResult(serverResult, userId, 'synced');
-      await clearPendingCareerGameSubmission({ userId, gameId: game.id });
-      set({ result: synced, isSubmitting: false, error: null });
-      return serverResult;
-    } catch (error) {
-      if (!hasVerifiedCareerSession(userId, authStateVersion)) {
-        if (get().userId === userId) set({ isSubmitting: false, error: null });
-        return localResult;
-      }
-      const statusCode = error instanceof ApiError ? error.statusCode : undefined;
-      const retryable = isTransientQuizSubmissionFailure(statusCode);
-      if (!retryable) {
-        await clearPendingCareerGameSubmission({ userId, gameId: game.id });
-      }
-
-      const failed = await saveCareerGameResult(
-        { ...localResult, syncState: 'failed' },
-        userId,
-        'failed'
-      );
-      const current = get();
-      if (current.userId === userId && current.result?.gameId === game.id) {
-        set({
-          result: failed,
-          isSubmitting: false,
-          error: retryable
-            ? 'Solved on this device. We’ll retry syncing later.'
-            : error instanceof Error
-              ? error.message
-              : 'Failed to save career game',
-        });
-      }
-      return failed;
-    }
+  completeGame: async (game,answer,outcome='solved') => {
+    const id = get().userId;
+    if(!id) throw new Error('Journey is not ready');
+    if(game.date !== getQuizDate()) throw new Error('A new Journey is available. Return to Games.');
+    const version = useAuthStore.getState().authStateVersion;
+    const current = () => get().userId === id && useAuthStore.getState().authStateVersion === version;
+    const workKey = `${id}:${game.id}`;
+    const running = inflight.get(workKey); if(running) return running;
+    const work = (async () => {
+      const existing = await getTodayCareerGameResult(id);
+      if(existing?.gameId === game.id) return existing;
+      if(!current()) throw new Error('Account changed');
+      const guest = id.startsWith('guest_');
+      const result = await saveCareerGameResult({date:game.date,gameId:game.id,completed:true,outcome,
+        canonicalName:game.canonicalName,submittedAnswer:outcome === 'solved' ? answer.trim() : '',
+        syncState:guest ? 'synced' : 'pending',isOptimistic:!guest},id);
+      if(current()) set({result,error:null});
+      if(!guest && current()) await get().retryPendingSubmission(id);
+      return current() ? get().result ?? result : result;
+    })();
+    inflight.set(workKey,work);
+    try { return await work; }
+    catch(error) { if(current()) set({error:'Unable to save this result. Keep this screen open and retry.'}); throw error; }
+    finally { inflight.delete(workKey); }
   },
-
-  retryPendingSubmission: async (userId) => {
-    const pending = await getPendingCareerGameSubmission(userId);
-    if (!pending || pending.userId !== userId) {
-      return;
-    }
-    const authStateVersion = useAuthStore.getState().authStateVersion;
-    if (!hasVerifiedCareerSession(userId, authStateVersion)) {
-      logInfo('career.submit.retry.waiting_for_verified_session', { userId });
-      return;
-    }
-    if (pending.localResult.date !== getQuizDate()) {
-      await clearPendingCareerGameSubmission({
-        userId,
-        gameId: pending.gameId,
-      });
-      return;
-    }
-
+  retryPendingSubmission: async id => {
+    if(id.startsWith('guest_') || retrying.has(id)) return;
+    const version = useAuthStore.getState().authStateVersion;
+    const current = () => get().userId === id && verified(id,version);
+    if(!current()) return;
+    retrying.add(id);
     try {
-      const serverResult = await submitCompletion(
-        pending.userId,
-        pending.gameId,
-        pending.submittedAnswer
-      );
-      if (!hasVerifiedCareerSession(userId, authStateVersion)) return;
-      const cached = await saveCareerGameResult(serverResult, userId, 'synced');
-      await clearPendingCareerGameSubmission({
-        userId,
-        gameId: pending.gameId,
-      });
-      const current = get();
-      if (
-        current.userId === userId &&
-        (!current.result || current.result.gameId === pending.gameId)
-      ) {
-        set({ result: cached, error: null });
+      const pending = await getTodayCareerGameResult(id);
+      if(!pending || pending.syncState !== 'pending' || !current()) return;
+      set({isSubmitting:true});
+      const canonical = await submit(pending.gameId,id,pending.submittedAnswer,pending.outcome ?? 'solved');
+      // Writing the originating account's cache is safe even after an account change.
+      const result = await saveCareerGameResult(canonical,id,'synced');
+      if(current() && result.date === getQuizDate()) set({result,error:null});
+    } catch(error) {
+      if(current()) {
+        const retryable = isTransientQuizSubmissionFailure(error instanceof ApiError ? error.statusCode : undefined);
+        if(!retryable) {
+          const local = await getTodayCareerGameResult(id);
+          if(local) {
+            const result = await saveCareerGameResult(local,id,'failed');
+            if(current()) set({result});
+          }
+        }
+        if(current()) set({error:retryable ? 'Saved on this device. Retry sync when connected.' : 'This result could not be synced. Return to Games to refresh.'});
       }
-      logInfo('career.submit.retry.success', {
-        userId,
-        gameId: pending.gameId,
-      });
-    } catch (error) {
-      const statusCode = error instanceof ApiError ? error.statusCode : undefined;
-      if (!isTransientQuizSubmissionFailure(statusCode)) {
-        await clearPendingCareerGameSubmission({
-          userId,
-          gameId: pending.gameId,
-        });
-        logWarn('career.submit.retry.discarded', {
-          userId,
-          gameId: pending.gameId,
-          statusCode,
-        });
-        return;
-      }
-      logError('career.submit.retry.error', error);
-    }
+    } finally { retrying.delete(id); if(current()) set({isSubmitting:false}); }
   },
 }));
