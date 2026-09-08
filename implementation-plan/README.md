@@ -1,8 +1,12 @@
 # Pundit Trivia - Implementation Plan
 
-> Last updated: v2.13.0 leaderboards, player profiles, and friend requests
+> Last updated: v2.14.0 Quiz Archive and Journey improvements
 > Status: Active product; all three username and social identity phases are delivered
 > Source of truth: This folder documents current behavior and near-term hardening.
+
+## Current release
+
+[v2.14.0 Quiz Archive and Journey improvements](v2.14.0-archive-journey.md) documents the implemented contracts, local storage boundaries, isolated preview, validation evidence and remaining device acceptance. This release adds a date-selected Daily Quiz Archive; Journey remains daily-only. Billing and competitive game modes remain outside this release.
 
 ## Recent Delivery Summary
 

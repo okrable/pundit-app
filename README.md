@@ -1,9 +1,15 @@
-# Pundit Trivia v2.10.0
+# Pundit Trivia v2.14.0
 
 Pundit Trivia is a daily football quiz app built with Expo React Native,
 TypeScript, Netlify Functions, BigQuery, and CockroachDB.
 
 ## Current Product
+
+- Separate, initially free **Quiz Archive**: browse validated past five-question quizzes, replay chosen dates, and resume cached attempts offline. Progress and latest scores remain local and account-separated; archive play never changes daily achievements or competitive results.
+- Daily Journey now includes canonical player suggestions and confirmed Give Up. The first persisted solved/given-up outcome wins; shared text never reveals the footballer.
+- Canonical Daily Quiz retries preserve stored scores and available answer details. Historical missing details remain unavailable; statistics are rebuilt from persisted results.
+- Release contracts, preview configuration, migrations and acceptance: [v2.14.0 implementation](implementation-plan/v2.14.0-archive-journey.md).
+
 
 - Daily 5-question football quiz with typewriter prompt pacing.
 - Date-gated UK question and player-career content from BigQuery, with
@@ -49,7 +55,7 @@ TypeScript, Netlify Functions, BigQuery, and CockroachDB.
 
 ## Versioning
 
-- Current app/docs version: `2.10.0`.
+- Current app/docs version: `2.14.0`.
 - `package.json`, `package-lock.json`, `app.json`, `app/constants/version.ts`,
   and native iOS/Android marketing versions must stay aligned.
 - Settings displays the app version from `APP_VERSION`.
