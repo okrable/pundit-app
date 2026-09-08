@@ -1,11 +1,29 @@
+import { PREVIEW_BUILD } from './deploymentContext';
 import { Pool, PoolClient, QueryResultRow } from 'pg';
 
 let pool: Pool | null = null;
 
+export function databaseConnection(env: Record<string, string | undefined> = process.env, previewBuild = PREVIEW_BUILD): string | undefined {
+  if (previewBuild || env.CONTEXT === 'deploy-preview' || env.CONTEXT === 'branch-deploy') {
+    if (!env.PREVIEW_DATABASE_URL || env.PREVIEW_DATABASE_URL === env.DATABASE_URL) {
+      throw new Error('Preview persistence requires a separate PREVIEW_DATABASE_URL');
+    }
+    if (env.DATABASE_URL) {
+      const preview = new URL(env.PREVIEW_DATABASE_URL);
+      const production = new URL(env.DATABASE_URL);
+      if (preview.host === production.host && preview.pathname === production.pathname) {
+        throw new Error('Preview persistence requires a separate database');
+      }
+    }
+    return env.PREVIEW_DATABASE_URL;
+  }
+  return env.DATABASE_URL;
+}
+
 export function getPool() {
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: databaseConnection(),
       ssl: {
         rejectUnauthorized: false,
       },

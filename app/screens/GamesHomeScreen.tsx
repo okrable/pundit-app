@@ -231,7 +231,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
     (!quizAvailable || isDailyPayloadLoading);
   const careerActionLabel =
     careerTileState === 'completed'
-      ? 'Player found'
+      ? (currentCareerResult?.outcome === 'given_up' ? 'Answer revealed' : 'Player found')
       : careerTileState === 'available'
         ? 'Play'
         : careerTileState === 'loading'

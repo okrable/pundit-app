@@ -122,11 +122,11 @@ export default function CareerGameScreen({ navigation }: Props) {
     if (!game || completionLock.current) return;
     completionLock.current = true;
     try {
-      const saved = await completeGame(game,answer,outcome);
-      const stillCurrent = useCareerGameStore.getState().userId === gameUserId;
-      if(stillCurrent) trackAnalyticsEvent(saved.outcome === 'given_up' ? 'journey_given_up' : 'journey_solved',
-        isAuthenticated ? 'authenticated' : 'guest', {quizDate:game.date,durationMs:Math.min(Date.now()-startedAt.current,600000)});
-    } catch (e) { setFeedback(e instanceof Error ? e.message : 'Unable to save result. Please retry.'); }
+      await completeGame(game,answer,outcome,Date.now()-startedAt.current);
+    } catch (e) {
+      if(useCareerGameStore.getState().userId === gameUserId)
+        setFeedback(e instanceof Error ? e.message : 'Unable to save result. Please retry.');
+    }
     finally { completionLock.current = false; }
   };
 
@@ -142,7 +142,7 @@ export default function CareerGameScreen({ navigation }: Props) {
   if (result) {
     return (
       <SafeAreaView style={styles.container} edges={safeAreaEdges}>
-        <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.resultContent}>
+        <ScrollView contentContainerStyle={{flexGrow:1}}><CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.resultContent}>
           <Image source={logoImage} style={styles.resultLogo} resizeMode="contain" />
           <View style={styles.resultCard}>
             <View style={styles.resultTick}>
@@ -160,20 +160,20 @@ export default function CareerGameScreen({ navigation }: Props) {
             ) : null}
           </View>
           <View style={styles.resultActions}>
-            {result.syncState === 'pending' ? <TouchableOpacity style={styles.secondaryAction} onPress={retry} disabled={isSubmitting}>
+            {result.syncState === 'pending' ? <TouchableOpacity accessibilityRole="button" style={styles.secondaryAction} onPress={retry} disabled={isSubmitting}>
               <Text style={styles.secondaryActionText}>{isSubmitting ? 'Syncing…' : 'Retry sync'}</Text>
             </TouchableOpacity> : null}
-            <TouchableOpacity style={styles.secondaryAction} onPress={handleShare}>
+            <TouchableOpacity accessibilityRole="button" style={styles.secondaryAction} onPress={handleShare}>
               <Text style={styles.secondaryActionText}>Share result</Text>
             </TouchableOpacity>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.primaryAction}
               onPress={() => navigation.popToTop()}
             >
               <Text style={styles.primaryActionText}>Back to Games</Text>
             </TouchableOpacity>
           </View>
-        </CenteredWebContent>
+        </CenteredWebContent></ScrollView>
       </SafeAreaView>
     );
   }
@@ -191,7 +191,7 @@ export default function CareerGameScreen({ navigation }: Props) {
               ? 'The career card will be ready in a moment.'
               : 'The daily quiz is still available from Games.'}
           </Text>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.primaryAction}
             onPress={() => navigation.popToTop()}
           >
@@ -206,12 +206,12 @@ export default function CareerGameScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container} edges={safeAreaEdges}>
       <Modal visible={confirmGiveUp} transparent animationType="fade" onRequestClose={() => setConfirmGiveUp(false)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard} accessibilityViewIsModal>
+          <ScrollView style={{maxHeight:"90%"}} contentContainerStyle={styles.modalCard} accessibilityViewIsModal>
             <Text style={styles.stateTitle}>Reveal today’s player?</Text>
             <Text style={styles.stateCopy}>This finishes today’s Journey as given up. You cannot change it to a solve.</Text>
-            <TouchableOpacity style={styles.secondaryAction} onPress={() => setConfirmGiveUp(false)}><Text style={styles.secondaryActionText}>Keep guessing</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.primaryAction} onPress={() => { setConfirmGiveUp(false); Keyboard.dismiss(); void finish('given_up'); }}><Text style={styles.primaryActionText}>Give Up and reveal</Text></TouchableOpacity>
-          </View>
+            <TouchableOpacity accessibilityRole="button" style={styles.secondaryAction} onPress={() => setConfirmGiveUp(false)}><Text style={styles.secondaryActionText}>Keep guessing</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" style={styles.primaryAction} onPress={() => { setConfirmGiveUp(false); Keyboard.dismiss(); void finish('given_up'); }}><Text style={styles.primaryActionText}>Give Up and reveal</Text></TouchableOpacity>
+          </ScrollView>
         </View>
       </Modal>
       <KeyboardAvoidingView
@@ -283,13 +283,13 @@ export default function CareerGameScreen({ navigation }: Props) {
               />
               <PlayerNameSuggestions value={guess} onSelect={name => { setGuess(name); setFeedback(null); }} actorType={isAuthenticated ? 'authenticated' : 'guest'} identityKey={gameUserId} />
               {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
-              <TouchableOpacity style={styles.submitButton} onPress={() => void handleSubmit()}>
+              <TouchableOpacity accessibilityRole="button" style={styles.submitButton} onPress={() => void handleSubmit()}>
                 <Text style={styles.submitButtonText}>Submit guess</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryAction} onPress={() => setConfirmGiveUp(true)} accessibilityLabel="Give up and reveal the player">
+              <TouchableOpacity accessibilityRole="button" style={styles.secondaryAction} onPress={() => setConfirmGiveUp(true)} accessibilityLabel="Give up and reveal the player">
                 <Text style={styles.secondaryActionText}>Give Up</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => navigation.popToTop()}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => navigation.popToTop()}>
                 <Text style={styles.backText}>Back to Games</Text>
               </TouchableOpacity>
             </View>
