@@ -1,3 +1,4 @@
+import { openArchive } from '../navigation/rootNavigation';
 import React, { useMemo } from 'react';
 import {
   Image,
@@ -141,6 +142,7 @@ export default function ResultsScreen({
         </View>
 
           <View style={styles.actions}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={openArchive}><Text style={styles.secondaryButtonText}>Quiz Archive</Text></TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={handleShare} activeOpacity={0.86}>
               <Text style={styles.secondaryButtonText}>Share result</Text>
             </TouchableOpacity>

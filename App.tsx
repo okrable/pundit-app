@@ -29,6 +29,8 @@ import {
 } from './shared/clientIdentityPolicy';
 import { getAppLaunchDuration, trackAnalyticsEvent } from './app/services/analytics';
 import PlayerProfileScreen from './app/screens/PlayerProfileScreen';
+import ArchiveScreen from './app/screens/ArchiveScreen';
+import ArchiveQuizScreen from './app/screens/ArchiveQuizScreen';
 import DailyQuizScreen from './app/screens/DailyQuizScreen';
 import {
   rootNavigationRef,
@@ -210,6 +212,8 @@ function AppContent() {
         component={MainNavigator}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="Archive" component={ArchiveScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ArchiveQuiz" component={ArchiveQuizScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="DailyQuiz"
         component={DailyQuizScreen}

@@ -11,6 +11,8 @@ export type RootStackParamList = {
   Main: { screen?: 'Games' | 'Challenge' | 'League Tables' | 'Me' } | undefined;
   DailyQuiz: { autoStart?: boolean } | undefined;
   PlayerProfile: PlayerProfileRouteParams;
+  Archive: undefined;
+  ArchiveQuiz: { date: string };
 };
 
 export const rootNavigationRef = createNavigationContainerRef<RootStackParamList>();
@@ -24,5 +26,11 @@ export function openPlayerProfile(params: PlayerProfileRouteParams): boolean {
 export function openDailyQuiz(params?: { autoStart?: boolean }): boolean {
   if (!rootNavigationRef.isReady()) return false;
   rootNavigationRef.navigate('DailyQuiz', params);
+  return true;
+}
+
+export function openArchive(): boolean {
+  if (!rootNavigationRef.isReady()) return false;
+  rootNavigationRef.navigate('Archive');
   return true;
 }
