@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -19,8 +19,7 @@ import {
   markAnalyticsTiming,
   trackAnalyticsEvent,
 } from '../services/analytics';
-import type { GamesStackParamList } from '../navigation/GamesNavigator';
-import { useMainTabSafeAreaEdges } from '../navigation/MainTabSafeArea';
+import type { RootStackParamList } from '../navigation/rootNavigation';
 import { getQuizDate } from '../utils/quizDate';
 import { isQuizForDate } from '../../shared/dailyQuiz';
 import { useAchievementStore } from '../state/useAchievementStore';
@@ -31,14 +30,15 @@ import {
   normalizeDailyQuizAttempt,
 } from '../../shared/dailyQuizAttempt';
 
-type Props = NativeStackScreenProps<GamesStackParamList, 'DailyQuiz'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'DailyQuiz'>;
 
 export default function DailyQuizScreen({ navigation, route }: Props) {
-  const safeAreaEdges = useMainTabSafeAreaEdges(['bottom']);
   const centeredQuizStyle = useCenteredWebStyle(webContentWidth.quiz);
   const [startRequested, setStartRequested] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(20);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
   const completionStartedRef = useRef<string | null>(null);
   const resumedAttemptRef = useRef<string | null>(null);
   const recapEventKeyRef = useRef<string | null>(null);
@@ -284,7 +284,17 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     }
     else if (quizIsCurrent) setStartRequested(true);
   };
-  const handleReturnToGames = () => { resetQuiz(); navigation.popToTop(); };
+  const handleReturnToGames = () => {
+    resetQuiz();
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('Main', { screen: 'Games' });
+  };
+  const handleOptionsRevealStarted = useCallback((optionsOffsetY: number) => {
+    scrollViewRef.current?.scrollTo({
+      y: Math.max(optionsOffsetY - theme.spacing.sm, 0),
+      animated: true,
+    });
+  }, []);
 
   if (result?.date === currentQuizDate && quizIsCurrent && quiz) {
     return (
@@ -319,7 +329,7 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
     activeAttempt.phase === 'exiting';
   const answeringEnabled = activeAttempt.phase === 'answering' && !attemptError;
   return (
-    <SafeAreaView style={styles.container} edges={safeAreaEdges}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       {attemptError ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Retry saving quiz progress"
           style={styles.saveError} onPress={handleRetryAttemptSave}>
@@ -327,8 +337,10 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
         </Pressable>
       ) : null}
       <Pressable style={styles.pressable} onPressIn={() => setIsHolding(true)}
+        onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)}
         onPressOut={() => setIsHolding(false)}>
-        <ScrollView style={styles.scrollView}
+        <ScrollView ref={scrollViewRef} style={styles.scrollView}
+          contentInsetAdjustmentBehavior={Platform.OS === 'ios' ? 'automatic' : undefined}
           contentContainerStyle={[styles.contentContainer, centeredQuizStyle]}
           showsVerticalScrollIndicator={false}>
           {currentQuestion ? (
@@ -337,7 +349,9 @@ export default function DailyQuizScreen({ navigation, route }: Props) {
               disabled={!answeringEnabled} isExiting={activeAttempt.phase === 'exiting'}
               showResult={showingResult} correctOptionIndex={currentQuestion.correctOptionIndex}
               isHolding={isHolding} onOptionsReady={handleOptionsReady}
+              onOptionsRevealStarted={handleOptionsRevealStarted}
               revealImmediately={activeAttempt.phase !== 'preparing'}
+              viewportHeight={viewportHeight}
               questionNumber={activeAttempt.questionIndex + 1}
               totalQuestions={quiz.questions.length} score={activeAttempt.score}
               timerDuration={20} timerActive={activeAttempt.phase === 'answering' && timeRemaining > 0}

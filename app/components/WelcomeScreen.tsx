@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  useWindowDimensions,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme/theme';
 import LawsOfTheGameModal from './LawsOfTheGameModal';
 import CenteredWebContent, { webContentWidth } from './ResponsiveLayout';
@@ -16,53 +25,52 @@ export default function WelcomeScreen({
   helperText = null,
 }: WelcomeScreenProps) {
   const [showLaws, setShowLaws] = useState(false);
-  const { width, height } = useWindowDimensions();
-  const verticalLift = -Math.min(height * 0.125, 92);
+  const { width, fontScale } = useWindowDimensions();
+  const stackActions = width < 380 || fontScale > 1.15;
 
   return (
-    <View style={styles.container}>
-      <CenteredWebContent
-        maxWidth={webContentWidth.quiz}
-        style={[
-          styles.content,
-          { transform: [{ translateY: verticalLift }] },
-        ]}
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <Image
-          source={require('../../assets/logo/white/pundit-white.png')}
-          style={[styles.logo, { width: Math.min(width * 0.7, 360) }]}
-          resizeMode="contain"
-        />
+        <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
+          <Image
+            source={require('../../assets/logo/white/pundit-white.png')}
+            style={[styles.logo, { width: Math.min(width * 0.7, 360) }]}
+            resizeMode="contain"
+          />
 
-        <Text style={styles.tagline}>5 Questions. Don't bottle it.</Text>
+          <Text style={styles.tagline}>5 Questions. Don't bottle it.</Text>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.lawsButton}
-            onPress={() => setShowLaws(true)}
-          >
-            <Text style={styles.lawsButtonText}>Laws of the Game</Text>
-          </TouchableOpacity>
+          <View style={[styles.buttonContainer, stackActions && styles.buttonContainerStacked]}>
+            <TouchableOpacity
+              style={[styles.lawsButton, stackActions && styles.buttonStacked]}
+              onPress={() => setShowLaws(true)}
+            >
+              <Text style={styles.lawsButtonText}>Laws of the Game</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.kickOffButton}
-            onPress={onStartQuiz}
-            disabled={isPreparing}
-          >
-            <Text style={styles.kickOffButtonText}>
-              {isPreparing ? 'Warming Up...' : 'Kick Off'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.kickOffButton, stackActions && styles.buttonStacked]}
+              onPress={onStartQuiz}
+              disabled={isPreparing}
+            >
+              <Text style={styles.kickOffButtonText}>
+                {isPreparing ? 'Warming Up...' : 'Kick Off'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
-      </CenteredWebContent>
+          {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
+        </CenteredWebContent>
+      </ScrollView>
 
       <LawsOfTheGameModal
         visible={showLaws}
         onClose={() => setShowLaws(false)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -71,11 +79,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.accent,
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.xl,
   },
   logo: {
     height: 100,
@@ -91,6 +103,14 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     gap: theme.spacing.md,
+  },
+  buttonContainerStacked: {
+    width: '100%',
+    maxWidth: 280,
+    flexDirection: 'column',
+  },
+  buttonStacked: {
+    width: '100%',
   },
   lawsButton: {
     backgroundColor: theme.colors.background,

@@ -110,6 +110,11 @@ import {
   selectMainNavigator,
 } from '../shared/navigationPolicy';
 import {
+  getQuizLayoutPolicy,
+  getQuizOptionRevealDuration,
+  shouldNotifyQuizOptionsReveal,
+} from '../shared/quizLayout';
+import {
   AVATAR_DEFINITIONS,
   SYMBOL_AVATAR_DEFINITIONS,
   chooseRandomSymbolAvatarId,
@@ -1216,6 +1221,69 @@ test('selects the platform navigator and safely falls back when native tabs are 
     }),
     'tabs-host-unavailable'
   );
+});
+
+test('uses comfortable Daily Quiz density only for a roomy default-text viewport', () => {
+  const policy = getQuizLayoutPolicy({
+    width: 430,
+    viewportHeight: 760,
+    fontScale: 1,
+  });
+
+  assert.equal(policy.tier, 'comfortable');
+  assert.equal(policy.useSingleColumnOptions, false);
+  assert.equal(policy.optionMinHeight, 78);
+});
+
+test('compacts Daily Quiz spacing for shorter screens or moderately enlarged text', () => {
+  const shortPolicy = getQuizLayoutPolicy({
+    width: 390,
+    viewportHeight: 680,
+    fontScale: 1,
+  });
+  const enlargedTextPolicy = getQuizLayoutPolicy({
+    width: 430,
+    viewportHeight: 760,
+    fontScale: 1.2,
+  });
+
+  assert.equal(shortPolicy.tier, 'compact');
+  assert.equal(enlargedTextPolicy.tier, 'compact');
+  assert.equal(shortPolicy.useSingleColumnOptions, false);
+  assert.ok(shortPolicy.cardPadding < 16);
+});
+
+test('uses readable single-column answers for accessibility-constrained quiz layouts', () => {
+  const smallViewport = getQuizLayoutPolicy({
+    width: 390,
+    viewportHeight: 600,
+    fontScale: 1,
+  });
+  const narrowViewport = getQuizLayoutPolicy({
+    width: 340,
+    viewportHeight: 760,
+    fontScale: 1,
+  });
+  const accessibilityText = getQuizLayoutPolicy({
+    width: 430,
+    viewportHeight: 760,
+    fontScale: 1.31,
+  });
+
+  for (const policy of [smallViewport, narrowViewport, accessibilityText]) {
+    assert.equal(policy.tier, 'accessibility');
+    assert.equal(policy.useSingleColumnOptions, true);
+    assert.ok(policy.optionMinHeight >= 44);
+  }
+});
+
+test('aligns options once per question without shortening the reveal delay', () => {
+  assert.equal(getQuizOptionRevealDuration(4), 960);
+  assert.equal(shouldNotifyQuizOptionsReveal('q1', null, false, 320), false);
+  assert.equal(shouldNotifyQuizOptionsReveal('q1', null, true, null), false);
+  assert.equal(shouldNotifyQuizOptionsReveal('q1', null, true, 320), true);
+  assert.equal(shouldNotifyQuizOptionsReveal('q1', 'q1', true, 320), false);
+  assert.equal(shouldNotifyQuizOptionsReveal('q2', 'q1', true, 280), true);
 });
 
 test('validates answer shape, bounds, and duplicates', () => {

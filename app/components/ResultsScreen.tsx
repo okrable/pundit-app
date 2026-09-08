@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   Image,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -83,10 +84,14 @@ export default function ResultsScreen({
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       {result.score === PERFECT_DAILY_SCORE ? <PerfectScoreFireworks /> : null}
-      <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
-        <View style={styles.topBar}>
-          <Image source={logoImage} style={styles.logo} resizeMode="contain" />
-        </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.content}>
+          <View style={styles.topBar}>
+            <Image source={logoImage} style={styles.logo} resizeMode="contain" />
+          </View>
 
         <View style={styles.summaryCard}>
           <View style={styles.heroRow}>
@@ -133,15 +138,16 @@ export default function ResultsScreen({
           {syncMessage ? <Text style={styles.syncText}>{syncMessage}</Text> : null}
         </View>
 
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleShare} activeOpacity={0.86}>
-            <Text style={styles.secondaryButtonText}>Share result</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.shareButton} onPress={onReturnToGames} activeOpacity={0.86}>
-            <Text style={styles.shareButtonText}>Back to Games</Text>
-          </TouchableOpacity>
-        </View>
-      </CenteredWebContent>
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleShare} activeOpacity={0.86}>
+              <Text style={styles.secondaryButtonText}>Share result</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.shareButton} onPress={onReturnToGames} activeOpacity={0.86}>
+              <Text style={styles.shareButtonText}>Back to Games</Text>
+            </TouchableOpacity>
+          </View>
+        </CenteredWebContent>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -151,8 +157,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.lg,
