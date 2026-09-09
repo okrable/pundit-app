@@ -1,3 +1,4 @@
+import { openArchive } from '../navigation/rootNavigation';
 import React, { useMemo } from 'react';
 import {
   Image,
@@ -43,8 +44,10 @@ export default function ResultsScreen({
     () =>
       result.answers.map((answer, index) => {
         const question = quiz.questions.find(q => q.id === answer.questionId);
-        const correctOptionIndex = answer.correctOptionIndex ?? question?.correctOptionIndex ?? 0;
-        const correctAnswer = question?.options[correctOptionIndex] ?? 'Unknown';
+        const correctOptionIndex = answer.correctOptionIndex;
+        const correctAnswer = question && correctOptionIndex !== undefined
+          ? question.options[correctOptionIndex] ?? 'Answer details unavailable'
+          : 'Answer details unavailable';
 
         return {
           questionNumber: index + 1,
@@ -139,6 +142,7 @@ export default function ResultsScreen({
         </View>
 
           <View style={styles.actions}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={openArchive}><Text style={styles.secondaryButtonText}>Quiz Archive</Text></TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={handleShare} activeOpacity={0.86}>
               <Text style={styles.secondaryButtonText}>Share result</Text>
             </TouchableOpacity>

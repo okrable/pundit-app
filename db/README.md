@@ -139,3 +139,10 @@ users
   ├── online_game_players
   └── challenges
 ```
+
+## v2.14.0 release migrations
+
+- `021_quiz_answer_details.sql`: nullable canonical answer-detail snapshots; historical rows remain intact.
+- `022_journey_outcomes.sql`: additive solved/given_up outcome with legacy solved default.
+
+See [release configuration and rollback](../implementation-plan/v2.14.0-archive-journey.md). Apply these to isolated preview persistence first. Keep both columns and backend terminal-conflict protections during rollback. Deploy previews now require `PREVIEW_DATABASE_URL` and never fall back to production persistence.

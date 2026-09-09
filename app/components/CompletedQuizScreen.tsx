@@ -1,3 +1,4 @@
+import { openArchive } from '../navigation/rootNavigation';
 import React from 'react';
 import {
   Image,
@@ -90,6 +91,7 @@ export default function CompletedQuizScreen({
           <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
             <Text style={styles.shareButtonText}>Share</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.shareButton} onPress={openArchive}><Text style={styles.shareButtonText}>Browse Quiz Archive</Text></TouchableOpacity>
           {onReturnToGames ? (
             <TouchableOpacity style={styles.gamesButton} onPress={onReturnToGames}>
               <Text style={styles.gamesButtonText}>Back to Games</Text>

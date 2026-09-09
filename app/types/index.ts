@@ -54,6 +54,7 @@ export interface CareerGame {
 }
 
 export interface CareerGameResult {
+  outcome?: import("../../shared/journeyOutcome").JourneyOutcome;
   date: string;
   gameId: string;
   completed: true;
@@ -72,9 +73,10 @@ export interface AnswerWithTiming {
 
 // Detailed answer info returned immediately after quiz submission
 export interface QuizAnswerDetail {
-  questionId: string;
-  selectedOptionIndex: number;
-  correctOptionIndex: number;
+  questionId?: string;
+  selectedOptionIndex?: number;
+  correctOptionIndex?: number;
+  timeRemainingMs?: number;
   isCorrect: boolean;
 }
 

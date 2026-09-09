@@ -398,7 +398,7 @@ export async function getTodayCareerGameResult(
   userId: string
 ): Promise<CareerGameResult | null> {
   const response = await fetchApi<{ result: CareerGameResult | null }>(
-    `/getTodayCareerGameResult?userId=${encodeURIComponent(userId)}`
+    `/getTodayCareerGameResult?contractVersion=2&userId=${encodeURIComponent(userId)}`
   );
   return response.result;
 }
@@ -406,13 +406,14 @@ export async function getTodayCareerGameResult(
 export async function completeCareerGame(
   gameId: string,
   userId: string,
-  submittedAnswer: string
+  submittedAnswer: string,
+  outcome: import('../../shared/journeyOutcome').JourneyOutcome = 'solved'
 ): Promise<CareerGameResult> {
   const response = await fetchApi<{ result: CareerGameResult }>(
     '/completeCareerGame',
     {
       method: 'POST',
-      body: JSON.stringify({ gameId, userId, submittedAnswer }),
+      body: JSON.stringify({ gameId, userId, submittedAnswer, outcome, contractVersion: 2 }),
     },
     {
       timeoutMs: SUBMIT_QUIZ_TIMEOUT_MS,

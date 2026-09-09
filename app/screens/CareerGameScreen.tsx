@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
+  Modal,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -12,6 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { journeyShare } from '../../shared/journeyOutcome';
+import { trackAnalyticsEvent } from '../services/analytics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { GamesStackParamList } from '../navigation/GamesNavigator';
@@ -19,6 +24,7 @@ import { useQuizStore } from '../state/useQuizStore';
 import { useCareerGameStore } from '../state/useCareerGameStore';
 import { useAuthStore } from '../state/useAuthStore';
 import { getUserId } from '../storage/userStorage';
+import PlayerNameSuggestions from '../components/PlayerNameSuggestions';
 import JourneyGraphic from '../components/JourneyGraphic';
 import CenteredWebContent, { webContentWidth } from '../components/ResponsiveLayout';
 import { matchesCareerAnswer } from '../../shared/careerAnswer';
@@ -35,6 +41,9 @@ export default function CareerGameScreen({ navigation }: Props) {
   const inputRef = useRef<TextInput>(null);
   const previousGameUserIdRef = useRef<string | null>(null);
   const [guess, setGuess] = useState('');
+  const [confirmGiveUp, setConfirmGiveUp] = useState(false);
+  const startedAt = useRef(Date.now());
+  const completionLock = useRef(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const { quiz, fetchQuiz, isQuizLoading } = useQuizStore();
   const { user, isAuthenticated } = useAuthStore();
@@ -45,25 +54,45 @@ export default function CareerGameScreen({ navigation }: Props) {
     setUserId,
     hydrateFromCache,
     completeGame,
+    retryPendingSubmission,
+    isSubmitting,
   } = useCareerGameStore();
 
   useEffect(() => {
     const previousUserId = previousGameUserIdRef.current;
     previousGameUserIdRef.current = gameUserId;
-    if (!previousUserId || !gameUserId || previousUserId === gameUserId) return;
+    if (previousUserId === gameUserId) return;
+    setConfirmGiveUp(false);
+    startedAt.current = Date.now();
     setGuess('');
     setFeedback(null);
     Keyboard.dismiss();
   }, [gameUserId]);
 
   useEffect(() => {
+    let active = true;
     const prepare = async () => {
-      const userId = isAuthenticated && user ? user.sub : await getUserId();
-      setUserId(userId);
-      await Promise.all([hydrateFromCache(userId), fetchQuiz()]);
+      const id = isAuthenticated && user ? user.sub : await getUserId();
+      if (!active) return;
+      setUserId(id);
+      await Promise.all([hydrateFromCache(id), fetchQuiz()]);
     };
     void prepare();
+    return () => { active = false; };
   }, [fetchQuiz, hydrateFromCache, isAuthenticated, setUserId, user]);
+  const retry = useCallback(() => {
+    if (gameUserId) void retryPendingSubmission(gameUserId);
+  }, [gameUserId, retryPendingSubmission]);
+  useFocusEffect(useCallback(() => { retry(); }, [retry]));
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => { if(state === 'active') retry(); });
+    return () => sub.remove();
+  }, [retry]);
+  useEffect(() => {
+    if (result?.syncState !== 'pending') return;
+    const timers = [5000,15000,30000].map(delay => setTimeout(retry,delay));
+    return () => timers.forEach(clearTimeout);
+  }, [result?.gameId,result?.syncState,retry]);
 
   const game = quiz?.careerGame;
   const rows = useMemo(
@@ -86,7 +115,19 @@ export default function CareerGameScreen({ navigation }: Props) {
 
     Keyboard.dismiss();
     setFeedback(null);
-    await completeGame(game, guess);
+    await finish('solved', guess);
+  };
+
+  const finish = async (outcome: 'solved' | 'given_up', answer = '') => {
+    if (!game || completionLock.current) return;
+    completionLock.current = true;
+    try {
+      await completeGame(game,answer,outcome,Date.now()-startedAt.current);
+    } catch (e) {
+      if(useCareerGameStore.getState().userId === gameUserId)
+        setFeedback(e instanceof Error ? e.message : 'Unable to save result. Please retry.');
+    }
+    finally { completionLock.current = false; }
   };
 
   const handleShare = async () => {
@@ -94,42 +135,45 @@ export default function CareerGameScreen({ navigation }: Props) {
       return;
     }
     await Share.share({
-      message: `Pundit - ${result.date}\nPlayer found ✅`,
+      message: journeyShare(result.date,result.outcome ?? 'solved'),
     });
   };
 
   if (result) {
     return (
       <SafeAreaView style={styles.container} edges={safeAreaEdges}>
-        <CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.resultContent}>
+        <ScrollView contentContainerStyle={{flexGrow:1}}><CenteredWebContent maxWidth={webContentWidth.quiz} style={styles.resultContent}>
           <Image source={logoImage} style={styles.resultLogo} resizeMode="contain" />
           <View style={styles.resultCard}>
             <View style={styles.resultTick}>
-              <Text style={styles.resultTickText}>✓</Text>
+              <Text style={styles.resultTickText}>{result.outcome === 'given_up' ? '?' : '✓'}</Text>
             </View>
-            <Text style={styles.resultKicker}>PLAYER FOUND</Text>
+            <Text style={styles.resultKicker}>{result.outcome === 'given_up' ? 'ANSWER REVEALED' : 'PLAYER FOUND'}</Text>
             <Text style={styles.resultName}>{result.canonicalName}</Text>
             <Text style={styles.resultCopy}>
-              You followed the journey and found today’s player.
+              {result.outcome === 'given_up' ? 'You revealed today’s player. A new journey arrives tomorrow.' : 'You followed the journey and found today’s player.'}
             </Text>
-            {result.syncState === 'failed' || error ? (
+            {result.syncState === 'pending' || result.syncState === 'failed' || error ? (
               <Text style={styles.syncText}>
-                Solved on this device. We’ll retry syncing later.
+                {error || 'Saved on this device. Syncing today’s outcome.'}
               </Text>
             ) : null}
           </View>
           <View style={styles.resultActions}>
-            <TouchableOpacity style={styles.secondaryAction} onPress={handleShare}>
+            {result.syncState === 'pending' ? <TouchableOpacity accessibilityRole="button" style={styles.secondaryAction} onPress={retry} disabled={isSubmitting}>
+              <Text style={styles.secondaryActionText}>{isSubmitting ? 'Syncing…' : 'Retry sync'}</Text>
+            </TouchableOpacity> : null}
+            <TouchableOpacity accessibilityRole="button" style={styles.secondaryAction} onPress={handleShare}>
               <Text style={styles.secondaryActionText}>Share result</Text>
             </TouchableOpacity>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.primaryAction}
               onPress={() => navigation.popToTop()}
             >
               <Text style={styles.primaryActionText}>Back to Games</Text>
             </TouchableOpacity>
           </View>
-        </CenteredWebContent>
+        </CenteredWebContent></ScrollView>
       </SafeAreaView>
     );
   }
@@ -147,7 +191,7 @@ export default function CareerGameScreen({ navigation }: Props) {
               ? 'The career card will be ready in a moment.'
               : 'The daily quiz is still available from Games.'}
           </Text>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.primaryAction}
             onPress={() => navigation.popToTop()}
           >
@@ -160,6 +204,16 @@ export default function CareerGameScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={safeAreaEdges}>
+      <Modal visible={confirmGiveUp} transparent animationType="fade" onRequestClose={() => setConfirmGiveUp(false)}>
+        <View style={styles.modalBackdrop}>
+          <ScrollView style={{maxHeight:"90%"}} contentContainerStyle={styles.modalCard} accessibilityViewIsModal>
+            <Text style={styles.stateTitle}>Reveal today’s player?</Text>
+            <Text style={styles.stateCopy}>This finishes today’s Journey as given up. You cannot change it to a solve.</Text>
+            <TouchableOpacity accessibilityRole="button" style={styles.secondaryAction} onPress={() => setConfirmGiveUp(false)}><Text style={styles.secondaryActionText}>Keep guessing</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" style={styles.primaryAction} onPress={() => { setConfirmGiveUp(false); Keyboard.dismiss(); void finish('given_up'); }}><Text style={styles.primaryActionText}>Give Up and reveal</Text></TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -227,11 +281,15 @@ export default function CareerGameScreen({ navigation }: Props) {
                 style={styles.input}
                 accessibilityLabel="Player name"
               />
+              <PlayerNameSuggestions value={guess} onSelect={name => { setGuess(name); setFeedback(null); }} actorType={isAuthenticated ? 'authenticated' : 'guest'} identityKey={gameUserId} />
               {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
-              <TouchableOpacity style={styles.submitButton} onPress={() => void handleSubmit()}>
+              <TouchableOpacity accessibilityRole="button" style={styles.submitButton} onPress={() => void handleSubmit()}>
                 <Text style={styles.submitButtonText}>Submit guess</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => navigation.popToTop()}>
+              <TouchableOpacity accessibilityRole="button" style={styles.secondaryAction} onPress={() => setConfirmGiveUp(true)} accessibilityLabel="Give up and reveal the player">
+                <Text style={styles.secondaryActionText}>Give Up</Text>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" onPress={() => navigation.popToTop()}>
                 <Text style={styles.backText}>Back to Games</Text>
               </TouchableOpacity>
             </View>
@@ -243,6 +301,8 @@ export default function CareerGameScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  modalBackdrop: {flex:1,backgroundColor:'rgba(0,0,0,0.45)',justifyContent:'center',padding:24},
+  modalCard: {backgroundColor:theme.colors.background,padding:24,borderRadius:theme.borderRadius.lg,gap:16,width:'100%',maxWidth:440,alignSelf:'center'},
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -355,7 +415,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.accent,
   },
   submitButtonText: {
     fontSize: 16,
@@ -413,7 +473,7 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -461,7 +521,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.accent,
     paddingHorizontal: theme.spacing.lg,
   },
   primaryActionText: {

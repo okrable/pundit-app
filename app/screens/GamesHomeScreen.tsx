@@ -1,3 +1,4 @@
+import { openArchive } from '../navigation/rootNavigation';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Image,
@@ -230,7 +231,7 @@ export default function GamesHomeScreen({ navigation }: Props) {
     (!quizAvailable || isDailyPayloadLoading);
   const careerActionLabel =
     careerTileState === 'completed'
-      ? 'Player found'
+      ? (currentCareerResult?.outcome === 'given_up' ? 'Answer revealed' : 'Player found')
       : careerTileState === 'available'
         ? 'Play'
         : careerTileState === 'loading'
@@ -329,6 +330,13 @@ export default function GamesHomeScreen({ navigation }: Props) {
               }
               onPress={handleOpenQuiz}
             />
+          </GameRow>
+
+          <GameRow cardWidth={cardWidth} horizontalPadding={rowHorizontalPadding}>
+            <GameGalleryTile title="Quiz Archive" description="Past quizzes. A fresh chance."
+              artwork={<Ionicons name="calendar-outline" size={64} color={theme.colors.accent} />}
+              actionLabel="Browse quizzes" actionTone="primary" width={cardWidth}
+              onPress={openArchive} accessibilityHint="Browse and replay past five-question quizzes" />
           </GameRow>
 
           <GameRow

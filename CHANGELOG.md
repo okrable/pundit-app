@@ -2,6 +2,14 @@
 
 This project uses SemVer for app and documentation checkpoints. Dates are intentionally milestone-style until release tags provide authoritative dates.
 
+## v2.14.0 - Quiz Archive and Journey improvements
+
+- Add a separate, initially free Daily Quiz Archive with date browsing, deliberate replay and identity-isolated local restore, including cached offline continuation.
+- Add Journey player autocomplete and confirmed Give Up with canonical first-terminal-outcome persistence and spoiler-free sharing.
+- Preserve canonical Daily Quiz results on duplicate/lost-response retries, retain available answer snapshots and rebuild statistics safely from stored results.
+- Hold pooled clients until query settlement; add focused regression and release acceptance coverage.
+- Require isolated preview persistence, with additive result-detail/outcome migrations. Preserve Pundit's established fonts, artwork and orange-led styling.
+
 ## v2.13.1 - Immersive responsive Daily Quiz
 
 - Moved the Daily Quiz above global navigation with a standard back route, so

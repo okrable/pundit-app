@@ -1,7 +1,7 @@
 import { withLambda, type LambdaHandler } from '@netlify/aws-lambda-compat';
 import { queryWithClient, withTransaction } from './lib/db';
 import { requireCompletedIdentity } from './lib/identity';
-import { recomputeUserStreak } from './lib/streaks';
+import { recomputeUserQuizStats, withUserResultTransaction } from './lib/quizResults';
 
 interface FinalizeStatsRequest {
   quizId: string;
@@ -57,53 +57,13 @@ const handler: LambdaHandler = async (event) => {
       return identity.response;
     }
 
-    const quizDate = quizId.replace('quiz-', '');
-
-    const updated = await withTransaction(async (client) => {
-      const resultRows = await queryWithClient<{
-        score: number;
-        answers: boolean[];
-      }>(
-        client,
-        `SELECT score, answers
-         FROM results
-         WHERE user_id = $1 AND quiz_id = $2`,
-        [userId, quizId]
-      );
-
-      if (resultRows.length === 0) {
-        return null;
-      }
-
-      const correctCount = (resultRows[0].answers || []).filter(Boolean).length;
-
-      const updatedUsers = await queryWithClient<{ best_score: number }>(
-        client,
-        `UPDATE users
-         SET
-           best_score = GREATEST(best_score, $3),
-           total_quizzes = CASE
-             WHEN last_played = $2::DATE THEN total_quizzes
-             ELSE total_quizzes + 1
-           END,
-           total_correct = CASE
-             WHEN last_played = $2::DATE THEN total_correct
-             ELSE total_correct + $4
-           END
-         WHERE id = $1
-         RETURNING best_score`,
-        [userId, quizDate, resultRows[0].score, correctCount]
-      );
-
-      if (!updatedUsers[0]) {
-        return null;
-      }
-
-      const streakStatus = await recomputeUserStreak(client, userId, quizDate);
-      return {
-        bestScore: updatedUsers[0].best_score,
-        streak: streakStatus.current,
-      };
+    if (!/^quiz-\d{4}-\d{2}-\d{2}$/.test(quizId)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid quizId' }) };
+    }
+    const updated = await withUserResultTransaction(userId, async (client) => {
+      const rows = await queryWithClient(client,
+        'SELECT id FROM results WHERE user_id=$1 AND quiz_id=$2', [userId, quizId]);
+      return rows.length ? recomputeUserQuizStats(client, userId) : null;
     });
 
     if (!updated) {

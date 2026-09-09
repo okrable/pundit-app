@@ -17,6 +17,7 @@
     "netlify/functions/lib/questionSource.ts",
     "netlify/functions/lib/auth.ts",
     "netlify/functions/lib/challengeIdentity.ts",
-    "netlify/functions/lib/siteUrl.ts"
+    "netlify/functions/lib/siteUrl.ts",
+    "netlify/functions/lib/playerCatalog.ts"
   ]
 }
